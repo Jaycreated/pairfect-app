@@ -1,5 +1,6 @@
 import { PoppinsText } from '@/components/PoppinsText';
 import { SignUpFormData, signUpSchema } from '@/utils/validations/auth';
+import { Ionicons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router } from 'expo-router';
 import React from 'react';
@@ -7,6 +8,9 @@ import { Controller, useForm } from 'react-hook-form';
 import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
 const SignUpScreen = () => {
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
+  
   const {
     control,
     handleSubmit,
@@ -115,17 +119,30 @@ const SignUpScreen = () => {
               control={control}
               name="password"
               render={({ field: { onChange, onBlur, value } }) => (
-                <TextInput
-                  style={[
-                    styles.input,
-                    errors.password && styles.inputError,
-                  ]}
-                  placeholder="Create a password (min 8 characters)"
-                  value={value}
-                  onChangeText={onChange}
-                  onBlur={onBlur}
-                  secureTextEntry
-                />
+                <View style={styles.passwordContainer}>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      styles.passwordInput,
+                      errors.password && styles.inputError,
+                    ]}
+                    placeholder="Create a password (min 8 characters)"
+                    value={value}
+                    onChangeText={onChange}
+                    onBlur={onBlur}
+                    secureTextEntry={!showPassword}
+                  />
+                  <TouchableOpacity 
+                    style={styles.eyeIcon}
+                    onPress={() => setShowPassword(!showPassword)}
+                  >
+                    <Ionicons 
+                      name={showPassword ? 'eye-off' : 'eye'} 
+                      size={20} 
+                      color="#666" 
+                    />
+                  </TouchableOpacity>
+                </View>
               )}
             />
             {errors.password && (
@@ -141,17 +158,30 @@ const SignUpScreen = () => {
               control={control}
               name="confirmPassword"
               render={({ field: { onChange, onBlur, value } }) => (
-                <TextInput
-                  style={[
-                    styles.input,
-                    errors.confirmPassword && styles.inputError,
-                  ]}
-                  placeholder="Confirm your password"
-                  value={value}
-                  onChangeText={onChange}
-                  onBlur={onBlur}
-                  secureTextEntry
-                />
+                <View style={styles.passwordContainer}>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      styles.passwordInput,
+                      errors.confirmPassword && styles.inputError,
+                    ]}
+                    placeholder="Confirm your password"
+                    value={value}
+                    onChangeText={onChange}
+                    onBlur={onBlur}
+                    secureTextEntry={!showConfirmPassword}
+                  />
+                  <TouchableOpacity 
+                    style={styles.eyeIcon}
+                    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    <Ionicons 
+                      name={showConfirmPassword ? 'eye-off' : 'eye'} 
+                      size={20} 
+                      color="#666" 
+                    />
+                  </TouchableOpacity>
+                </View>
               )}
             />
             {errors.confirmPassword && (
@@ -233,6 +263,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     borderWidth: 1,
     borderColor: '#e0e0e0',
+    width: '100%',
+  },
+  passwordContainer: {
+    position: 'relative',
+    width: '100%',
+  },
+  passwordInput: {
+    paddingRight: 45, // Make room for the eye icon
+  },
+  eyeIcon: {
+    position: 'absolute',
+    right: 15,
+    top: '50%',
+    transform: [{ translateY: -10 }],
+    padding: 5,
   },
   inputError: {
     borderColor: '#FF3B30',
