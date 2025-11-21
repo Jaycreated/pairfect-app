@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { router } from 'expo-router';
 import React from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { Image, KeyboardAvoidingView, Platform, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
 const SignUpScreen = () => {
   const {
@@ -36,149 +36,156 @@ const SignUpScreen = () => {
     <KeyboardAvoidingView 
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
     >
-      <View style={styles.logoContainer}>
-        <Image
-          source={require('@/assets/images/LandingLogo.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        <PoppinsText weight="bold" style={styles.title}>
-          Create Account
-        </PoppinsText>
-      </View>
-
-      <View style={styles.formContainer}>
-        <View style={styles.inputContainer}>
-          <PoppinsText style={styles.label}>Full Name</PoppinsText>
-          <Controller
-            control={control}
-            name="name"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <TextInput
-                style={[
-                  styles.input,
-                  errors.name && styles.inputError,
-                ]}
-                placeholder="Enter your name"
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                autoCapitalize="words"
-              />
-            )}
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.logoContainer}>
+          <Image
+            source={require('@/assets/images/LandingLogo.png')}
+            style={styles.logo}
+            resizeMode="contain"
           />
-          {errors.name && (
-            <PoppinsText style={styles.errorText}>
-              {errors.name.message}
-            </PoppinsText>
-          )}
-        </View>
-
-        <View style={styles.inputContainer}>
-          <PoppinsText style={styles.label}>Email</PoppinsText>
-          <Controller
-            control={control}
-            name="email"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <TextInput
-                style={[
-                  styles.input,
-                  errors.email && styles.inputError,
-                ]}
-                placeholder="Enter your email"
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            )}
-          />
-          {errors.email && (
-            <PoppinsText style={styles.errorText}>
-              {errors.email.message}
-            </PoppinsText>
-          )}
-        </View>
-
-        <View style={styles.inputContainer}>
-          <PoppinsText style={styles.label}>Password</PoppinsText>
-          <Controller
-            control={control}
-            name="password"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <TextInput
-                style={[
-                  styles.input,
-                  errors.password && styles.inputError,
-                ]}
-                placeholder="Create a password (min 8 characters)"
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                secureTextEntry
-              />
-            )}
-          />
-          {errors.password && (
-            <PoppinsText style={styles.errorText}>
-              {errors.password.message}
-            </PoppinsText>
-          )}
-        </View>
-
-        <View style={styles.inputContainer}>
-          <PoppinsText style={styles.label}>Confirm Password</PoppinsText>
-          <Controller
-            control={control}
-            name="confirmPassword"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <TextInput
-                style={[
-                  styles.input,
-                  errors.confirmPassword && styles.inputError,
-                ]}
-                placeholder="Confirm your password"
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                secureTextEntry
-              />
-            )}
-          />
-          {errors.confirmPassword && (
-            <PoppinsText style={styles.errorText}>
-              {errors.confirmPassword.message}
-            </PoppinsText>
-          )}
-        </View>
-
-        <TouchableOpacity 
-          style={[
-            styles.signUpButton, 
-            isSubmitting && styles.buttonDisabled
-          ]}
-          onPress={handleSubmit(onSubmit)}
-          disabled={isSubmitting}
-        >
-          <PoppinsText weight="semiBold" style={styles.signUpButtonText}>
-            {isSubmitting ? 'Creating Account...' : 'Sign Up'}
+          <PoppinsText weight="bold" style={styles.title}>
+            Create Account
           </PoppinsText>
-        </TouchableOpacity>
+        </View>
 
-        <View style={styles.loginContainer}>
-          <PoppinsText style={styles.loginText}>
-            Already have an account?{' '}
-          </PoppinsText>
-          <TouchableOpacity onPress={() => router.replace('/(auth)/login')}>
-            <PoppinsText weight="semiBold" style={styles.loginLink}>
-              Log In
+        <View style={styles.formContainer}>
+          <View style={styles.inputContainer}>
+            <PoppinsText style={styles.label}>Full Name</PoppinsText>
+            <Controller
+              control={control}
+              name="name"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <TextInput
+                  style={[
+                    styles.input,
+                    errors.name && styles.inputError,
+                  ]}
+                  placeholder="Enter your name"
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  autoCapitalize="words"
+                />
+              )}
+            />
+            {errors.name && (
+              <PoppinsText style={styles.errorText}>
+                {errors.name.message}
+              </PoppinsText>
+            )}
+          </View>
+
+          <View style={styles.inputContainer}>
+            <PoppinsText style={styles.label}>Email</PoppinsText>
+            <Controller
+              control={control}
+              name="email"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <TextInput
+                  style={[
+                    styles.input,
+                    errors.email && styles.inputError,
+                  ]}
+                  placeholder="Enter your email"
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              )}
+            />
+            {errors.email && (
+              <PoppinsText style={styles.errorText}>
+                {errors.email.message}
+              </PoppinsText>
+            )}
+          </View>
+
+          <View style={styles.inputContainer}>
+            <PoppinsText style={styles.label}>Password</PoppinsText>
+            <Controller
+              control={control}
+              name="password"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <TextInput
+                  style={[
+                    styles.input,
+                    errors.password && styles.inputError,
+                  ]}
+                  placeholder="Create a password (min 8 characters)"
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  secureTextEntry
+                />
+              )}
+            />
+            {errors.password && (
+              <PoppinsText style={styles.errorText}>
+                {errors.password.message}
+              </PoppinsText>
+            )}
+          </View>
+
+          <View style={styles.inputContainer}>
+            <PoppinsText style={styles.label}>Confirm Password</PoppinsText>
+            <Controller
+              control={control}
+              name="confirmPassword"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <TextInput
+                  style={[
+                    styles.input,
+                    errors.confirmPassword && styles.inputError,
+                  ]}
+                  placeholder="Confirm your password"
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  secureTextEntry
+                />
+              )}
+            />
+            {errors.confirmPassword && (
+              <PoppinsText style={styles.errorText}>
+                {errors.confirmPassword.message}
+              </PoppinsText>
+            )}
+          </View>
+
+          <TouchableOpacity 
+            style={[
+              styles.signUpButton, 
+              isSubmitting && styles.buttonDisabled
+            ]}
+            onPress={handleSubmit(onSubmit)}
+            disabled={isSubmitting}
+          >
+            <PoppinsText weight="semiBold" style={styles.signUpButtonText}>
+              {isSubmitting ? 'Creating Account...' : 'Sign Up'}
             </PoppinsText>
           </TouchableOpacity>
+
+          <View style={styles.loginContainer}>
+            <PoppinsText style={styles.loginText}>
+              Already have an account?{' '}
+            </PoppinsText>
+            <TouchableOpacity onPress={() => router.replace('/(auth)/login')}>
+              <PoppinsText weight="semiBold" style={styles.loginLink}>
+                Log In
+              </PoppinsText>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 };
@@ -187,8 +194,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  scrollContent: {
     padding: 20,
-    justifyContent: 'center',
   },
   logoContainer: {
     alignItems: 'center',
@@ -208,6 +216,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 400,
     alignSelf: 'center',
+    paddingBottom: 40, // Add some padding at the bottom for better scrolling
   },
   inputContainer: {
     marginBottom: 20,

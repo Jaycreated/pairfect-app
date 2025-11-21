@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { router } from 'expo-router';
 import React from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { Image, KeyboardAvoidingView, Platform, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
 const LoginScreen = () => {
   const {
@@ -35,25 +35,32 @@ const LoginScreen = () => {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <View style={styles.logoContainer}>
-        <Image
-          source={require('@/assets/images/LandingLogo.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        <PoppinsText weight="bold" style={styles.title}>
-          Welcome Back!
-        </PoppinsText>
-        <PoppinsText style={styles.subtitle}>
-          Sign in to continue
-        </PoppinsText>
-      </View>
+    <View style={styles.container}>
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+      >
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.logoContainer}>
+            <Image
+              source={require('@/assets/images/LandingLogo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+            <PoppinsText weight="bold" style={styles.title}>
+              Welcome Back!
+            </PoppinsText>
+            <PoppinsText style={styles.subtitle}>
+              Sign in to continue
+            </PoppinsText>
+          </View>
 
-      <View style={styles.formContainer}>
+          <View style={styles.formContainer}>
         <View style={styles.inputContainer}>
           <PoppinsText style={styles.label}>Email</PoppinsText>
           <Controller
@@ -131,8 +138,10 @@ const LoginScreen = () => {
             <PoppinsText style={styles.signupLink}>Sign Up</PoppinsText>
           </TouchableOpacity>
         </View>
-      </View>
-    </KeyboardAvoidingView>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 };
 
@@ -140,11 +149,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-    paddingHorizontal: 24,
+  },
+  scrollContent: {
+    padding: 24,
+    paddingBottom: 40, // Add some padding at the bottom for better scrolling
   },
   logoContainer: {
     alignItems: 'center',
-    marginTop: 60,
+    marginTop: 40,
     marginBottom: 40,
   },
   logo: {
@@ -162,7 +174,9 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   formContainer: {
-    flex: 1,
+    width: '100%',
+    maxWidth: 400,
+    alignSelf: 'center',
   },
   inputContainer: {
     marginBottom: 24,
