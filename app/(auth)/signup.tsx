@@ -1,18 +1,35 @@
-import React, { useState } from 'react';
-import { View, TextInput, TouchableOpacity, StyleSheet, Image, KeyboardAvoidingView, Platform } from 'react-native';
 import { PoppinsText } from '@/components/PoppinsText';
+import { SignUpFormData, signUpSchema } from '@/utils/validations/auth';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { router } from 'expo-router';
+import React from 'react';
+import { Controller, useForm } from 'react-hook-form';
+import { Image, KeyboardAvoidingView, Platform, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
 const SignUpScreen = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
+  const {
+    control,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<SignUpFormData>({
+    resolver: zodResolver(signUpSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+    },
+  });
 
-  const handleSignUp = () => {
-    // Handle sign up logic here
-    console.log('Sign up with:', { name, email, password });
-    // For now, just navigate to the main app
-    router.replace('/(tabs)');
+  const onSubmit = async (data: SignUpFormData) => {
+    try {
+      console.log('Sign up with:', data);
+      // Replace with actual signup logic
+      // await AuthService.signUp(data);
+      router.replace('/(tabs)');
+    } catch (error) {
+      console.error('Sign up error:', error);
+    }
   };
 
   return (
@@ -34,44 +51,120 @@ const SignUpScreen = () => {
       <View style={styles.formContainer}>
         <View style={styles.inputContainer}>
           <PoppinsText style={styles.label}>Full Name</PoppinsText>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter your name"
-            value={name}
-            onChangeText={setName}
-            autoCapitalize="words"
+          <Controller
+            control={control}
+            name="name"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <TextInput
+                style={[
+                  styles.input,
+                  errors.name && styles.inputError,
+                ]}
+                placeholder="Enter your name"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                autoCapitalize="words"
+              />
+            )}
           />
+          {errors.name && (
+            <PoppinsText style={styles.errorText}>
+              {errors.name.message}
+            </PoppinsText>
+          )}
         </View>
 
         <View style={styles.inputContainer}>
           <PoppinsText style={styles.label}>Email</PoppinsText>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter your email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
+          <Controller
+            control={control}
+            name="email"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <TextInput
+                style={[
+                  styles.input,
+                  errors.email && styles.inputError,
+                ]}
+                placeholder="Enter your email"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            )}
           />
+          {errors.email && (
+            <PoppinsText style={styles.errorText}>
+              {errors.email.message}
+            </PoppinsText>
+          )}
         </View>
 
         <View style={styles.inputContainer}>
           <PoppinsText style={styles.label}>Password</PoppinsText>
-          <TextInput
-            style={styles.input}
-            placeholder="Create a password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
+          <Controller
+            control={control}
+            name="password"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <TextInput
+                style={[
+                  styles.input,
+                  errors.password && styles.inputError,
+                ]}
+                placeholder="Create a password (min 8 characters)"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                secureTextEntry
+              />
+            )}
           />
+          {errors.password && (
+            <PoppinsText style={styles.errorText}>
+              {errors.password.message}
+            </PoppinsText>
+          )}
+        </View>
+
+        <View style={styles.inputContainer}>
+          <PoppinsText style={styles.label}>Confirm Password</PoppinsText>
+          <Controller
+            control={control}
+            name="confirmPassword"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <TextInput
+                style={[
+                  styles.input,
+                  errors.confirmPassword && styles.inputError,
+                ]}
+                placeholder="Confirm your password"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                secureTextEntry
+              />
+            )}
+          />
+          {errors.confirmPassword && (
+            <PoppinsText style={styles.errorText}>
+              {errors.confirmPassword.message}
+            </PoppinsText>
+          )}
         </View>
 
         <TouchableOpacity 
-          style={styles.signUpButton}
-          onPress={handleSignUp}
+          style={[
+            styles.signUpButton, 
+            isSubmitting && styles.buttonDisabled
+          ]}
+          onPress={handleSubmit(onSubmit)}
+          disabled={isSubmitting}
         >
           <PoppinsText weight="semiBold" style={styles.signUpButtonText}>
-            Sign Up
+            {isSubmitting ? 'Creating Account...' : 'Sign Up'}
           </PoppinsText>
         </TouchableOpacity>
 
@@ -131,6 +224,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     borderWidth: 1,
     borderColor: '#e0e0e0',
+  },
+  inputError: {
+    borderColor: '#FF3B30',
+    backgroundColor: '#FFF0EF',
+  },
+  errorText: {
+    color: '#FF3B30',
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 4,
+  },
+  buttonDisabled: {
+    opacity: 0.7,
   },
   signUpButton: {
     backgroundColor: '#651B55',

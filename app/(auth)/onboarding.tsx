@@ -2,7 +2,7 @@ import { PoppinsText } from '@/components/PoppinsText';
 import { Storage } from '@/utils/storage';
 import { useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
-import { Dimensions, Image, NativeScrollEvent, NativeSyntheticEvent, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, NativeScrollEvent, NativeSyntheticEvent, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Animated, {
   FadeIn,
   interpolate,
@@ -106,16 +106,29 @@ export default function OnboardingScreen() {
   };
 
   const handleSkip = async () => {
-  console.log('Skip button pressed');
-  try {
-    await Storage.setItem('onboarding_completed', 'true');
-    console.log('Navigating to signup page');
-    await router.replace('/(auth)/signup');
-    console.log('Navigation complete');
-  } catch (error) {
-    console.error('Error during skip:', error);
-  }
-};
+    console.log('🔄 Skip button pressed');
+    try {
+      console.log('📱 Platform:', Platform.OS);
+      
+      if (Platform.OS === 'web') {
+        console.log('🌐 Web platform detected, using localStorage');
+        localStorage.setItem('onboarding_completed', 'true');
+        console.log('✅ localStorage updated with onboarding_completed: true');
+      } else {
+        console.log('📱 Native platform detected, using SecureStore');
+        await Storage.setItem('onboarding_completed', 'true');
+        console.log('✅ SecureStore updated with onboarding_completed: true');
+      }
+      
+      console.log('🚀 Attempting navigation to /(auth)/signup');
+      router.replace('/(auth)/signup');
+      console.log('🎉 Navigation initiated to /(auth)/signup');
+    } catch (error) {
+      console.error('❌ Error during skip:', error);
+      console.log('⚠️  Attempting fallback navigation to /(auth)/signup');
+      router.replace('/(auth)/signup');
+    }
+  };
 
   const handleComplete = async () => {
     try {

@@ -1,15 +1,15 @@
-import { Stack, useRouter } from 'expo-router';
+import { Storage } from '@/utils/storage';
+import {
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold
+} from '@expo-google-fonts/poppins';
 import { useFonts } from 'expo-font';
+import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
-import { View, ActivityIndicator } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
-import { 
-  Poppins_400Regular, 
-  Poppins_500Medium, 
-  Poppins_600SemiBold, 
-  Poppins_700Bold 
-} from '@expo-google-fonts/poppins';
+import { ActivityIndicator, View } from 'react-native';
 
 // Prevent the splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
@@ -29,16 +29,16 @@ export default function AuthLayout() {
   useEffect(() => {
     const checkOnboarding = async () => {
       try {
-        const hasCompleted = await SecureStore.getItemAsync('onboarding_completed');
+        const hasCompleted = await Storage.getItem('onboarding_completed');
         if (hasCompleted !== 'true') {
           // If not completed, redirect to onboarding
-          router.replace('/onboarding');
+          router.replace('/(auth)/onboarding');
           return;
         }
       } catch (error) {
         console.error('Error checking onboarding:', error);
         // On error, redirect to onboarding to be safe
-        router.replace('/onboarding');
+        router.replace('/(auth)/onboarding');
         return;
       } finally {
         setIsReady(true);
@@ -73,8 +73,8 @@ export default function AuthLayout() {
         headerShown: false,
         animation: 'fade',
       }}>
-        <Stack.Screen name="onboarding" />
-        <Stack.Screen name="signup" />
+        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+        <Stack.Screen name="signup" options={{ headerShown: false }} />
       </Stack>
     </View>
   );
