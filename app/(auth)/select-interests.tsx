@@ -47,8 +47,8 @@ const SelectInterests = () => {
       // Save updated user data
       await Storage.setItem('user', JSON.stringify(updatedUser));
       
-      // Navigate to main app
-      router.replace('/(tabs)');
+      // Navigate to photo upload screen
+      router.push('/(auth)/photo-upload');
     } catch (error) {
       console.error('Error saving interests:', error);
       alert('Failed to save interests. Please try again.');
