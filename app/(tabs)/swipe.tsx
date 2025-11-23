@@ -139,11 +139,16 @@ const SwipeScreen = () => {
     });
   }, [currentIndex, users, position]);
 
+  const handleCardPress = useCallback((userId: string) => {
+    // Navigate to the user's public profile
+    router.push(`/user/${userId}`);
+  }, [router]);
+
   const renderCard = (user: User, index: number) => {
     if (index < currentIndex) return null;
     
     const isTopCard = index === currentIndex;
-    const panHandlers = isTopCard ? panResponder.panHandlers : {};
+    const panResponderHandlers = isTopCard ? panResponder.panHandlers : {};
     const cardStyle = isTopCard 
       ? [
           styles.card,
@@ -160,11 +165,16 @@ const SwipeScreen = () => {
     if (!user) return null;
 
     return (
-      <Animated.View 
+      <TouchableOpacity 
         key={user.id}
-        style={[cardStyle, { zIndex: -index }]}
-        {...panHandlers}
+        activeOpacity={0.9}
+        onPress={() => handleCardPress(user.id)}
+        style={{ flex: 1 }}
       >
+        <Animated.View 
+          style={[cardStyle, { zIndex: -index }]}
+          {...panResponderHandlers}
+        >
         <Image source={{ uri: user.images[0] }} style={styles.cardImage} />
         <View style={styles.cardOverlay}>
           {isTopCard && (
@@ -211,7 +221,8 @@ const SwipeScreen = () => {
             )}
           </View>
         </View>
-      </Animated.View>
+        </Animated.View>
+      </TouchableOpacity>
     );
   };
   
