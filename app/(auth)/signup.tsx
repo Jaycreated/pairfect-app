@@ -29,8 +29,12 @@ const SignUpScreen = () => {
     try {
       console.log('Sign up with:', data);
       // Replace with actual signup logic
-      // await AuthService.signUp(data);
-      router.replace('/(tabs)');
+      // const user = await AuthService.signUp(data);
+      // Store user data if needed
+      // await SecureStore.setItemAsync('user', JSON.stringify(user));
+      
+      // Navigate to profile setup
+      router.replace('/(auth)/profile-setup');
     } catch (error) {
       console.error('Sign up error:', error);
     }

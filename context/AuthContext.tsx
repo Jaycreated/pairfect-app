@@ -89,11 +89,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         token: `dummy-jwt-${Math.random().toString(36).substr(2)}`,
       };
 
-      await Storage.setItem('user', JSON.stringify(dummyUser));
+      // Store user data temporarily without setting the user state
+      // This allows us to show the profile setup first
+      await Storage.setItem('tempUser', JSON.stringify(dummyUser));
       await Storage.setItem('token', dummyUser.token);
-      setUser(dummyUser);
       
-      router.replace('/(tabs)');
+      // Redirect to profile setup instead of main app
+      router.replace('/(auth)/profile-setup');
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign up';
       setError(errorMessage);
