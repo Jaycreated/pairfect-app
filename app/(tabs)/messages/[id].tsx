@@ -1,80 +1,89 @@
 import { PoppinsText } from '@/components/PoppinsText';
 import { useAuth } from '@/context/AuthContext';
+import { withSubscription } from '@/context/SubscriptionContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    Image,
-    Keyboard,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  ActivityIndicator,
+  FlatList,
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from 'react-native';
 
-// Mock data - in a real app, this would come from your backend
-const MOCK_MESSAGES = [
+/** ------------------ TYPES ------------------ **/
+export type ChatMessage = {
+  id: string;
+  text: string;
+  senderId: string;
+  timestamp: Date;
+};
+
+/** ------------------ MOCK DATA ------------------ **/
+const MOCK_MESSAGES: ChatMessage[] = [
   {
     id: '1',
     text: 'Hey there! How are you doing?',
     senderId: '2',
-    timestamp: new Date(Date.now() - 1000 * 60 * 5), // 5 minutes ago
+    timestamp: new Date(Date.now() - 1000 * 60 * 5),
   },
   {
     id: '2',
-    text: 'I\'m good, thanks for asking! How about you?',
-    senderId: '1', // Current user
-    timestamp: new Date(Date.now() - 1000 * 60 * 4), // 4 minutes ago
+    text: "I'm good, thanks for asking! How about you?",
+    senderId: '1',
+    timestamp: new Date(Date.now() - 1000 * 60 * 4),
   },
   {
     id: '3',
     text: 'Doing great! Just finished that project we talked about.',
     senderId: '2',
-    timestamp: new Date(Date.now() - 1000 * 60 * 3), // 3 minutes ago
+    timestamp: new Date(Date.now() - 1000 * 60 * 3),
   },
   {
     id: '4',
-    text: 'That\'s awesome! Can you share some details?',
-    senderId: '1', // Current user
-    timestamp: new Date(Date.now() - 1000 * 60 * 2), // 2 minutes ago
+    text: "That's awesome! Can you share some details?",
+    senderId: '1',
+    timestamp: new Date(Date.now() - 1000 * 60 * 2),
   },
   {
     id: '5',
-    text: 'Sure! It\'s a mobile app for connecting people with similar interests. Would you like to check it out?',
+    text: "Sure! It’s a mobile app for connecting people with similar interests. Would you like to check it out?",
     senderId: '2',
-    timestamp: new Date(), // Now
+    timestamp: new Date(),
   },
 ];
 
-// Mock user data - in a real app, this would come from your backend
 const MOCK_USER = {
   id: '2',
   name: 'Alex Johnson',
-  avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&auto=format&fit=crop&q=60',
+  avatar:
+    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&auto=format&fit=crop&q=60',
 };
 
+/** ------------------ CHAT SCREEN ------------------ **/
 const ChatScreen = () => {
   const { id } = useLocalSearchParams();
   const { user } = useAuth();
   const router = useRouter();
-  const [messages, setMessages] = useState(MOCK_MESSAGES);
+
+  const [messages, setMessages] = useState<ChatMessage[]>(MOCK_MESSAGES);
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const flatListRef = useRef<FlatList>(null);
 
-  // In a real app, you would fetch the conversation and messages here
+  const flatListRef = useRef<FlatList<ChatMessage>>(null);
+
   useEffect(() => {
     const fetchMessages = async () => {
       setIsLoading(true);
       try {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 500));
-        // In a real app, you would set the messages from the API response
+        await new Promise((resolve) => setTimeout(resolve, 500));
       } catch (error) {
         console.error('Error fetching messages:', error);
       } finally {
@@ -88,50 +97,57 @@ const ChatScreen = () => {
   const handleSend = useCallback(() => {
     if (!newMessage.trim()) return;
 
-    // In a real app, you would send the message to your backend
-    const newMsg = {
+    const newMsg: ChatMessage = {
       id: Date.now().toString(),
       text: newMessage,
       senderId: user?.id || '1',
       timestamp: new Date(),
     };
 
-    setMessages(prev => [...prev, newMsg]);
+    setMessages((prev) => [...prev, newMsg]);
     setNewMessage('');
-    
-    // Scroll to bottom after sending a message
+
     setTimeout(() => {
       flatListRef.current?.scrollToEnd({ animated: true });
     }, 100);
   }, [newMessage, user?.id]);
 
-  const renderMessage = useCallback(({ item }) => {
-    const isCurrentUser = item.senderId === user?.id;
-    
-    return (
-      <View 
-        style={[
-          styles.messageBubble,
-          isCurrentUser ? styles.currentUserBubble : styles.otherUserBubble,
-        ]}
-      >
-        {!isCurrentUser && (
-          <Image source={{ uri: MOCK_USER.avatar }} style={styles.avatar} />
-        )}
-        <View 
+  /** ---- FIXED ⚠️: item now has a proper type ---- **/
+  const renderMessage = useCallback(
+    ({ item }: { item: ChatMessage }) => {
+      const isCurrentUser = item.senderId === user?.id;
+
+      return (
+        <View
           style={[
-            styles.messageContent,
-            isCurrentUser ? styles.currentUserMessage : styles.otherUserMessage,
+            styles.messageBubble,
+            isCurrentUser ? styles.currentUserBubble : styles.otherUserBubble,
           ]}
         >
-          <PoppinsText style={styles.messageText}>{item.text}</PoppinsText>
-          <PoppinsText style={styles.timestamp}>
-            {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </PoppinsText>
+          {!isCurrentUser && (
+            <Image source={{ uri: MOCK_USER.avatar }} style={styles.avatar} />
+          )}
+          <View
+            style={[
+              styles.messageContent,
+              isCurrentUser
+                ? styles.currentUserMessage
+                : styles.otherUserMessage,
+            ]}
+          >
+            <PoppinsText style={styles.messageText}>{item.text}</PoppinsText>
+            <PoppinsText style={styles.timestamp}>
+              {new Date(item.timestamp).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </PoppinsText>
+          </View>
         </View>
-      </View>
-    );
-  }, [user?.id]);
+      );
+    },
+    [user?.id]
+  );
 
   if (isLoading) {
     return (
@@ -142,7 +158,7 @@ const ChatScreen = () => {
   }
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
@@ -174,10 +190,10 @@ const ChatScreen = () => {
             renderItem={renderMessage}
             contentContainerStyle={styles.messagesList}
             showsVerticalScrollIndicator={false}
-            onContentSizeChange={() => 
+            onContentSizeChange={() =>
               flatListRef.current?.scrollToEnd({ animated: true })
             }
-            onLayout={() => 
+            onLayout={() =>
               flatListRef.current?.scrollToEnd({ animated: true })
             }
           />
@@ -197,22 +213,19 @@ const ChatScreen = () => {
           placeholderTextColor="#999"
           multiline
         />
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.sendButton, !newMessage && styles.sendButtonDisabled]}
           onPress={handleSend}
           disabled={!newMessage}
         >
-          <Ionicons 
-            name="send" 
-            size={20} 
-            color={newMessage ? '#fff' : '#999'} 
-          />
+          <Ionicons name="send" size={20} color={newMessage ? '#fff' : '#999'} />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
 };
 
+/** ------------------ STYLES ------------------ **/
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -305,9 +318,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
-  currentUserText: {
-    color: '#fff',
-  },
   timestamp: {
     fontSize: 10,
     color: '#999',
@@ -351,4 +361,7 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ChatScreen;
+/** ------------------ EXPORT WITH SUBSCRIPTION LOCK ------------------ **/
+export default withSubscription(ChatScreen, {
+  redirectTo: '/(tabs)/subscribe',
+});

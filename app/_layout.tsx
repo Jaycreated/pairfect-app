@@ -1,6 +1,7 @@
 
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { NotificationProvider } from '@/context/NotificationContext';
+import { SubscriptionProvider } from '@/context/SubscriptionContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Storage } from '@/utils/storage';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
@@ -124,18 +125,20 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme();
 
   return (
-    <AuthProvider>
-      <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
         <NotificationProvider>
-          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <FontWrapper>
-              <AuthLayout />
-              <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-            </FontWrapper>
-          </ThemeProvider>
+          <SubscriptionProvider>
+            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+              <FontWrapper>
+                <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+                <AuthLayout />
+              </FontWrapper>
+            </ThemeProvider>
+          </SubscriptionProvider>
         </NotificationProvider>
-      </QueryClientProvider>
-    </AuthProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 
