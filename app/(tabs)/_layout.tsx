@@ -25,35 +25,25 @@ export default function TabLayout() {
   }, []);
 
   return (
-    <Tabs screenOptions={{
-      header: () => <Header />,
-      tabBarActiveTintColor: '#651B55',
-      tabBarInactiveTintColor: 'gray',
-      tabBarStyle: {
-        backgroundColor: '#fff',
-        borderTopWidth: 1,
-        borderTopColor: '#f0f0f0',
-        height: 60,
-        paddingBottom: 8,
-      },
-      tabBarLabelStyle: {
-        fontSize: 12,
-        marginBottom: 4,
-      },
-    }}>
-      <Tabs.Screen
-        name="swipe"
-        options={{
-          title: 'Swipe',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? 'swap-horizontal' : 'swap-horizontal-outline'} 
-              size={24} 
-              color={color} 
-            />
-          ),
-        }}
-      />
+    <Tabs
+      screenOptions={{
+        header: () => <Header />,
+        tabBarActiveTintColor: '#000000',
+        tabBarInactiveTintColor: '#000000',
+        tabBarStyle: {
+          backgroundColor: '#fff',
+          borderTopWidth: 1,
+          borderTopColor: '#f0f0f0',
+          height: 60,
+          paddingBottom: 8,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          marginBottom: 4,
+        },
+      }}
+    >
+     
       <Tabs.Screen
         name="matches"
         options={{
@@ -61,6 +51,19 @@ export default function TabLayout() {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               name={focused ? 'heart' : 'heart-outline'} 
+              size={24} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="swipe"
+        options={{
+          title: 'Swipe',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              name={focused ? 'swap-horizontal' : 'swap-horizontal-outline'} 
               size={24} 
               color={color} 
             />
@@ -81,30 +84,41 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="notifications"
+        name="settings"
         options={{
-          title: 'Notifications',
+          title: 'Settings',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
-              name={focused ? 'notifications' : 'notifications-outline'} 
+              name={focused ? 'settings' : 'settings-outline'} 
               size={24} 
-              color={color}
+              color={color} 
             />
           ),
-          tabBarBadge: 2, // Example badge count
+        }}
+      />
+      <Tabs.Screen
+        name="help-support"
+        options={{
+          title: 'Help',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              name={focused ? 'help-circle' : 'help-circle-outline'} 
+              size={24} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          href: null, // This hides it from the tab bar
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? 'person' : 'person-outline'} 
-              size={24} 
-              color={color} 
-            />
-          ),
+          href: null, // This hides it from the tab bar
         }}
       />
     </Tabs>
