@@ -166,7 +166,7 @@ const SwipeScreen = () => {
         key={user.id}
         activeOpacity={0.9}
         onPress={() => handleCardPress(user.id)}
-        style={{ flex: 1 , borderColor: 'black' , borderWidth: 1}}
+        style={{ flex: 1}}
       >
         <Animated.View 
           style={cardStyle}
@@ -213,7 +213,23 @@ const SwipeScreen = () => {
                 </View>
             )}
           </View>
+             <View style={styles.footer}>
+        <TouchableOpacity
+          style={[styles.button, styles.nopeButton]}
+          onPress={handleNope}
+        >
+          <Ionicons name="close" size={24} color="#FFFFFF" />
+        </TouchableOpacity>
+      
+        <TouchableOpacity
+          style={[styles.button, styles.likeButton]}
+          onPress={handleLike}
+        >
+          <Ionicons name="heart" size={24} color="#FF0A0A" />
+        </TouchableOpacity>
+      </View>
       </TouchableOpacity>
+      
       </View>
     );
   };
@@ -233,7 +249,7 @@ const SwipeScreen = () => {
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
         <PoppinsText weight="bold" style={styles.headerTitle}>
-          Discover people around you
+          <Text>Discover people around you</Text>
         </PoppinsText>
         <View style={{ width: 24 }} />
       </View>
@@ -265,22 +281,6 @@ const SwipeScreen = () => {
         )}
       </View>
       </ScrollView>
-
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.button, styles.nopeButton]}
-          onPress={handleNope}
-        >
-          <Ionicons name="close" size={32} color="#FF3B30" />
-        </TouchableOpacity>
-      
-        <TouchableOpacity
-          style={[styles.button, styles.likeButton]}
-          onPress={handleLike}
-        >
-          <Ionicons name="heart" size={32} color="#4CD964" />
-        </TouchableOpacity>
-      </View>
     </View>
   );
 };
@@ -303,9 +303,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     paddingTop: 10,
-    backgroundColor: '#FFF',
-    borderBottomWidth: 1,
-    borderBottomColor: 'black',
+ 
   },
   headerTitle: {
     fontSize: 20,
@@ -321,8 +319,6 @@ const styles = StyleSheet.create({
     height: 300,
     maxWidth: 350,
     alignSelf: 'center',
-    borderColor: 'black',
-    borderWidth: 1,
   },
   card: {
     width: '100%',
@@ -454,17 +450,13 @@ const styles = StyleSheet.create({
   },
   footer: {
     flexDirection: 'row',
-    justifyContent: 'space-evenly',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    paddingBottom: 10,
-    backgroundColor: '#FFF',
-    borderTopWidth: 1,
-    borderTopColor: 'black',
+    marginTop: 10,
   },
   button: {
-    width: 60,
-    height: 60,
+    width: 50,
+    height: 50,
     borderRadius: 30,
     backgroundColor: '#FFF',
     justifyContent: 'center',
@@ -480,11 +472,13 @@ const styles = StyleSheet.create({
   },
   nopeButton: {
     borderWidth: 1,
-    borderColor: '#FF3B30',
+    borderColor: '#E03131',
+    backgroundColor: '#E03131',
   },
   likeButton: {
     borderWidth: 1,
-    borderColor: '#4CD964',
+    borderColor: '#FFCFF4',
+    backgroundColor: '#FFCFF4',
   },
   boostButton: {
     borderWidth: 1,
