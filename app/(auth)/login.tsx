@@ -1,40 +1,53 @@
 import { PoppinsText } from '@/components/PoppinsText';
+import { useAuth } from '@/context/AuthContext';
 import { LoginFormData, loginSchema } from '@/utils/validations/auth';
 import { Ionicons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router } from 'expo-router';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
 const LoginScreen = () => {
   const [showPassword, setShowPassword] = React.useState(false);
+  const { signIn, isLoading, error } = useAuth();
   
   const {
     control,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: '',
-      password: '',
+      email: 'test@example.com', // Pre-fill for testing
+      password: 'password123',  // Pre-fill for testing
     },
   });
 
+  // Handle auth errors
+  useEffect(() => {
+    if (error) {
+      Alert.alert('Login Failed', error);
+    }
+  }, [error]);
+
   const onSubmit = async (data: LoginFormData) => {
     try {
-      console.log('Login with:', data);
-      // Replace with actual login logic
-      // await AuthService.login(data);
-      router.replace('/(tabs)');
+      await signIn(data);
+      // The actual navigation will be handled by the auth state change in AuthContext
     } catch (error) {
+      // Errors are already handled by the auth context
       console.error('Login error:', error);
     }
   };
 
   const navigateToSignUp = () => {
     router.replace('/(auth)/signup');
+  };
+
+  const navigateToForgotPassword = () => {
+    // TODO: Implement forgot password flow
+    Alert.alert('Forgot Password', 'Please contact support to reset your password.');
   };
 
   return (
@@ -51,109 +64,95 @@ const LoginScreen = () => {
         >
           <View style={styles.logoContainer}>
             <Image
-              source={require('@/assets/images/LandingLogo.png')}
+              source={require('@/assets/images/logo.png')}
               style={styles.logo}
               resizeMode="contain"
             />
-            <PoppinsText weight="bold" style={styles.title}>
-              Welcome Back!
-            </PoppinsText>
-            <PoppinsText style={styles.subtitle}>
-              Sign in to continue
-            </PoppinsText>
           </View>
 
           <View style={styles.formContainer}>
-        <View style={styles.inputContainer}>
-          <PoppinsText style={styles.label}>Email</PoppinsText>
-          <Controller
-            control={control}
-            name="email"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <TextInput
-                style={[
-                  styles.input,
-                  errors.email && styles.inputError,
-                ]}
-                placeholder="Enter your email"
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            )}
-          />
-          {errors.email && (
-            <PoppinsText style={styles.errorText}>
-              {errors.email.message}
-            </PoppinsText>
-          )}
-        </View>
-
-        <View style={styles.inputContainer}>
-          <PoppinsText style={styles.label}>Password</PoppinsText>
-          <Controller
-            control={control}
-            name="password"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <View style={styles.passwordContainer}>
-                <TextInput
-                  style={[
-                    styles.input,
-                    styles.passwordInput,
-                    errors.password && styles.inputError,
-                  ]}
-                  placeholder="Enter your password"
-                  value={value}
-                  onChangeText={onChange}
-                  onBlur={onBlur}
-                  secureTextEntry={!showPassword}
-                />
-                <TouchableOpacity 
-                  style={styles.eyeIcon}
-                  onPress={() => setShowPassword(!showPassword)}
-                >
-                  <Ionicons 
-                    name={showPassword ? 'eye-off' : 'eye'} 
-                    size={20} 
-                    color="#666" 
+            <Controller
+              control={control}
+              name="email"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Email"
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    value={value}
+                    onChangeText={onChange}
+                    onBlur={onBlur}
                   />
-                </TouchableOpacity>
-              </View>
+                </View>
+              )}
+            />
+            {errors.email && (
+              <PoppinsText style={styles.errorText}>
+                {errors.email.message}
+              </PoppinsText>
             )}
-          />
-          {errors.password && (
-            <PoppinsText style={styles.errorText}>
-              {errors.password.message}
-            </PoppinsText>
-          )}
-          <TouchableOpacity style={styles.forgotPassword}>
-            <PoppinsText style={styles.forgotPasswordText}>
-              Forgot Password?
-            </PoppinsText>
-          </TouchableOpacity>
-        </View>
 
-        <TouchableOpacity 
-          style={[styles.button, isSubmitting && styles.buttonDisabled]}
-          onPress={handleSubmit(onSubmit)}
-          disabled={isSubmitting}
-        >
-          <PoppinsText weight="bold" style={styles.buttonText}>
-            {isSubmitting ? 'Signing in...' : 'Sign In'}
-          </PoppinsText>
-        </TouchableOpacity>
+            <Controller
+              control={control}
+              name="password"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <View style={[styles.inputContainer, styles.passwordInput]}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Password"
+                    secureTextEntry={!showPassword}
+                    value={value}
+                    onChangeText={onChange}
+                    onBlur={onBlur}
+                  />
+                  <TouchableOpacity
+                    style={styles.eyeIcon}
+                    onPress={() => setShowPassword(!showPassword)}
+                  >
+                    <Ionicons 
+                      name={showPassword ? 'eye-off' : 'eye'} 
+                      size={20} 
+                      color="#666" 
+                    />
+                  </TouchableOpacity>
+                </View>
+              )}
+            />
+            {errors.password && (
+              <PoppinsText style={styles.errorText}>
+                {errors.password.message}
+              </PoppinsText>
+            )}
 
-        <View style={styles.signupContainer}>
-          <PoppinsText style={styles.signupText}>
-            Don't have an account?{' '}
-          </PoppinsText>
-          <TouchableOpacity onPress={navigateToSignUp}>
-            <PoppinsText style={styles.signupLink}>Sign Up</PoppinsText>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              style={[styles.button, isLoading && styles.buttonDisabled]}
+              onPress={handleSubmit(onSubmit)}
+              disabled={isLoading}
+            >
+              <PoppinsText style={styles.buttonText}>
+                {isLoading ? 'Logging in...' : 'Login'}
+              </PoppinsText>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.forgotPasswordButton}
+              onPress={navigateToForgotPassword}
+            >
+              <PoppinsText style={styles.forgotPasswordText}>
+                Forgot Password?
+              </PoppinsText>
+            </TouchableOpacity>
+
+            <View style={styles.signupContainer}>
+              <PoppinsText style={styles.signupText}>
+                Don't have an account?{' '}
+              </PoppinsText>
+              <TouchableOpacity onPress={navigateToSignUp}>
+                <PoppinsText style={styles.signupLink}>Sign Up</PoppinsText>
+              </TouchableOpacity>
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -167,95 +166,64 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   scrollContent: {
-    padding: 24,
-    paddingBottom: 40, // Add some padding at the bottom for better scrolling
+    flexGrow: 1,
+    padding: 20,
   },
   logoContainer: {
     alignItems: 'center',
-    marginTop: 40,
-    marginBottom: 40,
+    marginVertical: 40,
   },
   logo: {
-    width: 120,
-    height: 120,
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 28,
-    color: '#1E1E1E',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
+    width: 150,
+    height: 150,
   },
   formContainer: {
-    width: '100%',
-    maxWidth: 400,
-    alignSelf: 'center',
+    flex: 1,
   },
   inputContainer: {
-    marginBottom: 24,
-  },
-  label: {
-    fontSize: 14,
-    color: '#333',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 10,
-    padding: 15,
-    fontSize: 16,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-    width: '100%',
-  },
-  passwordContainer: {
-    position: 'relative',
-    width: '100%',
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   passwordInput: {
-    paddingRight: 45, // Make room for the eye icon
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    paddingVertical: 8,
   },
   eyeIcon: {
-    position: 'absolute',
-    right: 15,
-    top: '50%',
-    transform: [{ translateY: -10 }],
-    padding: 5,
-  },
-  inputError: {
-    borderColor: '#FF3B30',
-    backgroundColor: '#FFF0EF',
-  },
-  errorText: {
-    color: '#FF3B30',
-    fontSize: 12,
-    marginTop: 4,
-    marginLeft: 4,
-  },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-  forgotPassword: {
-    alignSelf: 'flex-end',
-    marginTop: 8,
-  },
-  forgotPasswordText: {
-    color: '#666',
-    fontSize: 14,
+    padding: 8,
   },
   button: {
     backgroundColor: '#1E1E1E',
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 24,
   },
   buttonText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  forgotPasswordButton: {
+    alignSelf: 'flex-end',
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  forgotPasswordText: {
+    color: '#666',
+    fontSize: 14,
+    textDecorationLine: 'underline',
   },
   signupContainer: {
     flexDirection: 'row',
@@ -268,6 +236,13 @@ const styles = StyleSheet.create({
   signupLink: {
     color: '#1E1E1E',
     fontWeight: '600',
+  },
+  errorText: {
+    color: '#FF3B30',
+    fontSize: 12,
+    marginTop: -8,
+    marginBottom: 8,
+    marginLeft: 4,
   },
 });
 

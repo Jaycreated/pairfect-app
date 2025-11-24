@@ -1,51 +1,94 @@
+import { api } from '@/services/api';
 import { SignInCredentials, SignUpData, User } from '@/types/auth';
-
-type ErrorWithMessage = {
-  message: string;
-};
-
-import { Storage } from '@/utils/storage';
 import { router } from 'expo-router';
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import * as SecureStore from 'expo-secure-store';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
 type AuthContextType = {
+  // User state
   user: User | null;
-  signIn: (credentials: SignInCredentials) => Promise<void>;
-  signUp: (data: SignUpData) => Promise<void>;
+  profile: User | null;
+  isProfileLoading: boolean;
+  
+  // Auth methods
+  signIn: (credentials: SignInCredentials) => Promise<User>;
+  signUp: (data: SignUpData) => Promise<User>;
   signOut: () => Promise<void>;
+  
+  // Loading and error states
   isLoading: boolean;
   error: string | null;
+  
+  // Profile methods
+  updateProfile: (userData: Partial<User>) => Promise<Partial<User>>;
+  refreshProfile: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Load user profile
+  const loadProfile = useCallback(async () => {
+    if (!user) return;
+    
+    setIsProfileLoading(true);
+    try {
+      const response = await api.getProfile();
+      if (response.data) {
+        setProfile(response.data);
+      }
+    } catch (error) {
+      console.error('Failed to load profile:', error);
+    } finally {
+      setIsProfileLoading(false);
+    }
+  }, [user]);
+
+  // Update profile function
+  const updateProfile = async (userData: Partial<User>) => {
+    try {
+      const response = await api.updateProfile(userData);
+      if (response.data) {
+        setProfile(prev => ({ ...prev, ...response.data } as User));
+      }
+      return response.data;
+    } catch (error) {
+      console.error('Update profile error:', error);
+      throw error;
+    }
+  };
+
+  // Refresh profile function
+  const refreshProfile = useCallback(async () => {
+    await loadProfile();
+  }, [loadProfile]);
 
   // Check if user is logged in on initial load
   useEffect(() => {
-    const loadUser = async () => {
+    const checkAuth = async () => {
       try {
-        const userData = await Storage.getItem('user');
-        const token = await Storage.getItem('token');
-        
-        if (userData && token) {
-          setUser(JSON.parse(userData));
+        const token = await SecureStore.getItemAsync('auth_token');
+        if (token) {
+          // If we have a token, try to load the user profile
+          await loadProfile();
         }
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : 'Failed to load user';
-        console.error('Failed to load user:', errorMessage);
+      } catch (error) {
+        console.error('Auth check failed:', error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadUser();
-  }, []);
+    checkAuth();
+  }, [loadProfile]);
 
-  const signIn = async ({ email, password }: SignInCredentials) => {
+  const signIn = async ({ email, password }: SignInCredentials): Promise<User> => {
     setIsLoading(true);
     setError(null);
     
@@ -59,73 +102,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           token: 'dummy-jwt-token',
         };
 
-        await Storage.setItem('user', JSON.stringify(dummyUser));
-        await Storage.setItem('token', dummyUser.token);
+        // In a real app, you would get the token from the API response
+        await SecureStore.setItemAsync('auth_token', dummyUser.token);
+        
         setUser(dummyUser);
+        setProfile(dummyUser);
         
         router.replace('/(tabs)');
+        return dummyUser;
       } else {
         throw new Error('Invalid email or password');
       }
-    } catch (error: unknown) {
+    } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign in';
       setError(errorMessage);
-      throw new Error(errorMessage);
+      throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const signUp = async ({ name, email, password }: SignUpData) => {
+  const signUp = async (data: SignUpData): Promise<User> => {
     setIsLoading(true);
-    setError(null);
-    
-    try {
-      // Dummy registration - replace with actual API call
-      const dummyUser: User = {
-        id: Math.random().toString(36).substr(2, 9),
-        email,
-        name,
-        token: `dummy-jwt-${Math.random().toString(36).substr(2)}`,
-      };
-
-      // Store user data temporarily without setting the user state
-      // This allows us to show the profile setup first
-      await Storage.setItem('tempUser', JSON.stringify(dummyUser));
-      await Storage.setItem('token', dummyUser.token);
-      
-      // Redirect to profile setup instead of main app
-      router.replace('/(auth)/profile-setup');
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to sign up';
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const signOut = async () => {
     try {
-      await Storage.deleteItem('user');
-      await Storage.deleteItem('token');
+      // Clear all auth state
+      await SecureStore.deleteItemAsync('auth_token');
       setUser(null);
+      setProfile(null);
+      setError(null);
+      
+      // Redirect to login
       router.replace('/(auth)/login');
     } catch (error) {
-      console.error('Failed to sign out:', error);
+      console.warn('Logout failed:', error);
       throw error;
     }
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        signIn,
-        signUp,
-        signOut,
-        isLoading,
+    <AuthContext.Provider 
+      value={{ 
+        user, 
+        profile,
+        isProfileLoading,
+        signIn, 
+        signUp, 
+        signOut, 
+        isLoading, 
         error,
+        updateProfile,
+        refreshProfile
       }}
     >
       {children}
