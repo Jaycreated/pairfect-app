@@ -34,8 +34,8 @@ const HelpSupportScreen = () => {
             <Ionicons name="compass" size={24} color="#2e7d32" />
           </View>
           <View style={styles.navTextContainer}>
-            <Text style={styles.navTitle}>Discover</Text>
-            <Text style={styles.navDescription}>Browse through potential matches in your area</Text>
+            <Text style={styles.navTitle}>Discover & Swipe</Text>
+            <Text style={styles.navDescription}>Swipe right to like or left to pass on profiles in your area</Text>
           </View>
         </View>
 
@@ -96,9 +96,9 @@ const HelpSupportScreen = () => {
             <Text style={styles.stepNumberText}>2</Text>
           </View>
           <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Discover Matches</Text>
+            <Text style={styles.stepTitle}>Discover & Swipe</Text>
             <Text style={styles.stepDescription}>
-              Swipe right to like or left to pass on profiles that interest you.
+              Browse through profiles and swipe right to like or left to pass on potential matches.
             </Text>
           </View>
         </View>

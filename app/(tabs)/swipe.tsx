@@ -3,15 +3,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
 import {
-    Alert,
-    Animated,
-    Dimensions,
-    Image,
-    PanResponder,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Alert,
+  Animated,
+  Dimensions,
+  Image,
+  PanResponder,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
@@ -27,7 +28,7 @@ const MOCK_USERS = [
     bio: 'Adventure seeker and coffee enthusiast. Let\'s explore the world together!',
     distance: '2 miles',
     location: 'San Francisco',
-    interests: ['Hiking', 'Photography', 'Coffee', 'Travel'],
+    interest: 'Hiking',
     images: [
       'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&auto=format&fit=crop&q=60',
       'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=500&auto=format&fit=crop&q=60',
@@ -40,7 +41,7 @@ const MOCK_USERS = [
     bio: 'Foodie and travel lover. Looking for someone to try new restaurants with!',
     distance: '3 miles',
     location: 'San Francisco',
-    interests: ['Foodie', 'Travel', 'Yoga', 'Reading'],
+    interest: 'Foodie',
     images: [
       'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=500&auto=format&fit=crop&q=60',
       'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=500&auto=format&fit=crop&q=60',
@@ -144,54 +145,50 @@ const SwipeScreen = () => {
     router.push(`/user/${userId}`);
   }, [router]);
 
-  const renderCard = (user: User, index: number) => {
-    if (index < currentIndex) return null;
-    
-    const isTopCard = index === currentIndex;
-    const panResponderHandlers = isTopCard ? panResponder.panHandlers : {};
-    const cardStyle = isTopCard 
-      ? [
-          styles.card,
-          {
-            transform: [
-              { translateX: position.x },
-              { translateY: position.y },
-              { rotate },
-            ],
-          },
-        ]
-      : styles.card;
+  const renderCard = (user: User) => {
+    const panResponderHandlers = panResponder.panHandlers;
+    const cardStyle = [
+      styles.card,
+      {
+        transform: [
+          { translateX: position.x },
+          { translateY: position.y },
+          { rotate },
+        ],
+      },
+    ];
 
     if (!user) return null;
 
     return (
+      <View style={styles.cardContainer}>
       <TouchableOpacity 
         key={user.id}
         activeOpacity={0.9}
         onPress={() => handleCardPress(user.id)}
-        style={{ flex: 1 }}
+        style={{ flex: 1 , borderColor: 'black' , borderWidth: 1}}
       >
         <Animated.View 
-          style={[cardStyle, { zIndex: -index }]}
+          style={cardStyle}
           {...panResponderHandlers}
         >
         <Image source={{ uri: user.images[0] }} style={styles.cardImage} />
         <View style={styles.cardOverlay}>
-          {isTopCard && (
-            <>
-              <Animated.View 
-                style={[styles.likeBadgeContainer, { opacity: likeOpacity }]}
-              >
-                <Text style={styles.likeText}>LIKE</Text>
-              </Animated.View>
-              <Animated.View 
-                style={[styles.nopeBadgeContainer, { opacity: nopeOpacity }]}
-              >
-                <Text style={styles.nopeText}>NOPE</Text>
-              </Animated.View>
-            </>
-          )}
-          <View style={styles.cardFooter}>
+          <Animated.View 
+            style={[styles.likeBadgeContainer, { opacity: likeOpacity }]}
+          >
+            <Text style={styles.likeText}>LIKE</Text>
+          </Animated.View>
+          <Animated.View 
+            style={[styles.nopeBadgeContainer, { opacity: nopeOpacity }]}
+          >
+            <Text style={styles.nopeText}>NOPE</Text>
+          </Animated.View>
+       
+        </View>
+        
+        </Animated.View>
+           <View style={styles.cardFooter}>
             <View>
               <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
                 <PoppinsText weight="bold" style={styles.cardName}>
@@ -202,27 +199,22 @@ const SwipeScreen = () => {
                 </PoppinsText>
               </View>
               <View style={styles.cardLocation}>
-                <Ionicons name="location-sharp" size={16} color="#FFF" style={{ marginRight: 4 }} />
+                <Ionicons name="location-sharp" size={16} color="#651B55" style={{ marginRight: 4 }} />
                 <PoppinsText style={{ fontSize: 16 }}>
-                  {user.distance} • {user.location}
+                 {user.location}
                 </PoppinsText>
               </View>
             </View>
-            {user.interests && user.interests.length > 0 && (
-              <View style={styles.interestsContainer}>
-                {user.interests.slice(0, 4).map((interest, idx) => (
-                  <View key={idx} style={styles.interestTag}>
-                    <PoppinsText style={styles.interestText}>
-                      {interest}
-                    </PoppinsText>
-                  </View>
-                ))}
-              </View>
+            {user.interest && (
+                <View>
+                  <PoppinsText style={styles.interestText}>
+                    <Text style={styles.interestsText}>Interest: {user.interest}</Text>
+                  </PoppinsText>
+                </View>
             )}
           </View>
-        </View>
-        </Animated.View>
       </TouchableOpacity>
+      </View>
     );
   };
   
@@ -241,15 +233,22 @@ const SwipeScreen = () => {
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
         <PoppinsText weight="bold" style={styles.headerTitle}>
-          Discover
+          Discover people around you
         </PoppinsText>
         <View style={{ width: 24 }} />
       </View>
 
-      <View style={styles.swiperContainer}>
-        {users.length > 0 ? (
-          users.map((user, index) => renderCard(user, index))
-        ) : (
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollViewContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.swiperContainer}>
+          {users.length > 0 && currentIndex < users.length ? (
+            <View style={styles.cardContainer}>
+              {renderCard(users[currentIndex])}
+            </View>
+          ) : (
           <View style={styles.noMoreCards}>
             <PoppinsText style={styles.noMoreCardsText}>
               No more profiles to show
@@ -265,6 +264,7 @@ const SwipeScreen = () => {
           </View>
         )}
       </View>
+      </ScrollView>
 
       <View style={styles.footer}>
         <TouchableOpacity
@@ -273,12 +273,7 @@ const SwipeScreen = () => {
         >
           <Ionicons name="close" size={32} color="#FF3B30" />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, styles.boostButton]}
-          onPress={() => console.log('Boost')}
-        >
-          <Ionicons name="flash" size={24} color="#9B59B6" />
-        </TouchableOpacity>
+      
         <TouchableOpacity
           style={[styles.button, styles.likeButton]}
           onPress={handleLike}
@@ -293,42 +288,53 @@ const SwipeScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF',
+    backgroundColor: '#F5F5F5',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollViewContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    paddingTop: 50,
+    paddingTop: 10,
     backgroundColor: '#FFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E8E8E8',
+    borderBottomColor: 'black',
   },
   headerTitle: {
     fontSize: 20,
     color: '#000',
   },
   swiperContainer: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  cardContainer: {
+    width: '100%',
+    height: 300,
+    maxWidth: 350,
+    alignSelf: 'center',
+    borderColor: 'black',
+    borderWidth: 1,
   },
   card: {
-    position: 'relative',
-    backgroundColor: '#FFF',
-    width: width * 0.9,
-    height: height * 0.7,
+    width: '100%',
+    height: '100%',
     borderRadius: 20,
+    backgroundColor: '#FFF',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
-    alignSelf: 'center',
-    marginTop: 20,
+    overflow: 'hidden',
   },
   cardImage: {
     width: '100%',
@@ -411,63 +417,50 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   cardFooter: {
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    padding: 20,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    paddingTop: 12,
+    paddingRight: 12,
+    color: '#000000',
+    paddingLeft: 12,
     marginHorizontal: -20,
-    marginBottom: -20,
   },
   cardName: {
-    fontSize: 32,
-    color: '#FFF',
+    fontSize: 24,
+    color: '#651B55',
     marginBottom: 4,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
+    fontWeight: 600,
+
   },
   cardAge: {
     fontSize: 24,
-    color: '#FFF',
-    fontWeight: '300',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
+    color: '#651B55',
+    fontWeight: '600',
   },
   cardLocation: {
     fontSize: 16,
-    color: '#FFF',
+    color: '#651B55',
     marginBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
   },
-  interestsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 8,
-  },
-  interestTag: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 15,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginRight: 8,
-    marginBottom: 8,
-  },
+ 
   interestText: {
-    color: '#FFF',
+    color: '#651B55',
     fontSize: 12,
     fontWeight: '500',
+  },
+  interestsText : {
+    color: '#651B55',
+    fontSize: 16,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-evenly',
     alignItems: 'center',
     padding: 20,
-    paddingBottom: 40,
+    paddingBottom: 10,
     backgroundColor: '#FFF',
     borderTopWidth: 1,
-    borderTopColor: '#E8E8E8',
+    borderTopColor: 'black',
   },
   button: {
     width: 60,

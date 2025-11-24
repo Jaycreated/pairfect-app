@@ -1,3 +1,4 @@
+import { Header } from '@/components/Header';
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs, useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
@@ -25,7 +26,7 @@ export default function TabLayout() {
 
   return (
     <Tabs screenOptions={{
-      headerShown: false,
+      header: () => <Header />,
       tabBarActiveTintColor: '#651B55',
       tabBarInactiveTintColor: 'gray',
       tabBarStyle: {
@@ -41,12 +42,12 @@ export default function TabLayout() {
       },
     }}>
       <Tabs.Screen
-        name="index"
+        name="swipe"
         options={{
-          title: 'Discover',
+          title: 'Swipe',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
-              name={focused ? 'compass' : 'compass-outline'} 
+              name={focused ? 'swap-horizontal' : 'swap-horizontal-outline'} 
               size={24} 
               color={color} 
             />
