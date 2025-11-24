@@ -3,11 +3,13 @@ import { AuthProvider } from '@/context/AuthContext';
 import { NotificationProvider } from '@/context/NotificationContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { QueryClientProvider } from '@tanstack/react-query';
 import * as Notifications from 'expo-notifications';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
 import 'react-native-reanimated';
+import { queryClient } from '../lib/queryClient';
 import './global.css';
 
 // Configure notification behavior
@@ -53,5 +55,9 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
-  return <RootLayoutNav />;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <RootLayoutNav />
+    </QueryClientProvider>
+  );
 }

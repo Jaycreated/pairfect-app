@@ -1,6 +1,7 @@
 import { API_CONFIG, getApiUrl } from '@/config/api';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
+import Device from 'expo-device';
 
 // Types
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
