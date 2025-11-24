@@ -64,7 +64,7 @@ const LoginScreen = () => {
         >
           <View style={styles.logoContainer}>
             <Image
-              source={require('@/assets/images/logo.png')}
+              source={require('@/assets/images/LandingLogo.png')}
               style={styles.logo}
               resizeMode="contain"
             />

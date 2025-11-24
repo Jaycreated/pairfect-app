@@ -1,7 +1,7 @@
 import { api } from '@/services/api';
 import { SignInCredentials, SignUpData, User } from '@/types/auth';
+import { Storage } from '@/utils/storage';
 import { router } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
 type AuthContextType = {
@@ -73,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const token = await SecureStore.getItemAsync('auth_token');
+        const token = await Storage.getItem('auth_token');
         if (token) {
           // If we have a token, try to load the user profile
           await loadProfile();
@@ -103,12 +103,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
 
         // In a real app, you would get the token from the API response
-        await SecureStore.setItemAsync('auth_token', dummyUser.token);
+        await Storage.setItem('auth_token', dummyUser.token);
         
         setUser(dummyUser);
         setProfile(dummyUser);
         
-        router.replace('/(tabs)');
+        // Check if user has seen onboarding
+        const hasSeenOnboarding = await Storage.getItem('hasSeenOnboarding');
+        if (hasSeenOnboarding === 'true') {
+          router.replace('/(tabs)');
+        } else {
+          // If it's the first time, show onboarding
+          await Storage.setItem('hasSeenOnboarding', 'true');
+          router.replace('/(tabs)'); // Or '/onboarding' if you want to show onboarding
+        }
+        
         return dummyUser;
       } else {
         throw new Error('Invalid email or password');
@@ -129,7 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     try {
       // Clear all auth state
-      await SecureStore.deleteItemAsync('auth_token');
+      await Storage.deleteItem('auth_token');
       setUser(null);
       setProfile(null);
       setError(null);
