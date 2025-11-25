@@ -20,7 +20,7 @@ type Match = {
 
 export default function MatchesScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { profile } = useAuth();
   const [matches, setMatches] = useState<Match[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
