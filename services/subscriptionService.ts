@@ -1,5 +1,6 @@
-import { API_URL } from '@/config/api';
+import { getApiUrl } from '@/config/api';
 import { SubscriptionPlan, UserSubscription } from '@/types/subscription';
+import { get } from 'react-hook-form';
 import { Platform } from 'react-native';
 
 const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
@@ -37,7 +38,7 @@ export const getSubscriptionPlans = (): SubscriptionPlan[] => {
 
 export const getActiveSubscription = async (): Promise<UserSubscription | null> => {
   try {
-    const response = await fetch(`${API_URL}/subscriptions/me`, {
+    const response = await fetch(`${getApiUrl}/subscriptions/me`, {
       headers: {
         'Content-Type': 'application/json',
         // Add auth token here
@@ -57,7 +58,7 @@ export const getActiveSubscription = async (): Promise<UserSubscription | null> 
 
 export const initiatePayment = async (planId: string): Promise<{ authorizationUrl: string; reference: string }> => {
   try {
-    const response = await fetch(`${API_URL}/subscriptions/initiate-payment`, {
+    const response = await fetch(`${getApiUrl}/subscriptions/initiate-payment`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -84,7 +85,7 @@ export const initiatePayment = async (planId: string): Promise<{ authorizationUr
 
 export const verifyPayment = async (reference: string): Promise<{ success: boolean; subscription?: UserSubscription }> => {
   try {
-    const response = await fetch(`${API_URL}/subscriptions/verify-payment/${reference}`, {
+    const response = await fetch(`${getApiUrl}/subscriptions/verify-payment/${reference}`, {
       headers: {
         'Content-Type': 'application/json',
         // Add auth token here
