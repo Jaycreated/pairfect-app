@@ -1,9 +1,10 @@
+// app/(tabs)/subscribe.tsx
 import { useSubscription } from '@/context/SubscriptionContext';
-import { getSubscriptionPlans, initiatePayment } from '@/services/subscriptionService';
+import { createOrder, getSubscriptionPlans, initiatePayment, storePaymentAttempt } from '@/services/subscriptionService';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
 
 export default function SubscribeScreen() {
   const router = useRouter();
@@ -14,56 +15,67 @@ export default function SubscribeScreen() {
   const plans = getSubscriptionPlans();
 
   const handleSubscribe = async (planId: string) => {
+    if (isProcessing) return;
+    
     try {
       setIsProcessing(true);
       setSelectedPlan(planId);
       
-      // Initiate payment
-      const { authorizationUrl, reference } = await initiatePayment(planId);
+      // 1. Create an order first
+      const { orderId } = await createOrder(planId);
       
-      // In a real app, you would open the payment URL in a WebView or deep link
-      // For now, we'll simulate a successful payment after a delay
-      console.log('Payment initiated:', authorizationUrl);
+      // 2. Initiate payment with the order ID
+      const { paymentId, authorizationUrl, reference } = await initiatePayment(orderId);
       
-      // Simulate payment processing
+      // 3. Store payment attempt for recovery
+      await storePaymentAttempt({
+        paymentId,
+        orderId,
+        reference,
+        planId,
+      });
+      
+      // 4. In a real app, you would open the payment URL in a WebView or deep link
+      console.log('Payment URL:', authorizationUrl);
+      
+      // 5. For demo purposes, we'll simulate a successful payment
+      // In a real app, you would:
+      // - Open WebView with the authorization URL
+      // - Listen for payment completion
+      // - Verify payment status
+      // - Update subscription status
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Refresh subscription status
+      // 6. Refresh subscription status
       await refreshSubscription();
       
-      // Navigate to home or success screen
+      // 7. Navigate to success screen
       router.replace('/(tabs)/messages');
     } catch (error) {
       console.error('Payment error:', error);
-      alert('Failed to process payment. Please try again.');
+      Alert.alert(
+        'Payment Failed',
+        error instanceof Error ? error.message : 'Failed to process payment. Please try again.'
+      );
     } finally {
-      setIsProcessing(false);
       setSelectedPlan(null);
+      setIsProcessing(false);
     }
-  };
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-NG', {
-      style: 'currency',
-      currency: 'NGN',
-      minimumFractionDigits: 0,
-    }).format(price);
   };
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Unlock Chats</Text>
-        <Text style={styles.subtitle}>Choose a plan to start chatting with your matches</Text>
+        <Text style={styles.title}>Choose a Plan</Text>
       </View>
-      
+
       <View style={styles.plansContainer}>
         {plans.map((plan) => (
           <View 
             key={plan.id} 
             style={[
               styles.planCard,
-              plan.isPopular && styles.popularPlan,
+              plan.isPopular && styles.popularPlan
             ]}
           >
             {plan.isPopular && (
@@ -73,13 +85,16 @@ export default function SubscribeScreen() {
             )}
             
             <Text style={styles.planName}>{plan.name}</Text>
-            <Text style={styles.planPrice}>{formatPrice(plan.price)}</Text>
-            <Text style={styles.planDuration}>per {plan.duration}</Text>
+            <Text style={styles.planPrice}>
+              ₦{plan.price.toLocaleString()}
+              <Text style={styles.planDuration}> / {plan.duration}</Text>
+            </Text>
+            <Text style={styles.planDescription}>{plan.description}</Text>
             
-            <View style={styles.featuresContainer}>
+            <View style={styles.featuresList}>
               {plan.features.map((feature, index) => (
                 <View key={index} style={styles.featureItem}>
-                  <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                  <Ionicons name="checkmark-circle" size={18} color="#651B55" />
                   <Text style={styles.featureText}>{feature}</Text>
                 </View>
               ))}
@@ -88,7 +103,7 @@ export default function SubscribeScreen() {
             <TouchableOpacity
               style={[
                 styles.subscribeButton,
-                isProcessing && selectedPlan === plan.id && styles.subscribeButtonLoading,
+                (isProcessing && selectedPlan === plan.id) && styles.subscribeButtonLoading
               ]}
               onPress={() => handleSubscribe(plan.id)}
               disabled={isProcessing}
@@ -97,21 +112,12 @@ export default function SubscribeScreen() {
                 <ActivityIndicator color="#fff" />
               ) : (
                 <Text style={styles.subscribeButtonText}>
-                  {subscription?.status === 'active' ? 'Upgrade Plan' : 'Subscribe Now'}
+                  {subscription ? 'Manage Plan' : 'Subscribe Now'}
                 </Text>
               )}
             </TouchableOpacity>
           </View>
         ))}
-      </View>
-      
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          Your subscription will automatically renew unless canceled at least 24 hours before the end of the current period.
-        </Text>
-        <Text style={[styles.footerText, styles.termsText]}>
-          By subscribing, you agree to our Terms of Service and Privacy Policy
-        </Text>
       </View>
     </ScrollView>
   );
@@ -120,24 +126,19 @@ export default function SubscribeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f8f8f8',
   },
   header: {
-    padding: 24,
-    paddingBottom: 16,
+    padding: 20,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: '#eee',
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#212529',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#6c757d',
+    color: '#333',
+    textAlign: 'center',
   },
   plansContainer: {
     padding: 16,
@@ -147,48 +148,53 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 24,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
     position: 'relative',
-    overflow: 'hidden',
   },
   popularPlan: {
-    borderColor: '#6c5ce7',
     borderWidth: 2,
-    marginTop: 10,
+    borderColor: '#651B55',
   },
   popularBadge: {
     position: 'absolute',
-    top: 0,
-    right: 0,
-    backgroundColor: '#6c5ce7',
+    top: -10,
+    right: 20,
+    backgroundColor: '#651B55',
     paddingHorizontal: 12,
     paddingVertical: 4,
-    borderBottomLeftRadius: 12,
+    borderRadius: 12,
   },
   popularBadgeText: {
     color: '#fff',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   planName: {
     fontSize: 20,
-    fontWeight: '600',
-    color: '#212529',
+    fontWeight: 'bold',
+    color: '#333',
     marginBottom: 4,
   },
   planPrice: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#212529',
-    marginTop: 8,
+    color: '#651B55',
+    marginBottom: 8,
   },
   planDuration: {
-    fontSize: 14,
-    color: '#6c757d',
-    marginBottom: 20,
+    fontSize: 16,
+    color: '#666',
   },
-  featuresContainer: {
+  planDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+  },
+  featuresList: {
     marginBottom: 24,
   },
   featureItem: {
@@ -198,15 +204,14 @@ const styles = StyleSheet.create({
   },
   featureText: {
     marginLeft: 8,
-    color: '#495057',
+    color: '#444',
     fontSize: 14,
   },
   subscribeButton: {
-    backgroundColor: '#6c5ce7',
-    borderRadius: 8,
+    backgroundColor: '#651B55',
     padding: 16,
+    borderRadius: 8,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   subscribeButtonLoading: {
     opacity: 0.8,
@@ -215,19 +220,5 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-  },
-  footer: {
-    padding: 24,
-    paddingTop: 0,
-  },
-  footerText: {
-    fontSize: 12,
-    color: '#6c757d',
-    textAlign: 'center',
-    marginBottom: 8,
-    lineHeight: 16,
-  },
-  termsText: {
-    marginTop: 8,
   },
 });
