@@ -28,14 +28,19 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         header: () => <Header />,
-        tabBarActiveTintColor: '#000000',
-        tabBarInactiveTintColor: '#000000',
+        tabBarActiveTintColor: '#FFFFFF',
+        tabBarInactiveTintColor: '#FFFFFF',
         tabBarStyle: {
-          backgroundColor: '#fff',
-          borderTopWidth: 1,
-          borderTopColor: '#f0f0f0',
+          backgroundColor: '#651B55',
+          borderTopWidth: 0,
           height: 60,
-          paddingBottom: 8,
+          paddingBottom: 1,
+          borderTopLeftRadius: 10,
+          borderTopRightRadius: 10,
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
         },
         tabBarLabelStyle: {
           fontSize: 12,
@@ -43,20 +48,13 @@ export default function TabLayout() {
         },
       }}
     >
-     
       <Tabs.Screen
-        name="matches"
+        name="index"
         options={{
-          title: 'Matches',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? 'heart' : 'heart-outline'} 
-              size={24} 
-              color={color} 
-            />
-          ),
+          href: null, // This hides it from the tab bar
         }}
       />
+     
       <Tabs.Screen
         name="swipe"
         options={{
@@ -71,9 +69,22 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="matches"
+        options={{
+          title: 'Matches',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              name={focused ? 'heart' : 'heart-outline'} 
+              size={24} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="messages"
         options={{
-          title: 'Messages',
+          title: 'Chats',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
               name={focused ? 'chatbubbles' : 'chatbubbles-outline'} 
@@ -84,25 +95,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="settings"
+        name="profile"
         options={{
-          title: 'Settings',
+          title: 'Profile',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
-              name={focused ? 'settings' : 'settings-outline'} 
-              size={24} 
-              color={color} 
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="help-support"
-        options={{
-          title: 'Help',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? 'help-circle' : 'help-circle-outline'} 
+              name={focused ? 'person' : 'person-outline'} 
               size={24} 
               color={color} 
             />
@@ -111,12 +109,6 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="notifications"
-        options={{
-          href: null, // This hides it from the tab bar
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
         options={{
           href: null, // This hides it from the tab bar
         }}
