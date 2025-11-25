@@ -24,10 +24,14 @@ export default function TabLayout() {
     checkOnboarding();
   }, []);
 
+  const handleNotificationPress = () => {
+    router.push('/(tabs)/notifications');
+  };
+
   return (
     <Tabs
       screenOptions={{
-        header: () => <Header />,
+        header: () => <Header onNotificationPress={handleNotificationPress} />,
         tabBarActiveTintColor: '#FFFFFF',
         tabBarInactiveTintColor: '#FFFFFF',
         tabBarStyle: {
