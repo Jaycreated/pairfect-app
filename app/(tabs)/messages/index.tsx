@@ -5,13 +5,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    Image,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  FlatList,
+  Image,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 // Types
@@ -208,5 +208,5 @@ const styles = StyleSheet.create({
 
 // Subscription check
 export default withSubscription(MessagesScreen, {
-  redirectTo: '/(tabs)/subscribe',
+  redirectTo: '/screens/subscribe',
 });
