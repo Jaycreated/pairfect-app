@@ -33,24 +33,62 @@ const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   },
 ];
 
+// Helper function to get auth token
+const getAuthToken = async (): Promise<string | null> => {
+  try {
+    const token = await SecureStore.getItemAsync('auth_token');
+    return token;
+  } catch (error) {
+    console.error('Error getting auth token:', error);
+    return null;
+  }
+};
+
+// Helper function to create headers with auth
+const createHeaders = async (additionalHeaders: Record<string, string> = {}): Promise<HeadersInit> => {
+  const token = await getAuthToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...additionalHeaders,
+  };
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  return headers;
+};
+
 export const getSubscriptionPlans = (): SubscriptionPlan[] => {
   return SUBSCRIPTION_PLANS;
 };
 
 export const getActiveSubscription = async (): Promise<UserSubscription | null> => {
   try {
-    const response = await fetch(`${getApiUrl}/subscriptions/me`, {
-      headers: {
-        'Content-Type': 'application/json',
-        // Add auth token here
-      },
+    const headers = await createHeaders();
+    const response = await fetch(getApiUrl('/subscriptions/me'), {
+      method: 'GET',
+      headers,
     });
     
     if (!response.ok) {
-      throw new Error('Failed to fetch subscription');
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Subscription fetch failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorData
+      });
+      
+      // If unauthorized, return null instead of throwing
+      if (response.status === 401 || response.status === 403) {
+        return null;
+      }
+      
+      throw new Error(`Failed to fetch subscription: ${response.status}`);
     }
     
-    return await response.json();
+    const data = await response.json();
+    return data;
   } catch (error) {
     console.error('Error fetching subscription:', error);
     return null;
@@ -69,23 +107,32 @@ export interface CreateOrderResponse {
 }
 
 export const createOrder = async (planId: string): Promise<CreateOrderResponse> => {
-  const idempotencyKey = generateIdempotencyKey();
-  
-  const response = await fetch(`${getApiUrl}/subscriptions/orders`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
+  try {
+    const idempotencyKey = generateIdempotencyKey();
+    const headers = await createHeaders({
       'Idempotency-Key': idempotencyKey,
-      // Add auth token here
-    },
-    body: JSON.stringify({ planId }),
-  });
+    });
+    
+    const response = await fetch(getApiUrl('/subscriptions/orders'), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ planId }),
+    });
 
-  if (!response.ok) {
-    throw new Error('Failed to create order');
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Order creation failed:', {
+        status: response.status,
+        error: errorData
+      });
+      throw new Error(errorData.message || 'Failed to create order');
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error('Error creating order:', error);
+    throw error;
   }
-
-  return response.json();
 };
 
 export const initiatePayment = async (orderId: string): Promise<{ 
@@ -93,29 +140,39 @@ export const initiatePayment = async (orderId: string): Promise<{
   authorizationUrl: string; 
   reference: string;
 }> => {
-  const idempotencyKey = generateIdempotencyKey();
-  
-  const response = await fetch(`${getApiUrl}/subscriptions/initiate-payment`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
+  try {
+    const idempotencyKey = generateIdempotencyKey();
+    const headers = await createHeaders({
       'Idempotency-Key': idempotencyKey,
-      // Add auth token here
-    },
-    body: JSON.stringify({
-      orderId,
-      callbackUrl: Platform.OS === 'web' 
-        ? `${window.location.origin}/payment-callback` 
-        : 'pairfect://payment-callback',
-    }),
-  });
-  
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || 'Failed to initiate payment');
+    });
+    
+    const callbackUrl = Platform.OS === 'web' 
+      ? `${window.location.origin}/payment-callback` 
+      : 'pairfect://payment-callback';
+    
+    const response = await fetch(getApiUrl('/subscriptions/initiate-payment'), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        orderId,
+        callbackUrl,
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Payment initiation failed:', {
+        status: response.status,
+        error: errorData
+      });
+      throw new Error(errorData.message || 'Failed to initiate payment');
+    }
+    
+    return response.json();
+  } catch (error) {
+    console.error('Error initiating payment:', error);
+    throw error;
   }
-  
-  return response.json();
 };
 
 export const verifyPayment = async (reference: string): Promise<{ 
@@ -124,16 +181,18 @@ export const verifyPayment = async (reference: string): Promise<{
   message?: string;
 }> => {
   try {
-    const response = await fetch(`${getApiUrl}/subscriptions/verify-payment/${reference}`, {
+    const headers = await createHeaders();
+    const response = await fetch(getApiUrl(`/subscriptions/verify-payment/${reference}`), {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        // Add auth token here
-      },
+      headers,
     });
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      console.error('Payment verification failed:', {
+        status: response.status,
+        error: errorData
+      });
       throw new Error(errorData.message || 'Payment verification failed');
     }
     
@@ -154,23 +213,28 @@ export const storePaymentAttempt = async (paymentData: {
   reference: string;
   planId: string;
 }): Promise<void> => {
-  // Get existing payments
-  const existingPayments = await getPendingPayments();
-  
-  // Add new payment
-  const updatedPayments = [
-    ...existingPayments.filter(p => p.paymentId !== paymentData.paymentId),
-    {
-      ...paymentData,
-      timestamp: new Date().toISOString(),
-    }
-  ];
-  
-  // Store all payments under a single key
-  await SecureStore.setItemAsync(
-    'pending_payments',
-    JSON.stringify(updatedPayments)
-  );
+  try {
+    // Get existing payments
+    const existingPayments = await getPendingPayments();
+    
+    // Add new payment
+    const updatedPayments = [
+      ...existingPayments.filter(p => p.paymentId !== paymentData.paymentId),
+      {
+        ...paymentData,
+        timestamp: new Date().toISOString(),
+      }
+    ];
+    
+    // Store all payments under a single key
+    await SecureStore.setItemAsync(
+      'pending_payments',
+      JSON.stringify(updatedPayments)
+    );
+  } catch (error) {
+    console.error('Error storing payment attempt:', error);
+    throw error;
+  }
 };
 
 export const getPendingPayments = async (): Promise<Array<{
@@ -190,7 +254,46 @@ export const getPendingPayments = async (): Promise<Array<{
 };
 
 export const clearPaymentAttempt = async (paymentId: string): Promise<void> => {
-  const payments = await getPendingPayments();
-  const updatedPayments = payments.filter(payment => payment.paymentId !== paymentId);
-  await SecureStore.setItemAsync('pending_payments', JSON.stringify(updatedPayments));
+  try {
+    const payments = await getPendingPayments();
+    const updatedPayments = payments.filter(payment => payment.paymentId !== paymentId);
+    await SecureStore.setItemAsync('pending_payments', JSON.stringify(updatedPayments));
+  } catch (error) {
+    console.error('Error clearing payment attempt:', error);
+    throw error;
+  }
+};
+
+// Utility function to check if user has active subscription
+export const hasActiveSubscription = async (): Promise<boolean> => {
+  try {
+    const subscription = await getActiveSubscription();
+    if (!subscription) return false;
+    
+    const expiresAt = new Date(subscription.expiresAt);
+    return expiresAt > new Date();
+  } catch (error) {
+    console.error('Error checking subscription status:', error);
+    return false;
+  }
+};
+
+// Clean up expired payment attempts (older than 24 hours)
+export const cleanupExpiredPayments = async (): Promise<void> => {
+  try {
+    const payments = await getPendingPayments();
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    
+    const validPayments = payments.filter(payment => {
+      const paymentDate = new Date(payment.timestamp);
+      return paymentDate > oneDayAgo;
+    });
+    
+    if (validPayments.length !== payments.length) {
+      await SecureStore.setItemAsync('pending_payments', JSON.stringify(validPayments));
+      console.log(`Cleaned up ${payments.length - validPayments.length} expired payment attempts`);
+    }
+  } catch (error) {
+    console.error('Error cleaning up expired payments:', error);
+  }
 };

@@ -1,7 +1,7 @@
 import { API_CONFIG, getApiUrl } from '@/config/api';
-import * as Notifications from 'expo-notifications';
-import * as SecureStore from 'expo-secure-store';
+import { Storage } from '@/utils/storage';
 import Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
 
 // Types
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -23,7 +23,7 @@ async function fetchApi<T = any>(
   customHeaders: Record<string, string> = {}
 ): Promise<ApiResponse<T>> {
   const url = getApiUrl(endpoint);
-  const token = await SecureStore.getItemAsync('auth_token');
+  const token = await Storage.getItem('auth_token');
   
   const headers: HeadersInit = {
     ...API_CONFIG.HEADERS,
@@ -195,8 +195,8 @@ const withAuthRetry = async <T>(
           const refreshResponse = await fetchApi(API_CONFIG.ENDPOINTS.AUTH.REFRESH_TOKEN, 'POST');
           
           if (refreshResponse.data?.token) {
-            // Save new token
-            await SecureStore.setItemAsync('auth_token', refreshResponse.data.token);
+            // Save new token using Storage
+            await Storage.setItem('auth_token', refreshResponse.data.token);
             // Retry the original request
             const retryResponse = await apiCall();
             processQueue();

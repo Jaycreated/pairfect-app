@@ -33,22 +33,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isProfileLoading, setIsProfileLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load user profile
+  // Load user profile from backend using current auth token
   const loadProfile = useCallback(async () => {
-    if (!user) return;
-    
     setIsProfileLoading(true);
     try {
       const response = await api.getProfile();
       if (response.data) {
-        setProfile(response.data);
+        // Backend /users/me returns the user object
+        setUser(response.data as User);
+        setProfile(response.data as User);
       }
     } catch (error) {
       console.error('Failed to load profile:', error);
     } finally {
       setIsProfileLoading(false);
     }
-  }, [user]);
+  }, []);
 
   // Update profile function
   const updateProfile = async (userData: Partial<User>) => {
@@ -75,7 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const token = await Storage.getItem('auth_token');
         if (token) {
-          // If we have a token, try to load the user profile
+          // If we have a token, load the user profile
           await loadProfile();
         }
       } catch (error) {
@@ -91,37 +91,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async ({ email, password }: SignInCredentials): Promise<User> => {
     setIsLoading(true);
     setError(null);
-    
-    try {
-      // Dummy authentication - replace with actual API call
-      if (email === 'test@example.com' && password === 'password123') {
-        const dummyUser: User = {
-          id: '1',
-          email,
-          name: 'Test User',
-          token: 'dummy-jwt-token',
-        };
 
-        // In a real app, you would get the token from the API response
-        await Storage.setItem('auth_token', dummyUser.token);
-        
-        setUser(dummyUser);
-        setProfile(dummyUser);
-        
-        // Check if user has seen onboarding
-        const hasSeenOnboarding = await Storage.getItem('hasSeenOnboarding');
-        if (hasSeenOnboarding === 'true') {
-          router.replace('/(tabs)');
-        } else {
-          // If it's the first time, show onboarding
-          await Storage.setItem('hasSeenOnboarding', 'true');
-          router.replace('/(tabs)'); // Or '/onboarding' if you want to show onboarding
-        }
-        
-        return dummyUser;
-      } else {
-        throw new Error('Invalid email or password');
+    try {
+      const response = await api.login(email, password);
+
+      if (!response.data || response.error) {
+        const message = response.error?.message || 'Failed to sign in';
+        throw new Error(message);
       }
+
+      const { token, user } = response.data as { token: string; user: User };
+
+      // Persist token so services/api can use it for subsequent requests
+      await Storage.setItem('auth_token', token);
+
+      setUser(user);
+      setProfile(user);
+
+      // Check if user has seen onboarding
+      const hasSeenOnboarding = await Storage.getItem('hasSeenOnboarding');
+      if (hasSeenOnboarding === 'true') {
+        router.replace('/(tabs)');
+      } else {
+        await Storage.setItem('hasSeenOnboarding', 'true');
+        router.replace('/(tabs)');
+      }
+
+      return user;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign in';
       setError(errorMessage);
@@ -133,6 +129,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (data: SignUpData): Promise<User> => {
     setIsLoading(true);
+    // TODO: Implement real sign-up flow against backend
+    setIsLoading(false);
+    throw new Error('Sign up is not implemented yet');
   };
 
   const signOut = async () => {
@@ -142,7 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setProfile(null);
       setError(null);
-      
+
       // Redirect to login
       router.replace('/(auth)/login');
     } catch (error) {

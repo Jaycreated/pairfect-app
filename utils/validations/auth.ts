@@ -7,8 +7,7 @@ export const loginSchema = z.object({
     .email('Please enter a valid email address'),
   password: z
     .string()
-    .min(1, 'Password is required')
-    .min(8, 'Password must be at least 8 characters'),
+    .min(1, 'Password is required'),
 });
 
 export const signUpSchema = z
@@ -23,12 +22,7 @@ export const signUpSchema = z
       .email('Please enter a valid email address'),
     password: z
       .string()
-      .min(1, 'Password is required')
-      .min(8, 'Password must be at least 8 characters')
-      .regex(
-        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/,
-        'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
-      ),
+      .min(1, 'Password is required'),
     confirmPassword: z.string().min(1, 'Please confirm your password'),
   })
   .refine((data) => data.password === data.confirmPassword, {
