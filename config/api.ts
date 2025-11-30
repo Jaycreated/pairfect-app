@@ -8,29 +8,28 @@ export const API_CONFIG = {
     AUTH: {
       LOGIN: 'auth/login',
       REGISTER: 'auth/register',
+      ME: 'auth/me',
+      CHANGE_PASSWORD: 'auth/change-password',
       LOGOUT: 'auth/logout',
-      REFRESH_TOKEN: 'auth/refresh-token',
     },
-    USER: {
-      PROFILE: 'users/me',
-      UPDATE_PROFILE: 'users/me',
-      UPLOAD_AVATAR: 'users/me/avatar',
+    USERS: {
+      PROFILE: 'users/profile',
+      POTENTIAL_MATCHES: 'users/potential-matches',
     },
     MATCHES: {
-      GET_MATCHES: 'matches',
-      LIKE_USER: 'matches/like',
-      PASS_USER: 'matches/pass',
+      BASE: 'matches',
+      LIKE: (userId: string) => `matches/like/${userId}`,
+      PASS: (userId: string) => `matches/pass/${userId}`,
     },
-    NOTIFICATIONS: {
-      REGISTER_TOKEN: 'notifications/register',
-      UNREGISTER_TOKEN: 'notifications/unregister',
-    },
+    MESSAGES: {
+      CONVERSATION: (matchId: string) => `messages/${matchId}`,
+    }
   },
 
   // Default headers for API requests
   HEADERS: {
     'Content-Type': 'application/json',
-    Accept: 'application/json',
+    'Accept': 'application/json',
   },
 
   // Timeout for requests in milliseconds

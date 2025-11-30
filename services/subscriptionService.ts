@@ -33,8 +33,23 @@ const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   },
 ];
 
+// Dummy subscription data for development
+const DUMMY_ACTIVE_SUBSCRIPTION: UserSubscription = {
+  id: 'sub_dummy_123',
+  planId: 'monthly',
+  status: 'active',
+  startDate: new Date().toISOString(),
+  endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
+  autoRenew: true,
+};
+
 // Helper function to get auth token
 const getAuthToken = async (): Promise<string | null> => {
+  // In development, return a dummy token
+  if (__DEV__) {
+    return 'dummy_auth_token';
+  }
+  
   try {
     const token = await SecureStore.getItemAsync('auth_token');
     return token;
@@ -64,6 +79,15 @@ export const getSubscriptionPlans = (): SubscriptionPlan[] => {
 };
 
 export const getActiveSubscription = async (): Promise<UserSubscription | null> => {
+  // Return dummy data in development mode
+  if (__DEV__) {
+    console.log('Using dummy subscription data for development');
+    return DUMMY_ACTIVE_SUBSCRIPTION;
+    
+    // To test the no-subscription scenario, uncomment this:
+    // return null;
+  }
+
   try {
     const headers = await createHeaders();
     const response = await fetch(getApiUrl('/subscriptions/me'), {
@@ -79,7 +103,6 @@ export const getActiveSubscription = async (): Promise<UserSubscription | null> 
         error: errorData
       });
       
-      // If unauthorized, return null instead of throwing
       if (response.status === 401 || response.status === 403) {
         return null;
       }
@@ -87,8 +110,7 @@ export const getActiveSubscription = async (): Promise<UserSubscription | null> 
       throw new Error(`Failed to fetch subscription: ${response.status}`);
     }
     
-    const data = await response.json();
-    return data;
+    return await response.json();
   } catch (error) {
     console.error('Error fetching subscription:', error);
     return null;

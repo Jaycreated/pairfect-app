@@ -1,7 +1,8 @@
 import { PoppinsText } from '@/components/PoppinsText';
+import { useSubscription } from '@/context/SubscriptionContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     FlatList,
     Image,
@@ -12,7 +13,20 @@ import {
 } from 'react-native';
 
 // Mock notification data
-const NOTIFICATIONS = [
+const NOTIFICATIONS: NotificationType[] = [
+  {
+    id: '0',
+    type: 'match',
+    user: {
+      id: 'premium',
+      name: 'New Match!',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=60',
+    },
+    message: 'You have a new match! Subscribe to see who liked you!',
+    time: 'Just now',
+    read: false,
+    isSubscriptionPrompt: true
+  } as NotificationType,
   {
     id: '1',
     type: 'like',
@@ -74,12 +88,22 @@ type NotificationType = {
   message: string;
   time: string;
   read: boolean;
+  isSubscriptionPrompt?: boolean;
 };
 
 const NotificationsScreen = () => {
-  const [notifications, setNotifications] = useState<NotificationType[]>(NOTIFICATIONS);
+  const { subscription } = useSubscription();
+  const [notifications, setNotifications] = useState<NotificationType[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
+
+  // Filter out subscription prompt if user is already subscribed
+  useEffect(() => {
+    const filteredNotifications = NOTIFICATIONS.filter(
+      notification => !(notification.isSubscriptionPrompt && subscription)
+    ) as NotificationType[];
+    setNotifications(filteredNotifications);
+  }, [subscription]);
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -130,23 +154,30 @@ const NotificationsScreen = () => {
     );
   };
 
+  const handleNotificationPress = (notification: NotificationType) => {
+    if (notification.isSubscriptionPrompt) {
+      router.push('/screens/subscribe');
+      return;
+    }
+    markAsRead(notification.id);
+    // Navigate based on notification type
+    if (notification.type === 'message') {
+      router.push(`/messages/${notification.user.id}`);
+    } else if (notification.type === 'match') {
+      router.push(`/matches`);
+    } else {
+      router.push(`/user/${notification.user.id}`);
+    }
+  };
+
   const renderNotification = ({ item }: { item: NotificationType }) => (
     <TouchableOpacity 
       style={[
         styles.notificationItem,
         !item.read && styles.unreadNotification,
+        item.isSubscriptionPrompt && styles.subscriptionPrompt,
       ]}
-      onPress={() => {
-        markAsRead(item.id);
-        // Navigate based on notification type
-        if (item.type === 'message') {
-          router.push(`/messages/${item.user.id}`);
-        } else if (item.type === 'match') {
-          router.push(`/matches`);
-        } else {
-          router.push(`/user/${item.user.id}`);
-        }
-      }}
+      onPress={() => handleNotificationPress(item)}
     >
       <View style={styles.avatarContainer}>
         <Image source={{ uri: item.user.avatar }} style={styles.avatar} />
@@ -239,7 +270,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   unreadNotification: {
-    backgroundColor: '#f9f5ff',
+    backgroundColor: '#f9f0ff',
+  },
+  subscriptionPrompt: {
+    backgroundColor: '#f0f7ff',
+    borderLeftWidth: 4,
+    borderLeftColor: '#1890ff',
   },
   avatarContainer: {
     position: 'relative',

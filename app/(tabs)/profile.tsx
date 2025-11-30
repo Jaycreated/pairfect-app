@@ -5,14 +5,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 interface UserProfile {
@@ -38,6 +38,16 @@ export default function ProfileScreen() {
     photos: [],
   });
 
+  const INTERESTS = [
+    'Relationship', 
+    'Casual friendship', 
+    'Hookup', 
+    'Chat buddy', 
+    'Friends with benefit',
+    'Sugar Mummy', 
+    'Sugar Daddy'
+  ] as const;
+
   useEffect(() => {
     loadUserProfile();
   }, []);
@@ -49,13 +59,34 @@ export default function ProfileScreen() {
       const userData = await Storage.getItem('user');
       const userPhotos = await Storage.getItem('userPhotos');
       
-      if (userData) {
-        const parsedData = JSON.parse(userData);
-        setProfile(prev => ({
-          ...prev,
-          ...parsedData,
-          photos: userPhotos ? JSON.parse(userPhotos) : [],
-        }));
+      // Default dummy data
+      const dummyData = {
+        name: 'Alex Johnson',
+        age: '28',
+        bio: 'Adventure seeker and coffee enthusiast. Looking for meaningful connections and fun experiences. Let\'s chat and see where it takes us!',
+        interests: ['Hookup'],
+        photos: [
+          'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500&auto=format&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=500&auto=format&fit=crop&q=80',
+          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80'
+        ]
+      };
+
+      // Use stored data if available, otherwise use dummy data
+      const profileData = userData ? JSON.parse(userData) : dummyData;
+      const photos = userPhotos ? JSON.parse(userPhotos) : dummyData.photos;
+      
+      setProfile(prev => ({
+        ...prev,
+        ...profileData,
+        photos: photos,
+        email: user?.email || 'alex.johnson@example.com',
+      }));
+      
+      // Save the dummy data to storage if none exists
+      if (!userData) {
+        await Storage.setItem('user', JSON.stringify(dummyData));
+        await Storage.setItem('userPhotos', JSON.stringify(dummyData.photos));
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -119,17 +150,30 @@ export default function ProfileScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
+        <View style={{ width: 24 }} /> {/* Spacer to balance the header */}
         <PoppinsText style={styles.title}>My Profile</PoppinsText>
-        <TouchableOpacity 
-          onPress={() => isEditing ? handleSave() : setIsEditing(true)}
-          disabled={isLoading}
-        >
-          <Ionicons 
-            name={isEditing ? 'checkmark' : 'pencil'} 
-            size={24} 
-            color="#651B55" 
-          />
-        </TouchableOpacity>
+        <View style={styles.headerIcons}>
+          <TouchableOpacity 
+            onPress={() => router.push('/screens/settings')}
+            style={{ marginRight: 20 }}
+          >
+            <Ionicons 
+              name="settings-outline" 
+              size={24} 
+              color="#651B55" 
+            />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={() => isEditing ? handleSave() : setIsEditing(true)}
+            disabled={isLoading}
+          >
+            <Ionicons 
+              name={isEditing ? 'checkmark' : 'pencil'} 
+              size={24} 
+              color="#651B55" 
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.scrollView}>
@@ -177,20 +221,44 @@ export default function ProfileScreen() {
             )}
           </View>
 
-          {/* Interests */}
+          {/* Interest */}
           <View style={styles.fieldContainer}>
-            <PoppinsText style={styles.label}>Interests</PoppinsText>
-            <View style={styles.interestsContainer}>
-              {profile.interests && profile.interests.length > 0 ? (
-                profile.interests.map((interest, index) => (
-                  <View key={index} style={styles.interestTag}>
-                    <PoppinsText style={styles.interestText}>{interest}</PoppinsText>
+            <PoppinsText style={styles.label}>Interest</PoppinsText>
+            {isEditing ? (
+              <View style={styles.interestsContainer}>
+                {INTERESTS.map((interest) => (
+                  <TouchableOpacity
+                    key={interest}
+                    style={[
+                      styles.interestButton,
+                      profile.interests.includes(interest) && styles.selectedInterestButton,
+                    ]}
+                    onPress={() => setProfile({ ...profile, interests: [interest] })}
+                  >
+                    <PoppinsText
+                      style={[
+                        styles.interestText,
+                        profile.interests.includes(interest) && styles.selectedInterestText,
+                      ]}
+                    >
+                      {interest}
+                    </PoppinsText>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.interestsContainer}>
+                {profile.interests && profile.interests[0] ? (
+                  <View style={[styles.interestTag, { backgroundColor: '#f0f0f0' }]}>
+                    <PoppinsText style={styles.interestText}>
+                      {profile.interests[0]}
+                    </PoppinsText>
                   </View>
-                ))
-              ) : (
-                <PoppinsText style={styles.value}>No interests selected</PoppinsText>
-              )}
-            </View>
+                ) : (
+                  <PoppinsText style={styles.value}>No interest selected</PoppinsText>
+                )}
+              </View>
+            )}
           </View>
         </View>
 
@@ -223,7 +291,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: '#eee',
+  },
+  headerIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   title: {
     fontSize: 24,
@@ -296,6 +368,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: 5,
+    gap: 8,
+  },
+  interestButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    marginRight: 8,
+    marginBottom: 8,
+    backgroundColor: '#f9f9f9',
+  },
+  selectedInterestButton: {
+    backgroundColor: '#651B55',
+    borderColor: '#651B55',
+  },
+  selectedInterestText: {
+    color: '#fff',
   },
   interestTag: {
     backgroundColor: '#f0e6f7',

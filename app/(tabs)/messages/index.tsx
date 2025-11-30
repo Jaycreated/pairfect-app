@@ -1,17 +1,17 @@
 import { PoppinsText } from '@/components/PoppinsText';
 import { useAuth } from '@/context/AuthContext';
-import { withSubscription } from '@/context/SubscriptionContext';
+import { useSubscription, withSubscription } from '@/context/SubscriptionContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    FlatList,
+    Image,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 
 // Types
@@ -54,11 +54,38 @@ const MOCK_CONVERSATIONS: ConversationType[] = [
 ];
 
 const MessagesScreen = () => {
+  const { subscription, isLoading: isSubscriptionLoading } = useSubscription();
   const { user } = useAuth();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [conversations] = useState<ConversationType[]>(MOCK_CONVERSATIONS);
   const [isLoading] = useState(false);
+
+  // If still loading subscription status, show loading indicator
+  if (isSubscriptionLoading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#651B55" />
+      </View>
+    );
+  }
+
+  // If no subscription, show a message and redirect to subscribe page
+  if (!subscription) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+        <PoppinsText style={{ fontSize: 18, textAlign: 'center', marginBottom: 20 }}>
+          A subscription is required to view and send messages.
+        </PoppinsText>
+        <TouchableOpacity
+          style={styles.subscribeButton}
+          onPress={() => router.push('/subscribe' as any)}
+        >
+          <PoppinsText style={styles.subscribeButtonText}>Subscribe Now</PoppinsText>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   const handleSearch = useCallback((query: string) => {
     setSearchQuery(query);
@@ -204,9 +231,23 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   unreadCount: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  subscribeButton: {
+    backgroundColor: '#651B55',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  subscribeButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });
 
 // Subscription check
+// Wrap the component with withSubscription HOC to protect the route
 export default withSubscription(MessagesScreen, {
-  redirectTo: '/screens/subscribe',
+  redirectTo: '/subscribe' as any
 });

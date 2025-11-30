@@ -18,7 +18,7 @@ const MOCK_USER = {
   name: 'Alex Johnson',
   age: 28,
   bio: 'Adventure seeker and coffee enthusiast. Love hiking on weekends and trying out new recipes. Looking for someone to share life\'s little moments with.',
-  interests: ['Hiking', 'Cooking', 'Photography', 'Travel'],
+  interests: ['Hookup'],
   photos: [
     'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500&auto=format&fit=crop&q=80',
     'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=500&auto=format&fit=crop&q=80',

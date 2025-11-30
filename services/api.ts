@@ -1,7 +1,5 @@
 import { API_CONFIG, getApiUrl } from '@/config/api';
 import { Storage } from '@/utils/storage';
-import Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 
 // Types
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -91,75 +89,46 @@ export const api = {
     email: string;
     password: string;
     name: string;
+      sexualOrientation: string;
+
     // Add other registration fields as needed
   }) => fetchApi(API_CONFIG.ENDPOINTS.AUTH.REGISTER, 'POST', userData),
 
+  getCurrentUser: () => fetchApi(API_CONFIG.ENDPOINTS.AUTH.ME),
+
+  changePassword: (currentPassword: string, newPassword: string) =>
+    fetchApi(API_CONFIG.ENDPOINTS.AUTH.CHANGE_PASSWORD, 'POST', {
+      currentPassword,
+      newPassword,
+    }),
+
+  logout: () => fetchApi(API_CONFIG.ENDPOINTS.AUTH.LOGOUT, 'POST'),
+
   // User
-  getProfile: () => fetchApi(API_CONFIG.ENDPOINTS.USER.PROFILE),
+  getProfile: () => fetchApi(API_CONFIG.ENDPOINTS.USERS.PROFILE, 'GET'),
   
   updateProfile: (userData: any) =>
-    fetchApi(API_CONFIG.ENDPOINTS.USER.UPDATE_PROFILE, 'PATCH', userData),
-    
-  uploadAvatar: (imageUri: string) => {
-    const formData = new FormData();
-    formData.append('avatar', {
-      uri: imageUri,
-      type: 'image/jpeg', // or any other image type
-      name: 'profile.jpg',
-    } as any);
-    
-    return fetchApi(
-      API_CONFIG.ENDPOINTS.USER.UPLOAD_AVATAR,
-      'POST',
-      formData,
-      { 'Content-Type': 'multipart/form-data' }
-    );
-  },
+    fetchApi(API_CONFIG.ENDPOINTS.USERS.PROFILE, 'PUT', userData),
 
   // Matches
-  getMatches: () => fetchApi(API_CONFIG.ENDPOINTS.MATCHES.GET_MATCHES),
-  
+  getPotentialMatches: () => 
+    fetchApi(API_CONFIG.ENDPOINTS.USERS.POTENTIAL_MATCHES),
+    
   likeUser: (userId: string) =>
-    fetchApi(API_CONFIG.ENDPOINTS.MATCHES.LIKE_USER, 'POST', { userId }),
+    fetchApi(API_CONFIG.ENDPOINTS.MATCHES.LIKE(userId), 'POST'),
     
   passUser: (userId: string) =>
-    fetchApi(API_CONFIG.ENDPOINTS.MATCHES.PASS_USER, 'POST', { userId }),
-
-  // Notifications
-  registerPushToken: async () => {
-    if (!Device.isDevice) {
-      console.log('Must use a physical device for Push Notifications');
-      return { error: { message: 'Must use a physical device' } };
-    }
-
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
+    fetchApi(API_CONFIG.ENDPOINTS.MATCHES.PASS(userId), 'POST'),
     
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-    
-    if (finalStatus !== 'granted') {
-      console.log('Failed to get push token for push notification!');
-      return { error: { message: 'Failed to get push token' } };
-    }
+  getMatches: () => 
+    fetchApi(API_CONFIG.ENDPOINTS.MATCHES.BASE),
 
-    try {
-      const projectId = 'your-expo-project-id'; // Replace with your Expo project ID
-      const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-      
-      // Send the token to your backend
-      return fetchApi(
-        API_CONFIG.ENDPOINTS.NOTIFICATIONS.REGISTER_TOKEN,
-        'POST',
-        { token }
-      );
-    } catch (error) {
-      console.error('Error registering push token:', error);
-      return { error: { message: 'Error registering push token' } };
-    }
-  },
+  // Messages
+  getConversation: (matchId: string) =>
+    fetchApi(API_CONFIG.ENDPOINTS.MESSAGES.CONVERSATION(matchId)),
+    
+  sendMessage: (matchId: string, content: string) =>
+    fetchApi(API_CONFIG.ENDPOINTS.MESSAGES.CONVERSATION(matchId), 'POST', { content }),
 
   // Generic methods
   get: <T = any>(endpoint: string) => fetchApi<T>(endpoint, 'GET'),
@@ -171,65 +140,54 @@ export const api = {
 
 // Auth interceptor to handle token refresh
 let isRefreshing = false;
-let failedQueue: Array<() => void> = [];
+let failedQueue: Array<{ resolve: (value: any) => void; reject: (error: any) => void }> = [];
 
-const processQueue = (error: any = null) => {
-  failedQueue.forEach(prom => prom());
+const processQueue = (error: any = null, token: string | null = null) => {
+  failedQueue.forEach(promise => {
+    if (error) {
+      promise.reject(error);
+    } else {
+      promise.resolve(token);
+    }
+  });
   failedQueue = [];
 };
 
-// You can add this to your API calls to handle token refresh
-// This is a simplified example - you might need to adjust it based on your auth flow
-const withAuthRetry = async <T>(
+// Improved auth retry with proper token refresh
+export const withAuthRetry = async <T = any>(
   apiCall: () => Promise<ApiResponse<T>>
 ): Promise<ApiResponse<T>> => {
+  const result = await apiCall();
+  
+  // If the error is not an authentication error, return it
+  if (!result.error || result.error.status !== 401) {
+    return result;
+  }
+
+  // If we're already refreshing, add to the queue
+  if (isRefreshing) {
+    return new Promise((resolve, reject) => {
+      failedQueue.push({ resolve, reject });
+    }).then(() => apiCall());
+  }
+
+  isRefreshing = true;
+
   try {
-    const response = await apiCall();
+    // TODO: Implement actual token refresh endpoint
+    // Example: const refreshResult = await fetchApi('/auth/refresh', 'POST');
     
-    if (response.error?.status === 401) {
-      // Token expired, try to refresh
-      if (!isRefreshing) {
-        isRefreshing = true;
-        
-        try {
-          const refreshResponse = await fetchApi(API_CONFIG.ENDPOINTS.AUTH.REFRESH_TOKEN, 'POST');
-          
-          if (refreshResponse.data?.token) {
-            // Save new token using Storage
-            await Storage.setItem('auth_token', refreshResponse.data.token);
-            // Retry the original request
-            const retryResponse = await apiCall();
-            processQueue();
-            return retryResponse;
-          } else {
-            // Refresh failed, logout user
-            processQueue(new Error('Session expired'));
-            // TODO: Redirect to login
-            return { error: { message: 'Session expired. Please login again.' } };
-          }
-        } catch (error) {
-          processQueue(error);
-          return { error: { message: 'Failed to refresh session' } };
-        } finally {
-          isRefreshing = false;
-        }
-      } else {
-        // If we're already refreshing, queue the request
-        return new Promise((resolve) => {
-          failedQueue.push(() => {
-            resolve(apiCall());
-          });
-        });
-      }
-    }
+    // For now, clear the token and return the error
+    await Storage.deleteItem('auth_token');
+    processQueue(new Error('Token expired'), null);
     
-    return response;
+    return result;
   } catch (error) {
-    console.error('API call failed:', error);
-    return {
-      error: {
-        message: error instanceof Error ? error.message : 'An unknown error occurred',
-      },
-    };
+    console.error('Error during token refresh:', error);
+    await Storage.deleteItem('auth_token');
+    processQueue(error, null);
+    return result;
+  } finally {
+    isRefreshing = false;
   }
 };

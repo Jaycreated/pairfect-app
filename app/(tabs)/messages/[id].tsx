@@ -1,21 +1,22 @@
 import { PoppinsText } from '@/components/PoppinsText';
 import { useAuth } from '@/context/AuthContext';
-import { withSubscription } from '@/context/SubscriptionContext';
+import { useSubscription, withSubscription } from '@/context/SubscriptionContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Image,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View,
 } from 'react-native';
 
 /** ------------------ TYPES ------------------ **/
@@ -72,6 +73,7 @@ const ChatScreen = () => {
   const { id } = useLocalSearchParams();
   const { user } = useAuth();
   const router = useRouter();
+  const { subscription, isLoading: isSubscriptionLoading } = useSubscription();
 
   const [messages, setMessages] = useState<ChatMessage[]>(MOCK_MESSAGES);
   const [newMessage, setNewMessage] = useState('');
@@ -96,6 +98,25 @@ const ChatScreen = () => {
 
   const handleSend = useCallback(() => {
     if (!newMessage.trim()) return;
+
+    // Check if user has an active subscription
+    if (!subscription) {
+      Alert.alert(
+        'Subscription Required',
+        'You need an active subscription to send messages. Would you like to subscribe now?',
+        [
+          {
+            text: 'Not Now',
+            style: 'cancel',
+          },
+          {
+            text: 'Subscribe',
+            onPress: () => router.push('/subscribe' as any),
+          },
+        ]
+      );
+      return;
+    }
 
     const newMsg: ChatMessage = {
       id: Date.now().toString(),
@@ -157,11 +178,19 @@ const ChatScreen = () => {
     );
   }
 
+  if (isSubscriptionLoading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#651B55" />
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
-      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
+      style={styles.container}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       {/* Header */}
       <View style={styles.header}>
@@ -230,6 +259,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   loadingContainer: {
     flex: 1,

@@ -54,27 +54,11 @@ const SettingsScreen = () => {
         
         <TouchableOpacity 
           style={styles.settingItem} 
-          onPress={() => router.push('/(tabs)/help-support')}
+          onPress={() => router.push('/screens/help-support')}
         >
           <View style={styles.settingLeft}>
             <Ionicons name="help-circle-outline" size={24} color="#333" />
             <Text style={styles.settingText}>Help & Support</Text>
-          </View>
-          <Ionicons name="chevicon-forward" size={20} color="#999" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.settingItem} onPress={() => {}}>
-          <View style={styles.settingLeft}>
-            <Ionicons name="document-text-outline" size={24} color="#333" />
-            <Text style={styles.settingText}>Terms of Service</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#999" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.settingItem} onPress={() => {}}>
-          <View style={styles.settingLeft}>
-            <Ionicons name="shield-checkmark-outline" size={24} color="#333" />
-            <Text style={styles.settingText}>Privacy Policy</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#999" />
         </TouchableOpacity>

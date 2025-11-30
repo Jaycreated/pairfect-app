@@ -4,12 +4,15 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
-const interests = [
-  'Travel', 'Music', 'Sports', 'Reading', 'Photography',
-  'Cooking', 'Gaming', 'Movies', 'Fitness', 'Art',
-  'Dance', 'Fashion', 'Foodie', 'Technology', 'Pets',
-  'Yoga', 'Hiking', 'Cycling', 'Swimming', 'Writing'
-];
+const INTERESTS = [
+  'Relationship', 
+  'Casual friendship', 
+  'Hookup', 
+  'Chat buddy', 
+  'Friends with benefit',
+  'Sugar Mummy', 
+  'Sugar Daddy'
+] as const;
 
 const SelectInterests = () => {
   const router = useRouter();
@@ -17,15 +20,13 @@ const SelectInterests = () => {
 
   const toggleInterest = (interest: string) => {
     setSelectedInterests(prev => 
-      prev.includes(interest)
-        ? prev.filter(item => item !== interest)
-        : [...prev, interest]
+      prev.includes(interest) ? [] : [interest]
     );
   };
 
   const handleContinue = async () => {
-    if (selectedInterests.length < 3) {
-      alert('Please select at least 3 interests');
+    if (selectedInterests.length === 0) {
+      alert('Please select an interest');
       return;
     }
     
@@ -59,22 +60,22 @@ const SelectInterests = () => {
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <PoppinsText style={styles.title}>Select Your Interests</PoppinsText>
-        <PoppinsText style={styles.subtitle}>Choose at least 3 interests to help us find better matches for you</PoppinsText>
+        <PoppinsText style={styles.subtitle}>Choose an interest to help us find better matches for you</PoppinsText>
         
         <View style={styles.interestsContainer}>
-          {interests.map((interest) => (
+          {INTERESTS.map((interest) => (
             <TouchableOpacity
               key={interest}
               style={[
                 styles.interestButton,
-                selectedInterests.includes(interest) && styles.interestButtonSelected
+                selectedInterests.includes(interest) && styles.selectedInterestButton,
               ]}
               onPress={() => toggleInterest(interest)}
             >
-              <PoppinsText 
+              <PoppinsText
                 style={[
                   styles.interestText,
-                  selectedInterests.includes(interest) && styles.interestTextSelected
+                  selectedInterests.includes(interest) && styles.selectedInterestText,
                 ]}
               >
                 {interest}
@@ -137,23 +138,20 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingVertical: 10,
     paddingHorizontal: 16,
-    marginBottom: 12,
-    minWidth: '48%',
-    alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#eee',
+    borderColor: '#ddd',
   },
-  interestButtonSelected: {
+  selectedInterestButton: {
     backgroundColor: '#651B55',
     borderColor: '#651B55',
   },
   interestText: {
     color: '#333',
-    fontSize: 14,
+    textAlign: 'center',
+    fontSize: 16,
   },
-  interestTextSelected: {
-    color: '#fff',
-    fontWeight: '500',
+  selectedInterestText: {
+    color: 'white',
   },
   footer: {
     position: 'absolute',

@@ -20,9 +20,22 @@ export const signUpSchema = z
       .string()
       .min(1, 'Email is required')
       .email('Please enter a valid email address'),
+    sexualOrientation: z
+      .string()
+      .min(1, 'Sexual orientation is required')
+      .refine(
+        (val) =>
+          ['straight', 'gay', 'lesbian', 'bisexual', 'asexual', 'demisexual', 'pansexual', 'queer', 'questioning', 'other'].includes(
+            val.toLowerCase()
+          ),
+        {
+          message: 'Please select a valid sexual orientation',
+        }
+      ),
     password: z
       .string()
-      .min(1, 'Password is required'),
+      .min(1, 'Password is required')
+      .min(6, 'Password must be at least 6 characters'),
     confirmPassword: z.string().min(1, 'Please confirm your password'),
   })
   .refine((data) => data.password === data.confirmPassword, {
