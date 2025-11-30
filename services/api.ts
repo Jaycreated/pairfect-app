@@ -158,8 +158,46 @@ export const api = {
   }) => fetchApi(API_CONFIG.ENDPOINTS.USERS.PROFILE, 'PUT', userData),
 
   // Matches
-  getPotentialMatches: () => 
-    fetchApi(API_CONFIG.ENDPOINTS.USERS.POTENTIAL_MATCHES),
+  getPotentialMatches: async () => {
+    try {
+      const response = await fetchApi<{
+        success: boolean;
+        count: number;
+        matches: Array<{
+          id: number | string;
+          name: string;
+          age: number | null;
+          bio: string | null;
+          location: string | null;
+          photos: string[];
+          preferences: {
+            lookingFor?: string;
+            interestedIn?: string;
+          };
+        }>;
+      }>(API_CONFIG.ENDPOINTS.USERS.POTENTIAL_MATCHES, 'GET');
+      
+      if (response.error) {
+        console.error('Error fetching potential matches:', response.error);
+        return [];
+      }
+      
+      // Transform the API response to match the expected format
+      return (response.data?.matches || []).map(match => ({
+        id: String(match.id),
+        name: match.name,
+        age: match.age || 0,
+        bio: match.bio || '',
+        distance: '', // Not provided in the API response
+        location: match.location || '',
+        interest: match.preferences?.lookingFor || match.preferences?.interestedIn || '',
+        images: match.photos || []
+      }));
+    } catch (error) {
+      console.error('Failed to fetch potential matches:', error);
+      return [];
+    }
+  },
     
   likeUser: (userId: string) =>
     fetchApi(API_CONFIG.ENDPOINTS.MATCHES.LIKE(userId), 'POST'),
