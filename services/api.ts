@@ -23,10 +23,15 @@ async function fetchApi<T = any>(
   const url = getApiUrl(endpoint);
   const token = await Storage.getItem('auth_token');
   
+  console.log('Current auth token from storage:', token);
+  console.log('Making request to:', url);
+  
   const headers: HeadersInit = {
     ...API_CONFIG.HEADERS,
     ...customHeaders,
   };
+  
+  console.log('Request headers before adding auth:', headers);
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -49,6 +54,13 @@ async function fetchApi<T = any>(
   }
 
   try {
+    console.log('Final request config:', {
+      url,
+      method,
+      headers: config.headers,
+      body: data instanceof FormData ? '[FormData]' : data
+    });
+    
     const response = await Promise.race([
       fetch(url, config),
       new Promise<Response>((_, reject) => 
@@ -82,17 +94,34 @@ async function fetchApi<T = any>(
 // API Service
 export const api = {
   // Auth
-  login: (email: string, password: string) =>
-    fetchApi(API_CONFIG.ENDPOINTS.AUTH.LOGIN, 'POST', { email, password }),
+  login: async (email: string, password: string) => {
+    const response = await fetchApi(API_CONFIG.ENDPOINTS.AUTH.LOGIN, 'POST', { email, password });
+    
+    // If login is successful and we have a token, save it
+    if (response.data?.token) {
+      await Storage.setItem('auth_token', response.data.token);
+      console.log('Auth token saved after login');
+    }
+    
+    return response;
+  },
 
-  register: (userData: {
+  register: async (userData: {
     email: string;
     password: string;
     name: string;
-      sexualOrientation: string;
-
-    // Add other registration fields as needed
-  }) => fetchApi(API_CONFIG.ENDPOINTS.AUTH.REGISTER, 'POST', userData),
+    sexualOrientation: string;
+  }) => {
+    const response = await fetchApi(API_CONFIG.ENDPOINTS.AUTH.REGISTER, 'POST', userData);
+    
+    // If registration is successful and we have a token, save it
+    if (response.data?.token) {
+      await Storage.setItem('auth_token', response.data.token);
+      console.log('Auth token saved after registration');
+    }
+    
+    return response;
+  },
 
   getCurrentUser: () => fetchApi(API_CONFIG.ENDPOINTS.AUTH.ME),
 
@@ -116,7 +145,7 @@ export const api = {
     orientation?: string;
     interests?: string[];
     photos?: string[];
-  }>(API_CONFIG.ENDPOINTS.USER.PROFILE),
+  }>(API_CONFIG.ENDPOINTS.USERS.PROFILE),
 
   updateProfile: (userData: {
     name?: string;
@@ -126,7 +155,7 @@ export const api = {
     orientation?: string;
     interests?: string[];
     photos?: string[];
-  }) => fetchApi(API_CONFIG.ENDPOINTS.USER.PROFILE, 'PUT', userData),
+  }) => fetchApi(API_CONFIG.ENDPOINTS.USERS.PROFILE, 'PUT', userData),
 
   // Matches
   getPotentialMatches: () => 

@@ -1,18 +1,17 @@
 import { PoppinsText } from '@/components/PoppinsText';
+import { api } from '@/services/api';
+import { Storage } from '@/utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState, useEffect } from 'react';
-import { 
-  ScrollView, 
-  StyleSheet, 
-  TextInput, 
-  TouchableOpacity, 
-  View, 
-  Alert, 
-  ActivityIndicator 
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
-import { Storage } from '@/utils/storage';
-import { api } from '@/services/api';
 
 const ProfileSetup = () => {
   const router = useRouter();
@@ -83,20 +82,34 @@ const ProfileSetup = () => {
       setIsLoading(true);
       setError(null);
 
-      // Prepare profile data
+      // Convert gender to lowercase to match backend expectations
+      const genderMapping: Record<string, string> = {
+        'Woman': 'female',
+        'Man': 'male',
+        'Non-binary': 'non_binary'
+      };
+
       const profileData = {
         name: formData.name,
-        gender: formData.gender,
+        gender: genderMapping[formData.gender] || formData.gender.toLowerCase(),
         age: parseInt(formData.age, 10),
         location: formData.location,
         orientation: formData.orientation,
         interests: selectedInterests,
       };
 
-      // Save profile data
+      console.log('Sending profile data:', profileData);
       const response = await api.updateProfile(profileData);
       
       if (response.error) {
+        console.error('Profile update error:', response.error);
+        if (response.error.errors) {
+          // Handle validation errors from the API
+          const errorMessages = response.error.errors.map((err: any) => 
+            `${err.path}: ${err.msg}`
+          ).join('\n');
+          throw new Error(`Validation failed:\n${errorMessages}`);
+        }
         throw new Error(response.error.message || 'Failed to save profile');
       }
 
