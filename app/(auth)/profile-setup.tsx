@@ -1,9 +1,18 @@
 import { PoppinsText } from '@/components/PoppinsText';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, TextInput, TouchableOpacity, View, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { 
+  ScrollView, 
+  StyleSheet, 
+  TextInput, 
+  TouchableOpacity, 
+  View, 
+  Alert, 
+  ActivityIndicator 
+} from 'react-native';
 import { Storage } from '@/utils/storage';
+import { api } from '@/services/api';
 
 const ProfileSetup = () => {
   const router = useRouter();
@@ -18,6 +27,8 @@ const ProfileSetup = () => {
 
   const [step, setStep] = useState(1);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const relationshipInterests = [
     'Relationship',
@@ -29,12 +40,37 @@ const ProfileSetup = () => {
     'Sugar Daddy'
   ];
 
-  // FORM UPDATES
   const handleChange = (name: string, value: string) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // NEXT STEP OR COMPLETE PROFILE
+  // Load profile data when component mounts
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const response = await api.getProfile();
+        if (response.data) {
+          const { name, gender, age, location, orientation, interests } = response.data;
+          setFormData(prev => ({
+            ...prev,
+            name: name || '',
+            gender: gender || '',
+            age: age ? age.toString() : '',
+            location: location || '',
+            orientation: orientation || '',
+          }));
+          if (interests) {
+            setSelectedInterests(interests);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load profile:', err);
+      }
+    };
+
+    loadProfile();
+  }, []);
+
   const handleNext = async () => {
     if (!canProceed()) return;
 
@@ -44,39 +80,44 @@ const ProfileSetup = () => {
     }
 
     try {
-      const tempUser = await Storage.getItem('tempUser');
+      setIsLoading(true);
+      setError(null);
 
-      if (!tempUser) {
-        throw new Error('User data not found. Please sign up again.');
-      }
-
-      const user = JSON.parse(tempUser);
-
-      const finalUser = {
-        ...user,
-        profile: {
-          ...formData,
-          interests: selectedInterests
-        }
+      // Prepare profile data
+      const profileData = {
+        name: formData.name,
+        gender: formData.gender,
+        age: parseInt(formData.age, 10),
+        location: formData.location,
+        orientation: formData.orientation,
+        interests: selectedInterests,
       };
 
-      await Storage.setItem('user', JSON.stringify(finalUser));
-      await Storage.deleteItem('tempUser');
-      router.push('/(auth)/select-interests');
+      // Save profile data
+      const response = await api.updateProfile(profileData);
+      
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to save profile');
+      }
 
-    } catch (error) {
-      console.log(error);
-      Alert.alert('Error', 'Failed to complete profile setup. Please try again.');
+      // Clear temp user data if it exists
+      await Storage.deleteItem('tempUser');
+      
+      // Navigate to the main app
+      router.replace('/(tabs)');
+    } catch (err) {
+      console.error('Profile setup error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to save profile. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // BACK HANDLING
   const handleBack = () => {
     if (step > 1) setStep(step - 1);
     else router.back();
   };
 
-  // VALIDATION
   const canProceed = () => {
     if (step === 1) return !!formData.gender;
     if (step === 2) return !!formData.name && !!formData.age && !!formData.location;
@@ -85,10 +126,8 @@ const ProfileSetup = () => {
     return false;
   };
 
-  // STEP RENDERER
   const renderStep = () => {
     switch (step) {
-
       case 1:
         return (
           <View style={styles.stepContainer}>
@@ -188,19 +227,6 @@ const ProfileSetup = () => {
                 </TouchableOpacity>
               ))}
             </View>
-            
-            {/* PHOTO PLACEHOLDER */}
-            <View style={styles.photoUploadContainer}>
-              <PoppinsText style={styles.stepTitle}>Add Photos</PoppinsText>
-              <PoppinsText style={styles.subtitle}>Add at least 2 photos to continue</PoppinsText>
-              <View style={styles.photoGrid}>
-                {[1, 2, 3, 4].map((i) => (
-                  <View key={i} style={styles.photoPlaceholder}>
-                    <Ionicons name="add" size={32} color="#999" />
-                  </View>
-                ))}
-              </View>
-            </View>
           </View>
         );
 
@@ -247,8 +273,7 @@ const ProfileSetup = () => {
 
   return (
     <View style={styles.container}>
-
-      {/* PROGRESS DOTS */}
+      {/* Progress Dots */}
       <View style={styles.progressContainer}>
         {[1, 2, 3, 4].map((i) => (
           <View
@@ -261,7 +286,7 @@ const ProfileSetup = () => {
         ))}
       </View>
 
-      {/* CONTENT */}
+      {/* Content */}
       <ScrollView contentContainerStyle={styles.content}>
         <PoppinsText style={styles.title}>
           {step === 4 ? 'Almost there!' : 'Tell us about yourself'}
@@ -277,24 +302,30 @@ const ProfileSetup = () => {
         {renderStep()}
       </ScrollView>
 
-      {/* FOOTER ACTION BUTTON */}
+      {/* Footer Action Button */}
       <View style={styles.footer}>
+        {error && (
+          <View style={styles.errorContainer}>
+            <PoppinsText style={styles.errorText}>{error}</PoppinsText>
+          </View>
+        )}
         <TouchableOpacity
-          style={[styles.button, !canProceed() && styles.buttonDisabled]}
+          style={[styles.button, (!canProceed() || isLoading) && styles.buttonDisabled]}
           onPress={handleNext}
-          disabled={!canProceed()}
+          disabled={!canProceed() || isLoading}
         >
-          <PoppinsText style={styles.buttonText}>
-            {step === 4 ? 'Complete Profile' : 'Continue'}
-          </PoppinsText>
+          {isLoading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <PoppinsText style={styles.buttonText}>
+              {step === 4 ? 'Complete Profile' : 'Continue'}
+            </PoppinsText>
+          )}
         </TouchableOpacity>
       </View>
-
     </View>
   );
 };
-
-/* ========================= STYLES ======================== */
 
 const styles = StyleSheet.create({
   container: {
@@ -340,7 +371,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
   },
-  /* GENDER */
   genderContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -362,7 +392,6 @@ const styles = StyleSheet.create({
   genderTextSelected: {
     color: '#fff',
   },
-  /* INPUTS */
   input: {
     backgroundColor: '#F5F5F5',
     borderRadius: 12,
@@ -382,7 +411,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
   },
-  /* ORIENTATION */
   orientationContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -405,26 +433,6 @@ const styles = StyleSheet.create({
   orientationTextSelected: {
     color: '#fff',
   },
-  /* PHOTOS */
-  photoUploadContainer: {
-    marginTop: 30,
-  },
-  photoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginTop: 15,
-  },
-  photoPlaceholder: {
-    width: '48%',
-    aspectRatio: 0.8,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  /* INTERESTS */
   interestsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -446,7 +454,6 @@ const styles = StyleSheet.create({
   interestButtonTextSelected: {
     color: '#fff',
   },
-  /* FOOTER */
   footer: {
     padding: 20,
     borderTopWidth: 1,
@@ -465,6 +472,16 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  errorContainer: {
+    backgroundColor: '#FFEBEE',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: '#D32F2F',
+    textAlign: 'center',
   },
 });
 

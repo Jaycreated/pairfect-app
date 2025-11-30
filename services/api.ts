@@ -105,10 +105,28 @@ export const api = {
   logout: () => fetchApi(API_CONFIG.ENDPOINTS.AUTH.LOGOUT, 'POST'),
 
   // User
-  getProfile: () => fetchApi(API_CONFIG.ENDPOINTS.USERS.PROFILE, 'GET'),
-  
-  updateProfile: (userData: any) =>
-    fetchApi(API_CONFIG.ENDPOINTS.USERS.PROFILE, 'PUT', userData),
+  // User Profile
+  getProfile: () => fetchApi<{
+    id: string;
+    name: string;
+    email: string;
+    gender?: string;
+    age?: number;
+    location?: string;
+    orientation?: string;
+    interests?: string[];
+    photos?: string[];
+  }>(API_CONFIG.ENDPOINTS.USER.PROFILE),
+
+  updateProfile: (userData: {
+    name?: string;
+    gender?: string;
+    age?: number;
+    location?: string;
+    orientation?: string;
+    interests?: string[];
+    photos?: string[];
+  }) => fetchApi(API_CONFIG.ENDPOINTS.USER.PROFILE, 'PUT', userData),
 
   // Matches
   getPotentialMatches: () => 
