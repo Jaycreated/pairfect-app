@@ -151,23 +151,35 @@ export const api = {
   // User
   // User Profile
   getProfile: () => fetchApi<{
-    id: string;
-    name: string;
-    email: string;
-    gender?: string;
-    age?: number;
-    location?: string;
-    orientation?: string;
-    interests?: string[];
-    photos?: string[];
+    user: {
+      id: number;
+      email: string;
+      name: string;
+      age: number | null;
+      gender: string | null;
+      bio: string | null;
+      location: string | null;
+      orientation: string | null;
+      photos: string[];
+      interests: string[];
+      preferences: Record<string, any>;
+      created_at: string;
+      updated_at: string;
+      has_chat_access: boolean;
+      payment_date: string | null;
+      payment_reference: string | null;
+      is_admin: boolean;
+      last_login: string;
+    }
   }>(API_CONFIG.ENDPOINTS.USERS.PROFILE),
 
   updateProfile: (userData: {
     name?: string;
-    gender?: string;
-    age?: number;
-    location?: string;
-    orientation?: string;
+    gender?: string | null;
+    age?: number | null;
+    location?: string | null;
+    orientation?: string | null;
+    bio?: string | null;
     interests?: string[];
     photos?: string[];
   }) => fetchApi(API_CONFIG.ENDPOINTS.USERS.PROFILE, 'PUT', userData),

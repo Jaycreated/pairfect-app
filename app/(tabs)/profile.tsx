@@ -1,5 +1,6 @@
 import { PoppinsText } from '@/components/PoppinsText';
 import { useAuth } from '@/context/AuthContext';
+import { api } from '@/services/api';
 import { Storage } from '@/utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -16,12 +17,16 @@ import {
 } from 'react-native';
 
 interface UserProfile {
+  id?: string | number;
   name: string;
   email: string;
-  age: string;
-  bio: string;
+  age: number | string | null;
+  bio: string | null;
   interests: string[];
   photos: string[];
+  gender?: string | null;
+  location?: string | null;
+  orientation?: string | null;
 }
 
 export default function ProfileScreen() {
@@ -32,10 +37,13 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<UserProfile>({
     name: '',
     email: user?.email || '',
-    age: '',
-    bio: '',
+    age: null,
+    bio: null,
     interests: [],
     photos: [],
+    gender: null,
+    location: null,
+    orientation: null
   });
 
   const INTERESTS = [
@@ -55,38 +63,57 @@ export default function ProfileScreen() {
   const loadUserProfile = async () => {
     try {
       setIsLoading(true);
-      // Load profile data from storage
-      const userData = await Storage.getItem('user');
-      const userPhotos = await Storage.getItem('userPhotos');
       
-      // Default dummy data
-      const dummyData = {
-        name: 'Alex Johnson',
-        age: '28',
-        bio: 'Adventure seeker and coffee enthusiast. Looking for meaningful connections and fun experiences. Let\'s chat and see where it takes us!',
-        interests: ['Hookup'],
-        photos: [
-          'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500&auto=format&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=500&auto=format&fit=crop&q=80',
-          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80'
-        ]
-      };
-
-      // Use stored data if available, otherwise use dummy data
-      const profileData = userData ? JSON.parse(userData) : dummyData;
-      const photos = userPhotos ? JSON.parse(userPhotos) : dummyData.photos;
+      // Try to fetch profile from API
+      const response = await api.getProfile();
       
-      setProfile(prev => ({
-        ...prev,
-        ...profileData,
-        photos: photos,
-        email: user?.email || 'alex.johnson@example.com',
-      }));
-      
-      // Save the dummy data to storage if none exists
-      if (!userData) {
-        await Storage.setItem('user', JSON.stringify(dummyData));
-        await Storage.setItem('userPhotos', JSON.stringify(dummyData.photos));
+      if (response.data?.user) {
+        const { user: apiData } = response.data;
+        
+        setProfile({
+          id: apiData.id,
+          name: apiData.name,
+          email: apiData.email || user?.email || '',
+          age: apiData.age,
+          bio: apiData.bio,
+          interests: apiData.interests || [],
+          photos: apiData.photos || [],
+          gender: apiData.gender,
+          location: apiData.location,
+          orientation: apiData.orientation
+        });
+        
+        // Cache the data locally
+        await Storage.setItem('user', JSON.stringify({
+          name: apiData.name,
+          email: apiData.email,
+          age: apiData.age,
+          bio: apiData.bio,
+          interests: apiData.interests,
+          gender: apiData.gender,
+          location: apiData.location,
+          orientation: apiData.orientation
+        }));
+        
+        if (apiData.photos && apiData.photos.length > 0) {
+          await Storage.setItem('userPhotos', JSON.stringify(apiData.photos));
+        }
+      } else {
+        // Fallback to local storage if API fails
+        const userData = await Storage.getItem('user');
+        const userPhotos = await Storage.getItem('userPhotos');
+        
+        if (userData) {
+          const localData = JSON.parse(userData);
+          const photos = userPhotos ? JSON.parse(userPhotos) : [];
+          
+          setProfile(prev => ({
+            ...prev,
+            ...localData,
+            photos: photos,
+            email: localData.email || user?.email || ''
+          }));
+        }
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -99,13 +126,47 @@ export default function ProfileScreen() {
   const handleSave = async () => {
     try {
       setIsLoading(true);
-      // Save updated profile to storage
-      await Storage.setItem('user', JSON.stringify(profile));
+      
+      // Prepare data for API
+      const profileData = {
+        name: profile.name,
+        age: profile.age ? parseInt(profile.age.toString()) : null,
+        bio: profile.bio,
+        interests: profile.interests,
+        photos: profile.photos,
+        gender: profile.gender || null,
+        location: profile.location || null,
+        orientation: profile.orientation || null
+      };
+      
+      // Update profile via API
+      const response = await api.updateProfile(profileData);
+      
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to update profile');
+      }
+      
+      // Update local storage
+      await Storage.setItem('user', JSON.stringify({
+        name: profile.name,
+        email: profile.email,
+        age: profile.age,
+        bio: profile.bio,
+        interests: profile.interests,
+        gender: profile.gender,
+        location: profile.location,
+        orientation: profile.orientation
+      }));
+      
+      if (profile.photos && profile.photos.length > 0) {
+        await Storage.setItem('userPhotos', JSON.stringify(profile.photos));
+      }
+      
       setIsEditing(false);
       Alert.alert('Success', 'Profile updated successfully');
     } catch (error) {
       console.error('Error saving profile:', error);
-      Alert.alert('Error', 'Failed to save profile');
+      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to update profile');
     } finally {
       setIsLoading(false);
     }
@@ -120,21 +181,32 @@ export default function ProfileScreen() {
     }
   };
 
-  const renderField = (label: string, value: string, key: keyof UserProfile) => {
+  const renderField = (label: string, value: string | number | null | undefined, key: keyof UserProfile) => {
+    // Skip rendering if value is null or undefined and we're not in edit mode
+    if (!isEditing && (value === null || value === undefined || value === '')) {
+      return null;
+    }
+    const stringValue = value !== null && value !== undefined ? value.toString() : '';
+    const inputValue = value !== null && value !== undefined ? value.toString() : '';
     return isEditing ? (
       <View style={styles.fieldContainer}>
         <PoppinsText style={styles.label}>{label}</PoppinsText>
         <TextInput
           style={styles.input}
-          value={value}
-          onChangeText={(text) => setProfile({ ...profile, [key]: text })}
+          value={inputValue}
+          onChangeText={(text) => setProfile({ ...profile, [key]: text || null })}
           placeholder={`Enter ${label.toLowerCase()}`}
+          placeholderTextColor="#999"
+          editable={isEditing}
+          selectTextOnFocus={isEditing}
         />
       </View>
     ) : (
       <View style={styles.fieldContainer}>
         <PoppinsText style={styles.label}>{label}</PoppinsText>
-        <PoppinsText style={styles.value}>{value || 'Not set'}</PoppinsText>
+        <PoppinsText style={[styles.value, !stringValue && styles.placeholderText]}>
+          {stringValue || 'Not set'}
+        </PoppinsText>
       </View>
     );
   };
@@ -200,7 +272,10 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           {renderField('Name', profile.name, 'name')}
           {renderField('Email', profile.email, 'email')}
-          {renderField('Age', profile.age, 'age')}
+          {renderField('Age', profile.age?.toString(), 'age')}
+          {profile.gender && renderField('Gender', profile.gender, 'gender')}
+          {profile.location && renderField('Location', profile.location, 'location')}
+          {profile.orientation && renderField('Orientation', profile.orientation, 'orientation')}
           
           {/* Bio */}
           <View style={styles.fieldContainer}>
@@ -208,7 +283,7 @@ export default function ProfileScreen() {
             {isEditing ? (
               <TextInput
                 style={[styles.input, styles.bioInput]}
-                value={profile.bio}
+                value={profile.bio ||}
                 onChangeText={(text) => setProfile({ ...profile, bio: text })}
                 placeholder="Tell us about yourself"
                 multiline
@@ -398,6 +473,10 @@ const styles = StyleSheet.create({
   interestText: {
     color: '#651B55',
     fontSize: 14,
+  },
+  placeholderText: {
+    color: '#999',
+    fontStyle: 'italic',
   },
   signOutButton: {
     backgroundColor: '#ffebee',
