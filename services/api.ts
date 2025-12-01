@@ -1,6 +1,21 @@
 import { API_CONFIG, getApiUrl } from '@/config/api';
 import { Storage } from '@/utils/storage';
 
+export interface NotificationType {
+  id: string;
+  type: 'like' | 'match' | 'message' | 'view' | 'other';
+  user: {
+    id: string;
+    name: string;
+    avatar: string;
+  };
+  message: string;
+  time: string;
+  read: boolean;
+  isSubscriptionPrompt?: boolean;
+  createdAt: string;
+}
+
 // Types
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -220,7 +235,29 @@ export const api = {
   post: <T = any>(endpoint: string, data: any) => fetchApi<T>(endpoint, 'POST', data),
   put: <T = any>(endpoint: string, data: any) => fetchApi<T>(endpoint, 'PUT', data),
   patch: <T = any>(endpoint: string, data: any) => fetchApi<T>(endpoint, 'PATCH', data),
-  delete: <T = any>(endpoint: string) => fetchApi<T>(endpoint, 'DELETE'),
+  delete: (endpoint: string) => fetchApi(endpoint, 'DELETE'),
+
+  // Notifications
+  getNotifications: async () => {
+    const response = await fetchApi<{ notifications: NotificationType[] }>('/notifications', 'GET');
+    // Return the notifications array from the response data or an empty array if not found
+    return {
+      ...response,
+      data: response.data?.notifications || []
+    };
+  },
+  
+  getUnreadNotificationCount: () => 
+    fetchApi<{ count: number }>('/notifications/unread/count', 'GET'),
+  
+  markNotificationAsRead: (notificationId: string) => 
+    fetchApi(`/notifications/${notificationId}/read`, 'PUT'),
+  
+  markAllNotificationsAsRead: () => 
+    fetchApi('/notifications/read-all', 'PUT'),
+  
+  deleteNotification: (notificationId: string) => 
+    fetchApi(`/notifications/${notificationId}`, 'DELETE'),
 };
 
 // Auth interceptor to handle token refresh

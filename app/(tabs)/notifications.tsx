@@ -1,9 +1,11 @@
 import { PoppinsText } from '@/components/PoppinsText';
 import { useSubscription } from '@/context/SubscriptionContext';
+import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
+    ActivityIndicator,
     FlatList,
     Image,
     RefreshControl,
@@ -12,70 +14,30 @@ import {
     View,
 } from 'react-native';
 
-// Mock notification data
-const NOTIFICATIONS: NotificationType[] = [
-  {
-    id: '0',
-    type: 'match',
-    user: {
-      id: 'premium',
-      name: 'New Match!',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=60',
-    },
-    message: 'You have a new match! Subscribe to see who liked you!',
-    time: 'Just now',
-    read: false,
-    isSubscriptionPrompt: true
-  } as NotificationType,
-  {
-    id: '1',
-    type: 'like',
-    user: {
-      id: '2',
-      name: 'Alex Johnson',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&auto=format&fit=crop&q=60',
-    },
-    message: 'liked your profile',
-    time: '2m ago',
-    read: false,
-  },
-  {
-    id: '2',
-    type: 'match',
-    user: {
-      id: '3',
-      name: 'Jordan Smith',
-      avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=500&auto=format&fit=crop&q=60',
-    },
-    message: 'You matched with Jordan!',
-    time: '1h ago',
-    read: false,
-  },
-  {
-    id: '3',
-    type: 'message',
-    user: {
-      id: '4',
-      name: 'Taylor Swift',
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500&auto=format&fit=crop&q=60',
-    },
-    message: 'sent you a message',
-    time: '3h ago',
-    read: true,
-  },
-  {
-    id: '4',
-    type: 'view',
-    user: {
-      id: '5',
-      name: 'Chris Evans',
-      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=500&auto=format&fit=crop&q=60',
-    },
-    message: 'viewed your profile',
-    time: '1d ago',
-    read: true,
-  },
-];
+// Format time to relative time (e.g., '2m ago')
+const formatTimeAgo = (dateString: string) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  
+  const intervals = {
+    year: 31536000,
+    month: 2592000,
+    week: 604800,
+    day: 86400,
+    hour: 3600,
+    minute: 60
+  };
+
+  for (const [unit, secondsInUnit] of Object.entries(intervals)) {
+    const interval = Math.floor(seconds / secondsInUnit);
+    if (interval >= 1) {
+      return interval === 1 ? `1 ${unit} ago` : `${interval} ${unit}s ago`;
+    }
+  }
+  
+  return 'Just now';
+};
 
 type NotificationType = {
   id: string;
@@ -89,21 +51,88 @@ type NotificationType = {
   time: string;
   read: boolean;
   isSubscriptionPrompt?: boolean;
+  createdAt: string;
 };
 
 const NotificationsScreen = () => {
   const { subscription } = useSubscription();
   const [notifications, setNotifications] = useState<NotificationType[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  // Filter out subscription prompt if user is already subscribed
-  useEffect(() => {
-    const filteredNotifications = NOTIFICATIONS.filter(
-      notification => !(notification.isSubscriptionPrompt && subscription)
-    ) as NotificationType[];
-    setNotifications(filteredNotifications);
-  }, [subscription]);
+  const fetchNotifications = async () => {
+    try {
+      const [notificationsRes, unreadRes] = await Promise.all([
+        api.getNotifications(),
+        api.getUnreadNotificationCount()
+      ]);
+
+      if (notificationsRes.data) {
+        setNotifications(notificationsRes.data.map((n: any) => ({
+          ...n,
+          time: formatTimeAgo(n.createdAt)
+        })));
+      }
+
+      if (unreadRes.data) {
+        setUnreadCount(unreadRes.data.count);
+      }
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
+      setError('Failed to load notifications. Please try again.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const markAsRead = async (id: string) => {
+    try {
+      await api.markNotificationAsRead(id);
+      setNotifications(prev => 
+        prev.map(n => n.id === id ? { ...n, read: true } : n)
+      );
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (err) {
+      console.error('Error marking notification as read:', err);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      await api.markAllNotificationsAsRead();
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      setUnreadCount(0);
+    } catch (err) {
+      console.error('Error marking all as read:', err);
+    }
+  };
+
+  const deleteNotification = async (id: string) => {
+    try {
+      await api.deleteNotification(id);
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    } catch (err) {
+      console.error('Error deleting notification:', err);
+    }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchNotifications();
+  };
+
+  // Fetch notifications when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
+      fetchNotifications();
+    }, [])
+  );
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -135,37 +164,23 @@ const NotificationsScreen = () => {
     }
   };
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    // Simulate network request
-    setTimeout(() => {
-      setRefreshing(false);
-      // In a real app, you would fetch new notifications here
-    }, 1000);
-  };
-
-  const markAsRead = (id: string) => {
-    setNotifications(prev => 
-      prev.map(notification => 
-        notification.id === id 
-          ? { ...notification, read: true } 
-          : notification
-      )
-    );
-  };
-
-  const handleNotificationPress = (notification: NotificationType) => {
+  const handleNotificationPress = async (notification: NotificationType) => {
     if (notification.isSubscriptionPrompt) {
       router.push('/screens/subscribe');
       return;
     }
-    markAsRead(notification.id);
+
+    // Mark as read if not already read
+    if (!notification.read) {
+      await markAsRead(notification.id);
+    }
+
     // Navigate based on notification type
     if (notification.type === 'message') {
       router.push(`/messages/${notification.user.id}`);
     } else if (notification.type === 'match') {
       router.push(`/matches`);
-    } else {
+    } else if (notification.user?.id) {
       router.push(`/user/${notification.user.id}`);
     }
   };
@@ -203,13 +218,47 @@ const NotificationsScreen = () => {
     </TouchableOpacity>
   );
 
+  if (loading && !refreshing) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color="#651B55" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <Ionicons name="warning-outline" size={48} color="#ff4d4f" />
+        <PoppinsText style={styles.errorText}>{error}</PoppinsText>
+        <TouchableOpacity 
+          style={styles.retryButton}
+          onPress={fetchNotifications}
+        >
+          <PoppinsText style={styles.retryButtonText}>Try Again</PoppinsText>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <PoppinsText style={styles.headerTitle}>Notifications</PoppinsText>
-        <TouchableOpacity>
-          <Ionicons name="ellipsis-vertical" size={24} color="#333" />
-        </TouchableOpacity>
+        <View>
+          <PoppinsText style={styles.headerTitle}>Notifications</PoppinsText>
+          {unreadCount > 0 && (
+            <PoppinsText style={styles.unreadCount}>
+              {unreadCount} unread {unreadCount === 1 ? 'notification' : 'notifications'}
+            </PoppinsText>
+          )}
+        </View>
+        {notifications.length > 0 && (
+          <TouchableOpacity onPress={markAllAsRead}>
+            <PoppinsText style={styles.markAllButton}>
+              Mark all as read
+            </PoppinsText>
+          </TouchableOpacity>
+        )}
       </View>
 
       <FlatList
@@ -341,6 +390,39 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    color: '#ff4d4f',
+    fontSize: 16,
+    marginTop: 16,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: '#651B55',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  unreadCount: {
+    color: '#666',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  markAllButton: {
+    color: '#651B55',
+    fontWeight: '600',
+    fontSize: 14,
   },
 });
 
