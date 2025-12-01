@@ -283,7 +283,7 @@ export default function ProfileScreen() {
             {isEditing ? (
               <TextInput
                 style={[styles.input, styles.bioInput]}
-                value={profile.bio ||}
+                value={profile.bio || ''}
                 onChangeText={(text) => setProfile({ ...profile, bio: text })}
                 placeholder="Tell us about yourself"
                 multiline
