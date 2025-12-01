@@ -1,20 +1,22 @@
 import { useAuth } from '@/hooks/useAuth';
+import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Dimensions, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2; // 16px padding on each side + 16px gap between cards
 
 type Match = {
-  id: string;
+  id: number;
   name: string;
   age: number;
-  avatar: string;
+  bio: string | null;
+  photos: string[];
+  matched_at: string;
   lastMessage?: string;
   unreadCount?: number;
-  timestamp?: string;
   interests?: string[];
 };
 
@@ -24,56 +26,34 @@ export default function MatchesScreen() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // TODO: Replace with actual API call to fetch matches
   useEffect(() => {
-    // Simulate API call
     const fetchMatches = async () => {
       try {
-        // This is mock data - replace with actual API call
-        const mockMatches: Match[] = [
-          {
-            id: '1',
-            name: 'Alex Johnson',
-            age: 28,
-            avatar: 'https://randomuser.me/api/portraits/women/44.jpg',
-            lastMessage: 'Hey! How are you?',
-            unreadCount: 2,
-            timestamp: '10m ago',
-            interests: ['Hiking', 'Photography', 'Travel']
-          },
-          {
-            id: '2',
-            name: 'Jordan Smith',
-            age: 31,
-            avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
-            lastMessage: 'Let\'s meet up this weekend!',
-            timestamp: '2h ago',
-            interests: ['Cooking', 'Yoga', 'Reading']
-          },
-          {
-            id: '3',
-            name: 'Taylor Wilson',
-            age: 25,
-            avatar: 'https://randomuser.me/api/portraits/women/68.jpg',
-            lastMessage: 'Are you free tomorrow?',
-            unreadCount: 1,
-            timestamp: '5h ago',
-            interests: ['Music', 'Dancing', 'Art']
-          },
-          {
-            id: '4',
-            name: 'Casey Brown',
-            age: 29,
-            avatar: 'https://randomuser.me/api/portraits/men/22.jpg',
-            lastMessage: 'Great seeing you yesterday!',
-            timestamp: '1d ago',
-            interests: ['Gaming', 'Movies', 'Basketball']
-          },
-        ];
+        setIsLoading(true);
+        const response = await api.getMatches();
         
-        setMatches(mockMatches);
+        if (response.error) {
+          throw new Error(response.error.message || 'Failed to fetch matches');
+        }
+
+        // Transform the API response to match our Match type
+        const formattedMatches: Match[] = response.data.matches.map((match: any) => ({
+          id: match.id,
+          name: match.name,
+          age: match.age,
+          bio: match.bio,
+          photos: match.photos,
+          matched_at: match.matched_at,
+          // Add some default values for the UI
+          lastMessage: '',
+          unreadCount: 0,
+          interests: []
+        }));
+        
+        setMatches(formattedMatches);
       } catch (error) {
         console.error('Error fetching matches:', error);
+        Alert.alert('Error', 'Failed to load matches. Please try again later.');
       } finally {
         setIsLoading(false);
       }
@@ -88,22 +68,21 @@ export default function MatchesScreen() {
       onPress={() => router.push(`/(tabs)/messages/${item.id}`)}
     >
       <Image 
-        source={{ uri: item.avatar }} 
+        source={{ uri: item.photos && item.photos.length > 0 ? item.photos[0] : 'https://via.placeholder.com/150' }} 
         style={styles.cardImage} 
         resizeMode="cover"
+        defaultSource={{ uri: 'https://via.placeholder.com/150' }}
       />
       <View style={styles.cardContent}>
         <View style={styles.nameContainer}>
           <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
           <Text style={styles.age}>{item.age}</Text>
         </View>
-        {item.interests && item.interests.length > 0 && (
+        {item.bio && (
           <View style={styles.interestsContainer}>
-            <View style={styles.interestTag}>
-              <Text style={styles.interestText} numberOfLines={1}>
-                {item.interests[0]}
-              </Text>
-            </View>
+            <Text style={styles.bioText} numberOfLines={2}>
+              {item.bio}
+            </Text>
           </View>
         )}
         {item.unreadCount ? (
@@ -143,7 +122,7 @@ export default function MatchesScreen() {
       <FlatList
         data={matches}
         renderItem={renderMatchItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={styles.listContent}
         numColumns={numColumns}
         columnWrapperStyle={numColumns > 1 ? styles.columnWrapper : undefined}
@@ -214,8 +193,14 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   interestText: {
-    fontSize: 10,
-    color: '#555',
+    fontSize: 12,
+    color: '#666',
+  },
+  bioText: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+    lineHeight: 16,
   },
   moreInterests: {
     fontSize: 10,
