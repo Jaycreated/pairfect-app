@@ -236,11 +236,15 @@ export const api = {
     fetchApi(API_CONFIG.ENDPOINTS.MATCHES.BASE),
 
   // Messages
-  getConversation: (matchId: string) =>
-    fetchApi(API_CONFIG.ENDPOINTS.MESSAGES.CONVERSATION(matchId)),
+  getMessages: (matchId: string) => 
+    fetchApi(`/api/messages/${matchId}`),
     
-  sendMessage: (matchId: string, content: string) =>
-    fetchApi(API_CONFIG.ENDPOINTS.MESSAGES.CONVERSATION(matchId), 'POST', { content }),
+  sendMessage: (matchId: string, content: string) => {
+    return fetchApi(`/api/messages/${matchId}`, 'POST', { content });
+  },
+  getUnreadMessageCount: () => {
+    return fetchApi<{ count: number }>('/api/messages/unread/count');
+  },
 
   // Generic methods
   get: <T = any>(endpoint: string) => fetchApi<T>(endpoint, 'GET'),

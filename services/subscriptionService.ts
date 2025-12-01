@@ -4,6 +4,19 @@ import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
+// Dummy subscription data for development
+const DUMMY_SUBSCRIPTION: UserSubscription = {
+  id: 'sub_123456789',
+  userId: 'user_123',
+  planId: 'premium_monthly',
+  status: 'active',
+  startDate: new Date().toISOString(),
+  endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
+  paymentReference: 'pay_123456789',
+  amount: 999,
+  currency: 'USD'
+};
+
 const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     id: 'daily',
@@ -32,16 +45,6 @@ const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     ],
   },
 ];
-
-// Dummy subscription data for development
-const DUMMY_ACTIVE_SUBSCRIPTION: UserSubscription = {
-  id: 'sub_dummy_123',
-  planId: 'monthly',
-  status: 'active',
-  startDate: new Date().toISOString(),
-  endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
-  autoRenew: true,
-};
 
 // Helper function to get auth token
 const getAuthToken = async (): Promise<string | null> => {
@@ -79,13 +82,10 @@ export const getSubscriptionPlans = (): SubscriptionPlan[] => {
 };
 
 export const getActiveSubscription = async (): Promise<UserSubscription | null> => {
-  // Return dummy data in development mode
+  // In development, return the dummy subscription
   if (__DEV__) {
     console.log('Using dummy subscription data for development');
-    return DUMMY_ACTIVE_SUBSCRIPTION;
-    
-    // To test the no-subscription scenario, uncomment this:
-    // return null;
+    return DUMMY_SUBSCRIPTION;
   }
 
   try {
@@ -292,7 +292,7 @@ export const hasActiveSubscription = async (): Promise<boolean> => {
     const subscription = await getActiveSubscription();
     if (!subscription) return false;
     
-    const expiresAt = new Date(subscription.expiresAt);
+    const expiresAt = new Date(subscription.currentPeriodEnd);
     return expiresAt > new Date();
   } catch (error) {
     console.error('Error checking subscription status:', error);

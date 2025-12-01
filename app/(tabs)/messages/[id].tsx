@@ -1,22 +1,24 @@
 import { PoppinsText } from '@/components/PoppinsText';
 import { useAuth } from '@/context/AuthContext';
 import { useSubscription, withSubscription } from '@/context/SubscriptionContext';
+import { useWebSocket } from '@/context/WebSocketContext';
+import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Image,
-    Keyboard,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from 'react-native';
 
 /** ------------------ TYPES ------------------ **/
@@ -25,48 +27,16 @@ export type ChatMessage = {
   text: string;
   senderId: string;
   timestamp: Date;
+  isSending?: boolean;
+  isError?: boolean;
 };
 
-/** ------------------ MOCK DATA ------------------ **/
-const MOCK_MESSAGES: ChatMessage[] = [
-  {
-    id: '1',
-    text: 'Hey there! How are you doing?',
-    senderId: '2',
-    timestamp: new Date(Date.now() - 1000 * 60 * 5),
-  },
-  {
-    id: '2',
-    text: "I'm good, thanks for asking! How about you?",
-    senderId: '1',
-    timestamp: new Date(Date.now() - 1000 * 60 * 4),
-  },
-  {
-    id: '3',
-    text: 'Doing great! Just finished that project we talked about.',
-    senderId: '2',
-    timestamp: new Date(Date.now() - 1000 * 60 * 3),
-  },
-  {
-    id: '4',
-    text: "That's awesome! Can you share some details?",
-    senderId: '1',
-    timestamp: new Date(Date.now() - 1000 * 60 * 2),
-  },
-  {
-    id: '5',
-    text: "Sure! It’s a mobile app for connecting people with similar interests. Would you like to check it out?",
-    senderId: '2',
-    timestamp: new Date(),
-  },
-];
-
-const MOCK_USER = {
-  id: '2',
-  name: 'Alex Johnson',
-  avatar:
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&auto=format&fit=crop&q=60',
-};
+/** ------------------ TYPES ------------------ **/
+interface ChatUser {
+  id: string;
+  name: string;
+  avatar: string;
+}
 
 /** ------------------ CHAT SCREEN ------------------ **/
 const ChatScreen = () => {
@@ -74,64 +44,181 @@ const ChatScreen = () => {
   const { user } = useAuth();
   const router = useRouter();
   const { subscription, isLoading: isSubscriptionLoading } = useSubscription();
+  const { socket, emit, on, off } = useWebSocket();
 
-  const [messages, setMessages] = useState<ChatMessage[]>(MOCK_MESSAGES);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [chatUser, setChatUser] = useState<ChatUser | null>(null);
   const [newMessage, setNewMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const flatListRef = useRef<FlatList<ChatMessage>>(null);
 
+  // Fetch initial messages and chat user data
   useEffect(() => {
-    const fetchMessages = async () => {
-      setIsLoading(true);
+    console.log('ChatScreen: useEffect - Loading chat data for ID:', id);
+    
+    const loadChatData = async () => {
+      console.log('loadChatData: Starting to load chat data');
       try {
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        setIsLoading(true);
+        
+        // Load messages from API
+        console.log('loadChatData: Fetching messages from API');
+        const messagesResponse = await api.getMessages(id as string);
+        console.log('loadChatData: API response:', messagesResponse);
+        
+        if (messagesResponse?.data) {
+          const formattedMessages = Array.isArray(messagesResponse.data) 
+            ? messagesResponse.data.map((msg: any) => ({
+                id: msg.id || `msg-${Date.now()}`,
+                text: msg.content || msg.text || '',
+                senderId: msg.senderId || '',
+                timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
+              }))
+            : [];
+          
+          console.log('loadChatData: Formatted messages:', formattedMessages);
+          setMessages(formattedMessages);
+          
+          // Scroll to bottom after messages are loaded
+          setTimeout(() => {
+            console.log('loadChatData: Scrolling to bottom');
+            flatListRef.current?.scrollToEnd({ animated: true });
+          }, 100);
+        } else {
+          console.log('loadChatData: No messages data in response');
+        }
+
+        // For now, use a temporary user object
+        // In a real app, you would fetch this from your API
+        const tempUser = {
+          id: id as string,
+          name: 'Chat User',
+          avatar: 'https://via.placeholder.com/40'
+        };
+        console.log('loadChatData: Setting temporary user:', tempUser);
+        setChatUser(tempUser);
+        
       } catch (error) {
-        console.error('Error fetching messages:', error);
+        console.error('loadChatData: Failed to load chat data:', error);
+        Alert.alert('Error', 'Failed to load chat. Please try again later.');
       } finally {
+        console.log('loadChatData: Finished loading, setting isLoading to false');
         setIsLoading(false);
       }
     };
 
-    fetchMessages();
+    loadChatData();
   }, [id]);
 
-  const handleSend = useCallback(() => {
-    if (!newMessage.trim()) return;
-
-    // Check if user has an active subscription
-    if (!subscription) {
-      Alert.alert(
-        'Subscription Required',
-        'You need an active subscription to send messages. Would you like to subscribe now?',
-        [
-          {
-            text: 'Not Now',
-            style: 'cancel',
-          },
-          {
-            text: 'Subscribe',
-            onPress: () => router.push('/subscribe' as any),
-          },
-        ]
-      );
+  // Handle incoming WebSocket messages
+  useEffect(() => {
+    console.log('WebSocket effect running, socket:', socket ? 'connected' : 'not connected');
+    if (!socket) {
+      const error = 'No WebSocket connection available';
+      console.error(error);
+      Alert.alert('Connection Error', error);
       return;
     }
+    
+    console.log('WebSocket: Setting up message handlers');
 
-    const newMsg: ChatMessage = {
-      id: Date.now().toString(),
-      text: newMessage,
-      senderId: user?.id || '1',
-      timestamp: new Date(),
+    const handleNewMessage = (message: any) => {
+    console.log('Received message:', message);
+      console.log('New message received:', message);
+      
+      // Check if this message is for the current chat
+      if (message.matchId === id || message.chatId === id) {
+        const newMsg: ChatMessage = {
+          id: message.id || `msg-${Date.now()}`,
+          text: message.content || message.text || '',
+          senderId: message.senderId || '',
+          timestamp: message.timestamp ? new Date(message.timestamp) : new Date(),
+        };
+        
+        setMessages(prev => {
+          // Check if message already exists (for deduplication)
+          const exists = prev.some(m => m.id === newMsg.id);
+          return exists ? prev : [...prev, newMsg];
+        });
+
+        // Scroll to bottom when new message arrives
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
     };
 
-    setMessages((prev) => [...prev, newMsg]);
-    setNewMessage('');
+    // Set up error handling
+    const handleError = (error: any) => {
+    console.error('WebSocket error occurred:', error);
+      console.error('WebSocket error:', error);
+      Alert.alert('Connection Error', 'There was a problem with the chat connection.');
+    };
 
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
-  }, [newMessage, user?.id]);
+    // Set up event listeners first
+    console.log('Setting up WebSocket event listeners');
+    on('newMessage', handleNewMessage);
+    on('error', handleError);
+    
+    // Then join the chat room
+    console.log('Joining chat room:', id);
+    const joinSuccess = emit('joinChat', { matchId: id });
+    console.log('joinChat emit result:', joinSuccess);
+
+    // Clean up
+    return () => {
+      console.log('Cleaning up WebSocket listeners');
+      off('newMessage');
+      off('error');
+      const leaveSuccess = emit('leaveChat', { matchId: id });
+      console.log('leaveChat emit result:', leaveSuccess);
+    };
+  }, [socket, id, on, off, emit]);
+
+  const handleSend = useCallback(async () => {
+
+    const tempId = `temp-${Date.now()}`;
+    const messageToSend: ChatMessage = {
+      id: tempId,
+      text: newMessage,
+      senderId: user.id,
+      timestamp: new Date(),
+      isSending: true,
+    };
+
+    try {
+      // Optimistically add message to UI
+      setMessages(prev => [...prev, messageToSend]);
+      setNewMessage('');
+
+      // Send message via WebSocket
+      const success = emit('sendMessage', {
+        matchId: id,
+        content: newMessage,
+        timestamp: new Date().toISOString(),
+      });
+
+      if (!success) {
+        throw new Error('Failed to send message');
+      }
+
+      // Update message state when sent successfully
+      setMessages(prev =>
+        prev.map(msg =>
+          msg.id === tempId ? { ...msg, isSending: false } : msg
+        )
+      );
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      // Update message to show error state
+      setMessages(prev =>
+        prev.map(msg =>
+          msg.id === tempId ? { ...msg, isSending: false, isError: true } : msg
+        )
+      );
+    }
+  }, [newMessage, user?.id, subscription, id, emit, router]);
 
   /** ---- FIXED ⚠️: item now has a proper type ---- **/
   const renderMessage = useCallback(
@@ -146,7 +233,10 @@ const ChatScreen = () => {
           ]}
         >
           {!isCurrentUser && (
-            <Image source={{ uri: MOCK_USER.avatar }} style={styles.avatar} />
+            <Image 
+              source={{ uri: chatUser?.avatar || 'https://via.placeholder.com/40' }} 
+              style={styles.avatar} 
+            />
           )}
           <View
             style={[
@@ -156,7 +246,25 @@ const ChatScreen = () => {
                 : styles.otherUserMessage,
             ]}
           >
-            <PoppinsText style={styles.messageText}>{item.text}</PoppinsText>
+            <PoppinsText style={styles.messageText}>
+              {item.text}
+              {item.isSending && (
+                <Ionicons 
+                  name="time-outline" 
+                  size={12} 
+                  color="#666" 
+                  style={{ marginLeft: 4 }} 
+                />
+              )}
+              {item.isError && (
+                <Ionicons 
+                  name="alert-circle" 
+                  size={12} 
+                  color="#ff3b30" 
+                  style={{ marginLeft: 4 }} 
+                />
+              )}
+            </PoppinsText>
             <PoppinsText style={styles.timestamp}>
               {new Date(item.timestamp).toLocaleTimeString([], {
                 hour: '2-digit',
@@ -170,15 +278,7 @@ const ChatScreen = () => {
     [user?.id]
   );
 
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#651B55" />
-      </View>
-    );
-  }
-
-  if (isSubscriptionLoading) {
+  if (isLoading || isSubscriptionLoading) {
     return (
       <View style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" color="#651B55" />
@@ -198,10 +298,17 @@ const ChatScreen = () => {
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <View style={styles.userInfo}>
-          <Image source={{ uri: MOCK_USER.avatar }} style={styles.headerAvatar} />
+          <Image 
+            source={{ uri: chatUser?.avatar || 'https://via.placeholder.com/40' }} 
+            style={styles.headerAvatar} 
+          />
           <View>
-            <PoppinsText style={styles.userName}>{MOCK_USER.name}</PoppinsText>
-            <PoppinsText style={styles.status}>Online</PoppinsText>
+            <PoppinsText style={styles.userName}>
+              {chatUser?.name || 'Loading...'}
+            </PoppinsText>
+            <PoppinsText style={styles.status}>
+              {socket?.connected ? 'Online' : 'Offline'}
+            </PoppinsText>
           </View>
         </View>
         <TouchableOpacity style={styles.moreButton}>
@@ -303,7 +410,11 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
   },
   moreButton: {
+    marginLeft: 'auto',
     padding: 8,
+  },
+  errorMessage: {
+    opacity: 0.8,
   },
   messagesContainer: {
     flex: 1,
@@ -396,5 +507,5 @@ const styles = StyleSheet.create({
 
 /** ------------------ EXPORT WITH SUBSCRIPTION LOCK ------------------ **/
 export default withSubscription(ChatScreen, {
-  redirectTo: '/(tabs)/subscribe',
+  redirectTo: '/screens/subscribe',
 });

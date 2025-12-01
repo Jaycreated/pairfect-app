@@ -2,6 +2,7 @@
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { NotificationProvider } from '@/context/NotificationContext';
 import { SubscriptionProvider } from '@/context/SubscriptionContext';
+import { WebSocketProvider } from '@/context/WebSocketContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Storage } from '@/utils/storage';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
@@ -72,29 +73,44 @@ function AuthLayout() {
 
   // Handle navigation based on auth and onboarding status
   useEffect(() => {
-    if (isProfileLoading || !isNavigationReady || isCheckingOnboarding) return;
+    const checkNavigation = async () => {
+      if (isProfileLoading || !isNavigationReady || isCheckingOnboarding) return;
 
-    const inAuthGroup = segments[0] === '(auth)';
-    const inOnboarding = segments[0] === 'onboarding';
+      const inAuthGroup = segments[0] === '(auth)';
+      const inOnboarding = segments[0] === '(auth)' && segments[1] === 'onboarding';
 
-    // If user hasn't seen onboarding and not already on the onboarding screen
-    if (hasSeenOnboarding === false) {
-      if (!inOnboarding) {
-        router.replace('/onboarding');
-      }
-      return;
-    }
+      try {
+        // Check if user has completed onboarding
+        const hasCompleted = await Storage.getItem('onboarding_completed');
+        
+        // If onboarding not completed, redirect to onboarding
+        if (hasCompleted !== 'true') {
+          if (!inOnboarding) {
+            router.replace('/(auth)/onboarding');
+          }
+          return;
+        }
 
-    // Handle auth-based routing
-    if (!profile) {
-      if (!inAuthGroup && !inOnboarding) {
-        router.replace('/(auth)/login');
+        // Handle auth-based routing
+        if (!profile) {
+          if (!inAuthGroup) {
+            router.replace('/(auth)/login');
+          }
+        } else {
+          if (inAuthGroup) {
+            router.replace('/(tabs)');
+          }
+        }
+      } catch (error) {
+        console.error('Navigation error:', error);
+        // Default to login on error
+        if (!inAuthGroup) {
+          router.replace('/(auth)/login');
+        }
       }
-    } else {
-      if (inAuthGroup || inOnboarding) {
-        router.replace('/(tabs)');
-      }
-    }
+    };
+
+    checkNavigation();
   }, [profile, segments, isProfileLoading, isNavigationReady, hasSeenOnboarding, isCheckingOnboarding]);
 
   if (isProfileLoading || !isNavigationReady) {
@@ -107,11 +123,12 @@ function AuthLayout() {
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen 
-        name="onboarding" 
+        name="(auth)/onboarding"
         options={{ 
+          headerShown: false,
           animation: 'fade',
           presentation: 'modal',
         }} 
@@ -125,23 +142,27 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme();
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <NotificationProvider>
-          <SubscriptionProvider>
-            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-              <FontWrapper>
-                <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-                <AuthLayout />
-              </FontWrapper>
-            </ThemeProvider>
-          </SubscriptionProvider>
-        </NotificationProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <FontWrapper>
+        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+        <AuthLayout />
+      </FontWrapper>
+    </ThemeProvider>
   );
 }
 
 export default function RootLayout() {
-  return <RootLayoutNav />;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <WebSocketProvider>
+          <NotificationProvider>
+            <SubscriptionProvider>
+              <RootLayoutNav />
+            </SubscriptionProvider>
+          </NotificationProvider>
+        </WebSocketProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  );
 }

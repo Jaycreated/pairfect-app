@@ -1,3 +1,4 @@
+import PushNotificationIOS from '@react-native-community/push-notification-ios';
 import { Platform } from 'react-native';
 import PushNotification from 'react-native-push-notification';
 import { api } from './api';
@@ -21,7 +22,7 @@ PushNotification.configure({
     // Handle the notification
     
     // Call the completion handler for iOS
-    if (Platform.OS === 'ios') {
+    if (Platform.OS === 'ios' && notification.finish) {
       notification.finish(PushNotificationIOS.FetchResult.NoData);
     }
   },

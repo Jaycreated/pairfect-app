@@ -14,7 +14,7 @@ export interface UserProfile {
 }
 
 // Helper function to get auth token
-const getAuthToken = async (): Promise<string | null> => {
+export const getAuthToken = async (): Promise<string | null> => {
   try {
     return await SecureStore.getItemAsync('auth_token');
   } catch (error) {
