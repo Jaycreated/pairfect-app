@@ -1,0 +1,563 @@
+import { PoppinsText } from '@/components/PoppinsText';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Dimensions,
+  Image,
+  PanResponder,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { api } from '@/services/api';
+
+const { width, height } = Dimensions.get('window');
+const SWIPE_THRESHOLD = width * 0.4;
+const SWIPE_OUT_DURATION = 250;
+
+// Updated type to match API response
+type User = {
+  id: string;
+  name: string;
+  age: number;
+  bio: string;
+  distance: string;
+  location: string;
+  interest: string;
+  images: string[];
+};
+
+const SwipeScreen = () => {
+  const router = useRouter();
+  const [users, setUsers] = useState<User[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isProcessingSwipe, setIsProcessingSwipe] = useState(false);
+  
+  const position = useRef(new Animated.ValueXY()).current;
+  const rotate = position.x.interpolate({
+    inputRange: [-width / 2, 0, width / 2],
+    outputRange: ['-30deg', '0deg', '30deg'],
+    extrapolate: 'clamp',
+  });
+  const likeOpacity = position.x.interpolate({
+    inputRange: [0, width / 4],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+  const nopeOpacity = position.x.interpolate({
+    inputRange: [-width / 4, 0],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  // Fetch potential matches on component mount
+  useEffect(() => {
+    fetchPotentialMatches();
+  }, []);
+
+  const fetchPotentialMatches = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const matches = await api.getPotentialMatches();
+      setUsers(matches);
+      setCurrentIndex(0);
+    } catch (err) {
+      console.error('Error fetching matches:', err);
+      setError('Failed to load profiles. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => !isProcessingSwipe,
+      onPanResponderMove: (_, { dx, dy }) => {
+        if (!isProcessingSwipe) {
+          position.setValue({ x: dx, y: dy });
+        }
+      },
+      onPanResponderRelease: (_, { dx, dy }) => {
+        if (isProcessingSwipe) return;
+        
+        if (Math.abs(dx) > SWIPE_THRESHOLD) {
+          // Swipe right (like) or left (nope)
+          const direction = dx > 0 ? 1 : -1;
+          swipeCard(direction);
+        } else {
+          // Return to original position
+          Animated.spring(position, {
+            toValue: { x: 0, y: 0 },
+            useNativeDriver: false,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
+  const swipeCard = useCallback(async (direction: number) => {
+    if (isProcessingSwipe || currentIndex >= users.length) return;
+    
+    setIsProcessingSwipe(true);
+    const currentUser = users[currentIndex];
+
+    // Animate card off screen
+    Animated.timing(position, {
+      toValue: { 
+        x: direction * (width + 100), 
+        y: direction * 100 
+      },
+      duration: SWIPE_OUT_DURATION,
+      useNativeDriver: false,
+    }).start(async () => {
+      try {
+        // Call API based on swipe direction
+        if (direction > 0) {
+          // Like
+          const response = await api.likeUser(currentUser.id);
+          
+          if (response.error) {
+            console.error('Error liking user:', response.error);
+            Alert.alert('Error', 'Failed to like user. Please try again.');
+          } else {
+            console.log('Liked:', currentUser.name);
+            
+            // Check if it's a match (API should return this info)
+            if (response.data?.match) {
+              Alert.alert(
+                "It's a match! 💕",
+                `You and ${currentUser.name} have liked each other!`,
+                [
+                  { text: 'Keep Swiping', style: 'cancel' },
+                  { text: 'Send Message', onPress: () => router.push('/matches') }
+                ]
+              );
+            }
+          }
+        } else {
+          // Pass
+          const response = await api.passUser(currentUser.id);
+          
+          if (response.error) {
+            console.error('Error passing user:', response.error);
+          } else {
+            console.log('Passed:', currentUser.name);
+          }
+        }
+      } catch (err) {
+        console.error('Error processing swipe:', err);
+      } finally {
+        // Move to next card
+        const isLastCard = currentIndex >= users.length - 1;
+        
+        if (isLastCard) {
+          // Fetch more matches
+          await fetchPotentialMatches();
+        } else {
+          setCurrentIndex(currentIndex + 1);
+        }
+        
+        position.setValue({ x: 0, y: 0 });
+        setIsProcessingSwipe(false);
+      }
+    });
+  }, [currentIndex, users, position, isProcessingSwipe]);
+
+  const handleCardPress = useCallback((userId: string) => {
+    // Navigate to the user's public profile
+    router.push(`/user/${userId}`);
+  }, [router]);
+
+  const renderCard = (user: User) => {
+    const panResponderHandlers = panResponder.panHandlers;
+    const cardStyle = [
+      styles.card,
+      {
+        transform: [
+          { translateX: position.x },
+          { translateY: position.y },
+          { rotate },
+        ],
+      },
+    ];
+
+    if (!user) return null;
+
+    return (
+      <View style={styles.cardContainer}>
+        <TouchableOpacity 
+          key={user.id}
+          activeOpacity={0.9}
+          onPress={() => handleCardPress(user.id)}
+          style={{ flex: 1 }}
+          disabled={isProcessingSwipe}
+        >
+          <Animated.View 
+            style={cardStyle}
+            {...panResponderHandlers}
+          >
+            <Image source={{ uri: user.images[0] }} style={styles.cardImage} />
+            <View style={styles.cardOverlay}>
+              <Animated.View 
+                style={[styles.likeBadgeContainer, { opacity: likeOpacity }]}
+              >
+                <Text style={styles.likeText}>LIKE</Text>
+              </Animated.View>
+              <Animated.View 
+                style={[styles.nopeBadgeContainer, { opacity: nopeOpacity }]}
+              >
+                <Text style={styles.nopeText}>NOPE</Text>
+              </Animated.View>
+            </View>
+          </Animated.View>
+          
+          <View style={styles.cardFooter}>
+            <View>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
+                <PoppinsText weight="bold" style={styles.cardName}>
+                  {user.name}
+                </PoppinsText>
+                <PoppinsText style={styles.cardAge}>
+                  , {user.age}
+                </PoppinsText>
+              </View>
+              <View style={styles.cardLocation}>
+                <Ionicons name="location-sharp" size={16} color="#651B55" style={{ marginRight: 4 }} />
+                <PoppinsText style={{ fontSize: 16 }}>
+                  {user.location}
+                </PoppinsText>
+              </View>
+            </View>
+            {user.interest && (
+              <View>
+                <PoppinsText style={styles.interestText}>
+                  <Text style={styles.interestsText}>Interest: {user.interest}</Text>
+                </PoppinsText>
+              </View>
+            )}
+          </View>
+          
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={[styles.button, styles.nopeButton]}
+              onPress={handleNope}
+              disabled={isProcessingSwipe}
+            >
+              <Ionicons name="close" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          
+            <TouchableOpacity
+              style={[styles.button, styles.likeButton]}
+              onPress={handleLike}
+              disabled={isProcessingSwipe}
+            >
+              <Ionicons name="heart" size={24} color="#FF0A0A" />
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+  
+  const handleLike = useCallback(() => {
+    swipeCard(1);
+  }, [swipeCard]);
+  
+  const handleNope = useCallback(() => {
+    swipeCard(-1);
+  }, [swipeCard]);
+
+  // Loading state
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color="#651B55" />
+        <PoppinsText style={styles.loadingText}>Loading profiles...</PoppinsText>
+      </View>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <Ionicons name="alert-circle-outline" size={64} color="#E03131" />
+        <PoppinsText style={styles.errorText}>{error}</PoppinsText>
+        <TouchableOpacity 
+          style={styles.retryButton}
+          onPress={fetchPotentialMatches}
+        >
+          <PoppinsText style={styles.retryButtonText}>Retry</PoppinsText>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="#000" />
+        </TouchableOpacity>
+        <PoppinsText weight="bold" style={styles.headerTitle}>
+          <Text>Discover people around you</Text>
+        </PoppinsText>
+        <View style={{ width: 24 }} />
+      </View>
+
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollViewContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.swiperContainer}>
+          {users.length > 0 && currentIndex < users.length ? (
+            <View style={styles.cardContainer}>
+              {renderCard(users[currentIndex])}
+            </View>
+          ) : (
+            <View style={styles.noMoreCards}>
+              <Ionicons name="people-outline" size={64} color="#666" />
+              <PoppinsText style={styles.noMoreCardsText}>
+                No more profiles to show
+              </PoppinsText>
+              <TouchableOpacity 
+                style={styles.resetButton}
+                onPress={fetchPotentialMatches}
+              >
+                <PoppinsText style={styles.resetButtonText}>
+                  Refresh
+                </PoppinsText>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F5F5F5',
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollViewContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    paddingTop: 10,
+  },
+  headerTitle: {
+    fontSize: 20,
+    color: '#000',
+  },
+  swiperContainer: {
+    width: '100%',
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  cardContainer: {
+    width: '100%',
+    height: 300,
+    maxWidth: 350,
+    alignSelf: 'center',
+  },
+  card: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
+    backgroundColor: '#FFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    overflow: 'hidden',
+  },
+  cardImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
+  },
+  cardOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 20,
+    justifyContent: 'space-between',
+    padding: 20,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+  },
+  likeBadgeContainer: {
+    position: 'absolute',
+    top: 40,
+    left: 40,
+    borderWidth: 3,
+    borderColor: '#4CD964',
+    borderRadius: 10,
+    padding: 10,
+    transform: [{ rotate: '-15deg' }],
+  },
+  nopeBadgeContainer: {
+    position: 'absolute',
+    top: 40,
+    right: 40,
+    borderWidth: 3,
+    borderColor: '#FF3B30',
+    borderRadius: 10,
+    padding: 10,
+    transform: [{ rotate: '15deg' }],
+  },
+  likeText: {
+    color: '#4CD964',
+    fontSize: 32,
+    fontWeight: 'bold',
+  },
+  nopeText: {
+    color: '#FF3B30',
+    fontSize: 32,
+    fontWeight: 'bold',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
+  errorText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#E03131',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#651B55',
+    padding: 15,
+    borderRadius: 10,
+    width: 150,
+    alignItems: 'center',
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  noMoreCards: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  noMoreCardsText: {
+    fontSize: 18,
+    color: '#666',
+    marginTop: 16,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  resetButton: {
+    backgroundColor: '#651B55',
+    padding: 15,
+    borderRadius: 10,
+    width: 150,
+    alignItems: 'center',
+  },
+  resetButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  cardFooter: {
+    paddingTop: 12,
+    paddingRight: 12,
+    color: '#000000',
+    paddingLeft: 12,
+    marginHorizontal: -20,
+  },
+  cardName: {
+    fontSize: 24,
+    color: '#651B55',
+    marginBottom: 4,
+    fontWeight: '600',
+  },
+  cardAge: {
+    fontSize: 24,
+    color: '#651B55',
+    fontWeight: '600',
+  },
+  cardLocation: {
+    fontSize: 16,
+    color: '#651B55',
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  interestText: {
+    color: '#651B55',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  interestsText: {
+    color: '#651B55',
+    fontSize: 16,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  button: {
+    width: 50,
+    height: 50,
+    borderRadius: 30,
+    backgroundColor: '#FFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  nopeButton: {
+    borderWidth: 1,
+    borderColor: '#E03131',
+    backgroundColor: '#E03131',
+  },
+  likeButton: {
+    borderWidth: 1,
+    borderColor: '#FFCFF4',
+    backgroundColor: '#FFCFF4',
+  },
+});
+
+export default SwipeScreen;
