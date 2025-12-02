@@ -34,16 +34,29 @@ export const setAuthToken = async (token: string): Promise<void> => {
 };
 
 // Helper function to get auth token
-export const getAuthToken = async (): Promise<string> => {
-  console.log('🔑 [getAuthToken] Attempting to retrieve auth token...');
+export const getAuthToken = async (required = false): Promise<string | null> => {
   try {
+    console.log('🔑 [getAuthToken] Attempting to retrieve auth token...');
     const token = await Storage.getItem('auth_token');
-    console.log('🔑 [getAuthToken] Token exists:', !!token);
-    if (!token) throw new Error('No authentication token found');
+    
+    if (!token) {
+      if (required) {
+        console.warn('⚠️ [getAuthToken] No authentication token found in storage');
+        throw new Error('No authentication token found. Please log in.');
+      }
+      console.log('ℹ️ [getAuthToken] No authentication token found, but not required');
+      return null;
+    }
+    
+    console.log('🔑 [getAuthToken] Token retrieved successfully');
     return token;
   } catch (error) {
-    console.error('❌ [getAuthToken] Error retrieving token:', error);
-    throw error;
+    if (required) {
+      console.error('❌ [getAuthToken] Error retrieving required token:', error);
+      throw error;
+    }
+    console.warn('⚠️ [getAuthToken] Error retrieving token (non-critical):', error);
+    return null;
   }
 };
 

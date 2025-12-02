@@ -254,7 +254,7 @@ export default function ProfileScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View style={{ width: 24 }} /> {/* Spacer to balance the header */}
+        <View style={{ width: 24 }} /> 
         <PoppinsText style={styles.title}>My Profile</PoppinsText>
         <View style={styles.headerIcons}>
           <TouchableOpacity 

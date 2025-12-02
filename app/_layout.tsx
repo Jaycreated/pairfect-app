@@ -46,21 +46,30 @@ function AuthLayout() {
   const [isCheckingOnboarding, setIsCheckingOnboarding] = useState(true);
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean | null>(null);
 
-  // Check if user has seen onboarding
+  // Check if it's the first app launch
   useEffect(() => {
-    const checkOnboardingStatus = async () => {
+    const checkFirstLaunch = async () => {
       try {
-        const seen = await Storage.getItem('hasSeenOnboarding');
-        setHasSeenOnboarding(seen === 'true');
+        const hasLaunched = await Storage.getItem('hasLaunched');
+        
+        if (!hasLaunched) {
+          // First launch - show onboarding and mark as launched
+          await Storage.setItem('hasLaunched', 'true');
+          setHasSeenOnboarding(false);
+        } else {
+          // Not first launch - check if onboarding was completed
+          const completed = await Storage.getItem('onboarding_completed');
+          setHasSeenOnboarding(completed === 'true');
+        }
       } catch (error) {
-        console.error('Error checking onboarding status:', error);
-        setHasSeenOnboarding(false);
+        console.error('Error checking first launch status:', error);
+        setHasSeenOnboarding(true); // Default to not showing onboarding on error
       } finally {
         setIsCheckingOnboarding(false);
       }
     };
 
-    checkOnboardingStatus();
+    checkFirstLaunch();
   }, []);
 
   // Add a small delay to ensure the navigation is ready
@@ -71,47 +80,55 @@ function AuthLayout() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Handle navigation based on auth and onboarding status
+  // Handle navigation based on first launch and auth status
   useEffect(() => {
     const checkNavigation = async () => {
       if (isProfileLoading || !isNavigationReady || isCheckingOnboarding) return;
 
       const inAuthGroup = segments[0] === '(auth)';
-      const inOnboarding = segments[0] === '(auth)' && segments[1] === 'onboarding';
+      const inOnboarding = segments[0] === 'onboarding';
+      const inTabsGroup = segments[0] === '(tabs)';
 
       try {
-        // Check if user has completed onboarding
-        const hasCompleted = await Storage.getItem('onboarding_completed');
+        // First check if it's the first launch or onboarding not completed
+        const hasLaunched = await Storage.getItem('hasLaunched');
+        const hasCompletedOnboarding = await Storage.getItem('onboarding_completed');
         
-        // If onboarding not completed, redirect to onboarding
-        if (hasCompleted !== 'true') {
+        // If it's the first launch or onboarding not completed, show onboarding
+        if (hasLaunched === null || hasCompletedOnboarding !== 'true') {
           if (!inOnboarding) {
-            router.replace('/(auth)/onboarding');
+            router.replace('/onboarding');
           }
           return;
         }
 
-        // Handle auth-based routing
-        if (!profile) {
-          if (!inAuthGroup) {
+        // Get auth token after checking onboarding
+        const token = await Storage.getItem('auth_token');
+        
+        if (!token) {
+          // No token, redirect to login if not already there
+          if (!inAuthGroup && !inOnboarding) {
             router.replace('/(auth)/login');
           }
-        } else {
-          if (inAuthGroup) {
-            router.replace('/(tabs)');
-          }
+          return;
+        }
+
+        // User is authenticated, only redirect if they're in auth screens
+        // Don't redirect if they're on the onboarding screen
+        if (inAuthGroup) {
+          router.replace('/(tabs)');
         }
       } catch (error) {
         console.error('Navigation error:', error);
-        // Default to login on error
-        if (!inAuthGroup) {
+        // On error, redirect to login
+        if (!inAuthGroup && !inOnboarding) {
           router.replace('/(auth)/login');
         }
       }
     };
 
     checkNavigation();
-  }, [profile, segments, isProfileLoading, isNavigationReady, hasSeenOnboarding, isCheckingOnboarding]);
+  }, [profile, segments, isProfileLoading, isNavigationReady, isCheckingOnboarding]);
 
   if (isProfileLoading || !isNavigationReady) {
     return (
@@ -125,14 +142,7 @@ function AuthLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen 
-        name="(auth)/onboarding"
-        options={{ 
-          headerShown: false,
-          animation: 'fade',
-          presentation: 'modal',
-        }} 
-      />
+      <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
     </Stack>
   );

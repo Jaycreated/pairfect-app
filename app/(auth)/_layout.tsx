@@ -6,9 +6,11 @@ export default function AuthLayout() {
       headerShown: false,
       animation: 'fade',
     }}>
-      <Stack.Screen name="onboarding" />
-      <Stack.Screen name="signup" />
       <Stack.Screen name="login" />
+      <Stack.Screen name="signup" />
+      <Stack.Screen name="photo-upload" />
+      <Stack.Screen name="profile-setup" />
+      <Stack.Screen name="select-interests" />
     </Stack>
   );
 }
