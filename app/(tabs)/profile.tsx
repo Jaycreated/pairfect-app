@@ -1,5 +1,6 @@
 import { PoppinsText } from '@/components/PoppinsText';
 import { useAuth } from '@/context/AuthContext';
+import { useUpdateProfile } from '@/hooks/useProfile';
 import { api } from '@/services/api';
 import { Storage } from '@/utils/storage';
 import { Ionicons } from '@expo/vector-icons';
@@ -33,7 +34,8 @@ export default function ProfileScreen() {
   const { user, signOut } = useAuth();
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const { mutate: updateProfile, isPending: isUpdating } = useUpdateProfile();
   const [profile, setProfile] = useState<UserProfile>({
     name: '',
     email: user?.email || '',
@@ -45,6 +47,7 @@ export default function ProfileScreen() {
     location: null,
     orientation: null
   });
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
 
   const INTERESTS = [
     'Relationship', 
@@ -123,53 +126,82 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleSave = async () => {
-    try {
-      setIsLoading(true);
-      
-      // Prepare data for API
-      const profileData = {
-        name: profile.name,
-        age: profile.age ? parseInt(profile.age.toString()) : null,
-        bio: profile.bio,
-        interests: profile.interests,
-        photos: profile.photos,
-        gender: profile.gender || null,
-        location: profile.location || null,
-        orientation: profile.orientation || null
-      };
-      
-      // Update profile via API
-      const response = await api.updateProfile(profileData);
-      
-      if (response.error) {
-        throw new Error(response.error.message || 'Failed to update profile');
-      }
-      
-      // Update local storage
-      await Storage.setItem('user', JSON.stringify({
-        name: profile.name,
-        email: profile.email,
-        age: profile.age,
-        bio: profile.bio,
-        interests: profile.interests,
-        gender: profile.gender,
-        location: profile.location,
-        orientation: profile.orientation
-      }));
-      
-      if (profile.photos && profile.photos.length > 0) {
-        await Storage.setItem('userPhotos', JSON.stringify(profile.photos));
-      }
-      
-      setIsEditing(false);
-      Alert.alert('Success', 'Profile updated successfully');
-    } catch (error) {
-      console.error('Error saving profile:', error);
-      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to update profile');
-    } finally {
-      setIsLoading(false);
+  const handlePhotoSelect = (index: number) => {
+    if (isEditing) {
+      // In edit mode, allow reordering or removing photos
+      // For now, just set as main photo
+      setSelectedPhotoIndex(index);
+      // Move the selected photo to the first position
+      const newPhotos = [...profile.photos];
+      const [movedPhoto] = newPhotos.splice(index, 1);
+      newPhotos.unshift(movedPhoto);
+      setProfile({ ...profile, photos: newPhotos });
+      setSelectedPhotoIndex(0);
+    } else {
+      // In view mode, just select the photo
+      setSelectedPhotoIndex(index);
     }
+  };
+
+  const handleAddPhoto = () => {
+    // TODO: Implement photo upload functionality
+    // For now, just add a placeholder
+    if (profile.photos.length < 4) {
+      const newPhoto = `https://picsum.photos/400/600?random=${Date.now()}`; // Replace with actual photo upload
+      setProfile({
+        ...profile,
+        photos: [...profile.photos, newPhoto]
+      });
+    }
+  };
+
+  const handleRemovePhoto = (index: number) => {
+    const newPhotos = [...profile.photos];
+    newPhotos.splice(index, 1);
+    setProfile({
+      ...profile,
+      photos: newPhotos
+    });
+    if (selectedPhotoIndex >= newPhotos.length) {
+      setSelectedPhotoIndex(Math.max(0, newPhotos.length - 1));
+    }
+  };
+
+  const handleSave = () => {
+    // Prepare data for API
+    const profileData = {
+      name: profile.name,
+      age: profile.age ? parseInt(profile.age.toString()) : null,
+      bio: profile.bio,
+      interests: profile.interests,
+      photos: profile.photos,
+      gender: profile.gender || null,
+      location: profile.location || null,
+      orientation: profile.orientation || null
+    };
+    
+    // Update profile using the hook
+    updateProfile(profileData, {
+      onSuccess: () => {
+        // Update local storage on success
+        Storage.setItem('user', JSON.stringify({
+          name: profile.name,
+          email: profile.email,
+          age: profile.age,
+          bio: profile.bio,
+          interests: profile.interests,
+          gender: profile.gender,
+          location: profile.location,
+          orientation: profile.orientation
+        }));
+        
+        if (profile.photos && profile.photos.length > 0) {
+          Storage.setItem('userPhotos', JSON.stringify(profile.photos));
+        }
+        
+        setIsEditing(false);
+      }
+    });
   };
 
   const handleSignOut = async () => {
@@ -249,23 +281,64 @@ export default function ProfileScreen() {
       </View>
 
       <ScrollView style={styles.scrollView}>
-        {/* Profile Photo */}
-        <View style={styles.photoSection}>
+        {/* Main Profile Photo */}
+        <View style={styles.mainPhotoContainer}>
           {profile.photos && profile.photos.length > 0 ? (
             <Image 
-              source={{ uri: profile.photos[0] }} 
-              style={styles.profileImage}
+              source={{ uri: profile.photos[selectedPhotoIndex] }} 
+              style={styles.mainProfileImage}
+              resizeMode="cover"
             />
           ) : (
             <View style={styles.profileImagePlaceholder}>
               <Ionicons name="person" size={50} color="#999" />
             </View>
           )}
-          {isEditing && (
-            <TouchableOpacity style={styles.editPhotoButton}>
-              <Ionicons name="camera" size={20} color="#fff" />
-            </TouchableOpacity>
-          )}
+        </View>
+
+        {/* Photo Gallery */}
+        <View style={styles.photoGallery}>
+          {Array.from({ length: 4 }).map((_, index) => {
+            if (index < profile.photos.length) {
+              return (
+                <TouchableOpacity 
+                  key={index}
+                  onPress={() => handlePhotoSelect(index)}
+                  style={[
+                    styles.thumbnailContainer,
+                    selectedPhotoIndex === index && styles.selectedThumbnail
+                  ]}
+                >
+                  <Image 
+                    source={{ uri: profile.photos[index] }} 
+                    style={styles.thumbnail}
+                    resizeMode="cover"
+                  />
+                  {isEditing && (
+                    <TouchableOpacity 
+                      style={styles.removePhotoButton}
+                      onPress={() => handleRemovePhoto(index)}
+                    >
+                      <Ionicons name="close" size={16} color="#fff" />
+                    </TouchableOpacity>
+                  )}
+                </TouchableOpacity>
+              );
+            } else if (isEditing && index === profile.photos.length) {
+              return (
+                <TouchableOpacity 
+                  key={index}
+                  style={styles.addPhotoButton}
+                  onPress={handleAddPhoto}
+                  disabled={profile.photos.length >= 4}
+                >
+                  <Ionicons name="add" size={24} color="#651B55" />
+                </TouchableOpacity>
+              );
+            } else {
+              return <View key={index} style={styles.emptyPhotoSlot} />;
+            }
+          })}
         </View>
 
         {/* Profile Fields */}
@@ -344,12 +417,114 @@ export default function ProfileScreen() {
         >
           <PoppinsText style={styles.signOutText}>Sign Out</PoppinsText>
         </TouchableOpacity>
+        {isEditing ? (
+          <TouchableOpacity 
+            style={[styles.button, styles.saveButton, (isUpdating || isLoading) && styles.disabledButton]} 
+            onPress={handleSave}
+            disabled={isUpdating || isLoading}
+          >
+            {isUpdating || isLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <PoppinsText style={styles.buttonText}>Save Changes</PoppinsText>
+            )}
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity 
+            style={[styles.button, styles.editButton]} 
+            onPress={() => setIsEditing(true)}
+            disabled={isLoading}
+          >
+            <PoppinsText style={styles.buttonText}>Edit Profile</PoppinsText>
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  mainPhotoContainer: {
+    width: '100%',
+    aspectRatio: 3/4,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  mainProfileImage: {
+    width: '100%',
+    height: '100%',
+  },
+  photoGallery: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+    paddingHorizontal: 8,
+  },
+  thumbnailContainer: {
+    width: '23%',
+    aspectRatio: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  selectedThumbnail: {
+    borderColor: '#651B55',
+  },
+  thumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  addPhotoButton: {
+    width: '23%',
+    aspectRatio: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#651B55',
+    borderRadius: 8,
+    borderStyle: 'dashed',
+  },
+  emptyPhotoSlot: {
+    width: '23%',
+    aspectRatio: 1,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+  },
+  removePhotoButton: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  button: {
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 20,
+    marginHorizontal: 20,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Poppins_500Medium',
+  },
+  saveButton: {
+    backgroundColor: '#651B55',
+  },
+  editButton: {
+    backgroundColor: '#4a90e2',
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
   container: {
     flex: 1,
     backgroundColor: '#fff',

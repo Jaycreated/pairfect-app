@@ -173,7 +173,7 @@ export const api = {
     }
   }>(API_CONFIG.ENDPOINTS.USERS.PROFILE),
 
-  updateProfile: (userData: {
+  updateProfile: async (userData: {
     name?: string;
     gender?: string | null;
     age?: number | null;
@@ -182,7 +182,23 @@ export const api = {
     bio?: string | null;
     interests?: string[];
     photos?: string[];
-  }) => fetchApi(API_CONFIG.ENDPOINTS.USERS.PROFILE, 'PUT', userData),
+  }) => {
+    try {
+      console.log('📤 [API] Updating profile with data:', userData);
+      const response = await fetchApi(API_CONFIG.ENDPOINTS.USERS.PROFILE, 'PUT', userData);
+      
+      if (response.error) {
+        console.error('❌ [API] Profile update failed:', response.error);
+        throw new Error(response.error.message || 'Failed to update profile');
+      }
+      
+      console.log('✅ [API] Profile updated successfully');
+      return response.data;
+    } catch (error) {
+      console.error('❌ [API] Error in updateProfile:', error);
+      throw error;
+    }
+  },
 
   // Matches
   getPotentialMatches: async () => {
