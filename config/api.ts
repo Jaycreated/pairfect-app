@@ -15,6 +15,7 @@ export const API_CONFIG = {
     USERS: {
       PROFILE: 'users/profile',
       POTENTIAL_MATCHES: 'users/potential-matches',
+      SETTINGS: 'users/settings',
     },
     MATCHES: {
       BASE: 'matches',
