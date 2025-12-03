@@ -132,7 +132,7 @@ const LoginScreen = () => {
               disabled={isLoading}
             >
               <PoppinsText style={styles.buttonText}>
-                {isLoading ? 'Logging in...' : 'Login'}
+                {isLoading ? 'Signing in...' : 'Sign In'}
               </PoppinsText>
             </TouchableOpacity>
 
@@ -169,16 +169,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    paddingTop: 100,
     flexGrow: 1,
-    padding: 20,
+    padding: 25,
   },
   logoContainer: {
     alignItems: 'center',
-    marginVertical: 40,
+    marginVertical: 20,
   },
   logo: {
-    width: 150,
-    height: 150,
+    width: 80,
+    height: 80,
   },
   formContainer: {
     flex: 1,
@@ -187,7 +188,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 8,
+    borderRadius: 24,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
@@ -204,8 +205,8 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   button: {
-    backgroundColor: '#1E1E1E',
-    borderRadius: 8,
+    backgroundColor: '#651B55',
+    borderRadius: 24,
     padding: 16,
     alignItems: 'center',
     marginTop: 24,

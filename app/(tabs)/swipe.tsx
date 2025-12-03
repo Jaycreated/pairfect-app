@@ -350,6 +350,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
+    fontFamily: 'Poppins_400Regular',
   },
   centerContent: {
     justifyContent: 'center',
@@ -368,7 +369,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    paddingTop: 10,
+    paddingTop: 30,
   },
   headerTitle: {
     fontSize: 20,

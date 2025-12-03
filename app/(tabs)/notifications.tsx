@@ -5,13 +5,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    Image,
-    RefreshControl,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  Image,
+  RefreshControl,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 // Format time to relative time (e.g., '2m ago')
@@ -71,10 +71,16 @@ const NotificationsScreen = () => {
       ]);
 
       if (notificationsRes.data) {
-        setNotifications(notificationsRes.data.map((n: any) => ({
+        const formattedNotifications = notificationsRes.data.map((n: any) => ({
           ...n,
-          time: formatTimeAgo(n.createdAt)
-        })));
+          user: n.user || {
+            id: 'unknown',
+            name: 'Unknown User',
+            avatar: 'https://i.pravatar.cc/150?img=32' // Default avatar
+          },
+          time: formatTimeAgo(n.createdAt || new Date().toISOString())
+        }));
+        setNotifications(formattedNotifications);
       }
 
       if (unreadRes.data) {
@@ -195,7 +201,11 @@ const NotificationsScreen = () => {
       onPress={() => handleNotificationPress(item)}
     >
       <View style={styles.avatarContainer}>
-        <Image source={{ uri: item.user.avatar }} style={styles.avatar} />
+        <Image 
+          source={{ uri: item.user?.avatar || 'https://i.pravatar.cc/150?img=32' }} 
+          style={styles.avatar} 
+          defaultSource={{ uri: 'https://i.pravatar.cc/150?img=32' }}
+        />
         <View style={[
           styles.notificationIcon,
           { backgroundColor: getNotificationColor(item.type) }

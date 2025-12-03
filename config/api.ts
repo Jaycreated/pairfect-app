@@ -2,6 +2,18 @@
 export const API_CONFIG = {
   // Base URL for API requests (Render URL must be in .env)
   BASE_URL: process.env.EXPO_PUBLIC_API_URL as string,
+  
+  // WebSocket configuration
+  get WS_URL() {
+    const url = new URL(this.BASE_URL);
+    return `${url.protocol === 'https:' ? 'wss:' : 'ws:'}//${url.host}${url.pathname}`;
+  },
+  
+  // WebSocket namespace (path from the URL)
+  get WS_NAMESPACE() {
+    const url = new URL(this.BASE_URL);
+    return url.pathname || '/';
+  },
 
   // API endpoints
   ENDPOINTS: {

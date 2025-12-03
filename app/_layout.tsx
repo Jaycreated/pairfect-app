@@ -113,10 +113,15 @@ function AuthLayout() {
           return;
         }
 
-        // User is authenticated, only redirect if they're in auth screens
-        // Don't redirect if they're on the onboarding screen
-        if (inAuthGroup) {
-          router.replace('/(tabs)');
+        // User is authenticated, redirect to tabs (which will show the swipe screen)
+        // if they're in auth or onboarding screens
+        if (inAuthGroup || inOnboarding) {
+          // Replace the current route with the tabs navigation
+          // This ensures the user can't go back to the auth screens with the back button
+          router.replace({
+            pathname: '/(tabs)',
+            params: { screen: 'swipe' } // Explicitly navigate to the swipe screen
+          });
         }
       } catch (error) {
         console.error('Navigation error:', error);

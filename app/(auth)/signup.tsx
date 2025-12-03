@@ -300,16 +300,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
+    padding: 40,
+    paddingBottom: 60,
   },
   logoContainer: {
     alignItems: 'center',
     marginBottom: 32,
   },
   logo: {
-    width: 120,
-    height: 120,
+    width: 80,
+    height: 80,
     marginBottom: 16,
   },
   title: {
@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
   pickerContainer: {
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    borderRadius: 12,
+    borderRadius: 24,
     marginTop: 6,
     backgroundColor: '#F9FAFB',
     overflow: 'hidden',
@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
   },
   input: {
     backgroundColor: '#f5f5f5',
-    borderRadius: 10,
+    borderRadius: 24,
     padding: 15,
     fontSize: 16,
     borderWidth: 1,
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f5f5f5',
-    borderRadius: 10,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
   button: {
     backgroundColor: '#651B55',
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 24,
     alignItems: 'center',
     marginTop: 16,
   },

@@ -40,16 +40,18 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       socketRef.current.disconnect();
     }
 
-    // Create new socket connection
-    console.log('WebSocket: Creating new socket connection to', API_CONFIG.BASE_URL);
-    socketRef.current = io(API_CONFIG.BASE_URL, {
-      transports: ['websocket'],
+    console.log('WebSocket: Creating new socket connection to', API_CONFIG.WS_URL);
+    
+    socketRef.current = io(API_CONFIG.WS_URL, {
+      path: API_CONFIG.WS_NAMESPACE ? `${API_CONFIG.WS_NAMESPACE}socket.io` : '/socket.io',
+      transports: ['websocket', 'polling'],
       auth: { token },
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
       autoConnect: true,
-      forceNew: true
+      forceNew: true,
+      withCredentials: true
     });
     
     console.log('WebSocket: Socket instance created, setting up event listeners');
