@@ -1,53 +1,114 @@
 import { PoppinsText } from '@/components/PoppinsText';
+import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Dimensions,
-    Image,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Dimensions,
+  Image,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
-// Mock user data - in a real app, this would come from your backend
-const MOCK_USER = {
-  id: '1',
-  name: 'Alex Johnson',
-  age: 28,
-  bio: 'Adventure seeker and coffee enthusiast. Love hiking on weekends and trying out new recipes. Looking for someone to share life\'s little moments with.',
-  interests: ['Hookup'],
-  photos: [
-    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=500&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80',
-  ],
-};
+// Types for the user profile
+interface ApiResponse<T> {
+  data?: T;
+  error?: {
+    message: string;
+    status?: number;
+    code?: string;
+  };
+}
+
+interface UserProfile {
+  id: string;
+  name: string;
+  age?: number;
+  bio?: string;
+  interests?: string[];
+  photos: string[];
+  location?: string;
+  gender?: string;
+  orientation?: string;
+  lastActive?: string;
+  about?: string;
+  city?: string;
+  avatar?: string;
+  last_seen?: string;
+}
 
 export default function PublicProfileScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
 
   useEffect(() => {
-    // In a real app, you would fetch the user data here
-    const fetchUser = async () => {
+    const fetchUserProfile = async () => {
+      if (!id) {
+        console.error('No user ID provided');
+        setError('No user ID provided');
+        setLoading(false);
+        return;
+      }
+      
       try {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setUser(MOCK_USER);
-      } catch (error) {
-        console.error('Error fetching user:', error);
+        setLoading(true);
+        setError(null);
+        
+        console.log(`Fetching user profile for ID: ${id}`);
+        const response = await api.get<any>(`/users/${id}`);
+        
+        // The API returns the user data in the data property
+        const userData = response.data;
+        console.log('Received user data:', userData);
+        
+        if (!userData) {
+          throw new Error('No user data received');
+        }
+
+        // Transform the API response to match our UserProfile interface
+        const transformedUser: UserProfile = {
+          id: userData.id || String(id),
+          name: userData.name || 'User',
+          age: userData.age,
+          bio: userData.bio || userData.about,
+          interests: Array.isArray(userData.interests) 
+            ? userData.interests 
+            : userData.interests ? [userData.interests] : [],
+          photos: Array.isArray(userData.photos) && userData.photos.length > 0 
+            ? userData.photos 
+            : userData.avatar 
+              ? [userData.avatar]
+              : ['https://i.pravatar.cc/300?img=32'],
+          location: userData.location || userData.city,
+          gender: userData.gender,
+          orientation: userData.orientation,
+          lastActive: userData.lastActive || userData.last_seen
+        };
+        
+        console.log('Transformed user data:', transformedUser);
+        setUser(transformedUser);
+        
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load profile';
+        console.error('Error in fetchUserProfile:', {
+          error: err,
+          message: errorMessage,
+          stack: err instanceof Error ? err.stack : undefined
+        });
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchUser();
+    fetchUserProfile();
   }, [id]);
 
   if (loading) {
@@ -60,8 +121,14 @@ export default function PublicProfileScreen() {
 
   if (!user) {
     return (
-      <View style={styles.container}>
-        <PoppinsText>User not found</PoppinsText>
+      <View style={[styles.container, styles.centered]}>
+        {error ? (
+          <PoppinsText style={styles.errorText}>
+            {error}
+          </PoppinsText>
+        ) : (
+          <PoppinsText>User not found</PoppinsText>
+        )}
       </View>
     );
   }
@@ -186,6 +253,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#fff',
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    color: '#ff3b30',
+    textAlign: 'center',
+    marginHorizontal: 20,
   },
   header: {
     flexDirection: 'row',

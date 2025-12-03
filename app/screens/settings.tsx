@@ -97,108 +97,126 @@ const SettingsScreen = () => {
 
   if (isLoading || !settings) {
     return (
-      <View style={[styles.container, styles.loadingContainer]}>
-        <ActivityIndicator size="large" color="#651B55" />
-        <Text style={styles.loadingText}>Loading settings...</Text>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#000" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Settings</Text>
+          <View style={{ width: 24 }} /> {/* For alignment */}
+        </View>
+        <View style={[styles.loadingContainer, { flex: 1 }]}>
+          <ActivityIndicator size="large" color="#651B55" />
+          <Text style={styles.loadingText}>Loading settings...</Text>
+        </View>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Account</Text>
-        
-        <TouchableOpacity 
-          style={styles.settingItem} 
-          onPress={() => router.push('/(tabs)/profile')}
-          disabled={isLoading}
-        >
-          <View style={styles.settingLeft}>
-            <Ionicons name="person-outline" size={24} color={isLoading ? '#ccc' : '#333'} />
-            <Text style={[styles.settingText, isLoading && styles.disabledText]}>Edit Profile</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#999" />
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
+        <Text style={styles.headerTitle}>Settings</Text>
+        <View style={{ width: 24 }} /> {/* For alignment */}
       </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Notifications</Text>
-        
-        <View style={styles.settingItem}>
-          <View style={styles.settingLeft}>
-            <Ionicons 
-              name="notifications-outline" 
-              size={24} 
-              color={isLoading ? '#ccc' : '#333'} 
-            />
-            <Text style={[styles.settingText, isLoading && styles.disabledText]}>
-              New Matches
-            </Text>
-          </View>
-          {isLoading ? (
-            <ActivityIndicator color="#651B55" />
-          ) : (
-            <Switch
-              trackColor={{ false: '#f4f3f4', true: '#e0d3e6' }}
-              thumbColor="#651B55"
-              value={settings.notifications.matches}
-              onValueChange={(value) => handleNotificationSettingChange('matches', value)}
-              disabled={isLoading}
-            />
-          )}
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account</Text>
+          
+          <TouchableOpacity 
+            style={styles.settingItem} 
+            onPress={() => router.push('/(tabs)/profile')}
+            disabled={isLoading}
+          >
+            <View style={styles.settingLeft}>
+              <Ionicons name="person-outline" size={24} color={isLoading ? '#ccc' : '#333'} />
+              <Text style={[styles.settingText, isLoading && styles.disabledText]}>Edit Profile</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#999" />
+          </TouchableOpacity>
         </View>
 
-        <View style={[styles.settingItem, styles.settingItemNested]}>
-          <View style={styles.settingLeft}>
-            <Ionicons 
-              name="chatbubbles-outline" 
-              size={24} 
-              color={isLoading ? '#ccc' : '#333'} 
-            />
-            <Text style={[styles.settingText, isLoading && styles.disabledText]}>
-              Messages
-            </Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Notifications</Text>
+          
+          <View style={styles.settingItem}>
+            <View style={styles.settingLeft}>
+              <Ionicons 
+                name="notifications-outline" 
+                size={24} 
+                color={isLoading ? '#ccc' : '#333'} 
+              />
+              <Text style={[styles.settingText, isLoading && styles.disabledText]}>
+                New Matches
+              </Text>
+            </View>
+            {isLoading ? (
+              <ActivityIndicator color="#651B55" />
+            ) : (
+              <Switch
+                trackColor={{ false: '#f4f3f4', true: '#e0d3e6' }}
+                thumbColor="#651B55"
+                value={settings.notifications.matches}
+                onValueChange={(value) => handleNotificationSettingChange('matches', value)}
+                disabled={isLoading}
+              />
+            )}
           </View>
-          {isLoading ? (
-            <ActivityIndicator color="#651B55" />
-          ) : (
-            <Switch
-              trackColor={{ false: '#f4f3f4', true: '#e0d3e6' }}
-              thumbColor="#651B55"
-              value={settings.notifications.messages}
-              onValueChange={(value) => handleNotificationSettingChange('messages', value)}
-              disabled={isLoading}
-            />
-          )}
+
+          <View style={[styles.settingItem, styles.settingItemNested]}>
+            <View style={styles.settingLeft}>
+              <Ionicons 
+                name="chatbubbles-outline" 
+                size={24} 
+                color={isLoading ? '#ccc' : '#333'} 
+              />
+              <Text style={[styles.settingText, isLoading && styles.disabledText]}>
+                Messages
+              </Text>
+            </View>
+            {isLoading ? (
+              <ActivityIndicator color="#651B55" />
+            ) : (
+              <Switch
+                trackColor={{ false: '#f4f3f4', true: '#e0d3e6' }}
+                thumbColor="#651B55"
+                value={settings.notifications.messages}
+                onValueChange={(value) => handleNotificationSettingChange('messages', value)}
+                disabled={isLoading}
+              />
+            )}
+          </View>
         </View>
-      </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Support</Text>
-        
-        <TouchableOpacity 
-          style={styles.settingItem} 
-          onPress={() => router.push('/screens/help-support')}
-        >
-          <View style={styles.settingLeft}>
-            <Ionicons name="help-circle-outline" size={24} color="#333" />
-            <Text style={styles.settingText}>Help & Support</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#999" />
-        </TouchableOpacity>
-      </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Support</Text>
+          
+          <TouchableOpacity 
+            style={styles.settingItem} 
+            onPress={() => router.push('/screens/help-support')}
+          >
+            <View style={styles.settingLeft}>
+              <Ionicons name="help-circle-outline" size={24} color="#333" />
+              <Text style={styles.settingText}>Help & Support</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#999" />
+          </TouchableOpacity>
+        </View>
 
-      <View style={styles.section}>
-        <TouchableOpacity 
-          style={[styles.settingItem, styles.logoutButton]} 
-          onPress={handleLogout}
-        >
-          <Text style={styles.logoutText}>Log Out</Text>
-          <Ionicons name="log-out-outline" size={20} color="#e74c3c" />
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+        <View style={styles.section}>
+          <TouchableOpacity 
+            style={[styles.settingItem, styles.logoutButton]} 
+            onPress={handleLogout}
+          >
+            <Text style={styles.logoutText}>Log Out</Text>
+            <Ionicons name="log-out-outline" size={20} color="#e74c3c" />
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
   );
 };
 
@@ -219,9 +237,30 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
-    paddingTop: 16,
+    backgroundColor: '#fff',
+  },
+  scrollView: {
+    flex: 1,
     padding: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    paddingTop: 16,
+    height: 100,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    paddingTop: 16,
+  },
+  backButton: {
+    padding: 8,
+    marginLeft: -8,
   },
   section: {
     backgroundColor: '#fff',

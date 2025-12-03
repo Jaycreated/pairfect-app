@@ -242,11 +242,37 @@ export const api = {
     }
   },
     
-  likeUser: (userId: string) =>
-    fetchApi(API_CONFIG.ENDPOINTS.MATCHES.LIKE(userId), 'POST'),
+  likeUser: async (userId: string) => {
+    try {
+      const response = await fetchApi<{ success: boolean; match?: boolean; message?: string }>(
+        API_CONFIG.ENDPOINTS.MATCHES.LIKE(userId),
+        'POST'
+      );
+      
+      // Only include match in the response if it exists in the API response
+      const responseData = response.data?.match !== undefined 
+        ? { match: response.data.match }
+        : {};
+        
+      return { data: responseData, error: response.error };
+    } catch (error) {
+      console.error('Error liking user:', error);
+      return { error: 'Failed to like user' };
+    }
+  },
     
-  passUser: (userId: string) =>
-    fetchApi(API_CONFIG.ENDPOINTS.MATCHES.PASS(userId), 'POST'),
+  passUser: async (userId: string) => {
+    try {
+      const response = await fetchApi<{ success: boolean; message?: string }>(
+        API_CONFIG.ENDPOINTS.MATCHES.PASS(userId),
+        'POST'
+      );
+      return { data: {}, error: response.error };
+    } catch (error) {
+      console.error('Error passing user:', error);
+      return { error: 'Failed to pass user' };
+    }
+  },
     
   getMatches: () => 
     fetchApi(API_CONFIG.ENDPOINTS.MATCHES.BASE),

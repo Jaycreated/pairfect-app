@@ -1,4 +1,5 @@
 import { PoppinsText } from '@/components/PoppinsText';
+import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -15,7 +16,6 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import { api } from '@/services/api';
 
 const { width, height } = Dimensions.get('window');
 const SWIPE_THRESHOLD = width * 0.4;
@@ -104,72 +104,102 @@ const SwipeScreen = () => {
     })
   ).current;
 
+  type SwipeResponse = {
+    data?: {
+      match?: boolean;
+      success?: boolean;
+    };
+    error?: string | {
+      message: string;
+      status?: number;
+      code?: string;
+    };
+  };
+
   const swipeCard = useCallback(async (direction: number) => {
-    if (isProcessingSwipe || currentIndex >= users.length) return;
+    if (isProcessingSwipe || currentIndex >= users.length) {
+      console.log('Swipe prevented - isProcessingSwipe:', isProcessingSwipe, 'currentIndex:', currentIndex, 'users.length:', users.length);
+      return;
+    }
     
     setIsProcessingSwipe(true);
     const currentUser = users[currentIndex];
+    const isLike = direction > 0;
 
-    // Animate card off screen
-    Animated.timing(position, {
-      toValue: { 
-        x: direction * (width + 100), 
-        y: direction * 100 
-      },
-      duration: SWIPE_OUT_DURATION,
-      useNativeDriver: false,
-    }).start(async () => {
-      try {
-        // Call API based on swipe direction
-        if (direction > 0) {
-          // Like
-          const response = await api.likeUser(currentUser.id);
-          
-          if (response.error) {
-            console.error('Error liking user:', response.error);
-            Alert.alert('Error', 'Failed to like user. Please try again.');
-          } else {
-            console.log('Liked:', currentUser.name);
-            
-            // Check if it's a match (API should return this info)
-            if (response.data?.match) {
-              Alert.alert(
-                "It's a match! 💕",
-                `You and ${currentUser.name} have liked each other!`,
-                [
-                  { text: 'Keep Swiping', style: 'cancel' },
-                  { text: 'Send Message', onPress: () => router.push('/matches') }
-                ]
-              );
-            }
-          }
-        } else {
-          // Pass
-          const response = await api.passUser(currentUser.id);
-          
-          if (response.error) {
-            console.error('Error passing user:', response.error);
-          } else {
-            console.log('Passed:', currentUser.name);
-          }
-        }
-      } catch (err) {
-        console.error('Error processing swipe:', err);
-      } finally {
+    console.log('Starting swipe action:', {
+      action: isLike ? 'like' : 'pass',
+      userId: currentUser.id,
+      userName: currentUser.name,
+      currentIndex,
+      totalUsers: users.length
+    });
+
+    try {
+      // Call API based on swipe direction
+      console.log(`Sending ${isLike ? 'like' : 'pass'} for user:`, currentUser.id);
+      
+      const response: SwipeResponse = isLike 
+        ? await api.likeUser(currentUser.id)
+        : await api.passUser(currentUser.id);
+      
+      console.log('API Response:', JSON.stringify(response, null, 2));
+      
+      if (response.error) {
+        const errorMessage = typeof response.error === 'string' 
+          ? response.error 
+          : response.error.message || 'Unknown error';
+        
+        console.error(`Error ${isLike ? 'liking' : 'passing'} user:`, errorMessage);
+        Alert.alert('Error', `Failed to ${isLike ? 'like' : 'pass'} user: ${errorMessage}`);
+        setIsProcessingSwipe(false);
+        return;
+      }
+      
+      console.log(`${isLike ? 'Liked' : 'Passed'}:`, currentUser.name, 'Match data:', response.data);
+      
+      // Show match alert only if it's a like and the response has a match property that is true
+      if (isLike && response.data && 'match' in response.data && response.data.match === true) {
+        console.log('Match found with:', currentUser.name);
+        Alert.alert(
+          "It's a match! 💕",
+          `You and ${currentUser.name} have liked each other!`,
+          [
+            { text: 'Keep Swiping', style: 'cancel' },
+            { text: 'Send Message', onPress: () => router.push('/matches') }
+          ]
+        );
+      } else if (isLike) {
+        console.log('No match with:', currentUser.name);
+      }
+      
+      // Animate card off screen after successful API call
+      Animated.timing(position, {
+        toValue: { 
+          x: direction * (width + 100), 
+          y: direction * 100 
+        },
+        duration: SWIPE_OUT_DURATION,
+        useNativeDriver: false,
+      }).start(() => {
         // Move to next card
         const isLastCard = currentIndex >= users.length - 1;
         
         if (isLastCard) {
           // Fetch more matches
-          await fetchPotentialMatches();
+          fetchPotentialMatches();
         } else {
           setCurrentIndex(currentIndex + 1);
         }
         
         position.setValue({ x: 0, y: 0 });
         setIsProcessingSwipe(false);
-      }
-    });
+      });
+      
+    } catch (err) {
+      console.error('Error processing swipe:', err);
+      Alert.alert('Error', 'An error occurred while processing your action. Please try again.');
+      setIsProcessingSwipe(false);
+    }
   }, [currentIndex, users, position, isProcessingSwipe]);
 
   const handleCardPress = useCallback((userId: string) => {
@@ -350,7 +380,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
-    fontFamily: 'Poppins_400Regular',
   },
   centerContent: {
     justifyContent: 'center',
@@ -369,7 +398,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    paddingTop: 30,
+    paddingTop: 10,
   },
   headerTitle: {
     fontSize: 20,
