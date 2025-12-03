@@ -1,62 +1,45 @@
 import { PoppinsText } from '@/components/PoppinsText';
 import { useRouter } from 'expo-router';
-import { Dimensions, Image, StyleSheet, TouchableOpacity, useColorScheme, View } from 'react-native';
-
-const { width, height } = Dimensions.get('window');
+import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 export default function LandingScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme() || 'light';
-  const isDark = colorScheme === 'dark';
 
   const handleGetStarted = () => {
-    router.push('/onboarding');
+    router.push('/swipe');
   };
 
   return (
-    <View className="flex-1" style={[styles.container, { backgroundColor: '#1A1A2E' }]}>
-      <View className="absolute top-0 w-full h-1/2 bg-[#651B55] rounded-b-3xl" />
-      
-      <View className="flex-1 justify-center items-center px-8">
-        <View className="w-64 h-64 mb-10 bg-white rounded-3xl shadow-2xl items-center justify-center" 
-          style={styles.logoContainer}>
+    <View style={styles.container}>
+      <View style={styles.content}>
+        <View style={styles.logoContainer}>
           <Image
             source={require('@/assets/images/LandingLogo.png')}
-            className="w-40 h-40"
+            style={styles.logo}
             resizeMode="contain"
           />
         </View>
         
-        <View className="items-center mb-12">
+        <View style={styles.textContainer}>
           <PoppinsText 
             weight="bold" 
-            className="text-4xl text-center mb-3 text-white" 
-            style={{ fontSize: 36 }}
+            style={styles.title}
           >
-            Welcome to
+            Welcome to Pairfect
           </PoppinsText>
           <PoppinsText 
-            weight="bold" 
-            className="text-4xl text-center mb-6 text-[#FF9BE9]"
-            style={{ fontSize: 36 }}
+            style={styles.subtitle}
           >
-            Pairfect
-          </PoppinsText>
-          <PoppinsText 
-            className="text-lg text-center text-gray-300 px-4"
-            style={{ fontSize: 16, lineHeight: 24 }}
-          >
-            Swipe right to find your perfect match and start meaningful connections
+            Find your perfect match
           </PoppinsText>
         </View>
         
         <TouchableOpacity 
-          className="w-full py-5 rounded-2xl items-center justify-center"
-          style={[styles.button, { backgroundColor: '#FF9BE9' }]}
+          style={styles.button}
           onPress={handleGetStarted}
-          activeOpacity={0.9}
+          activeOpacity={0.8}
         >
-          <PoppinsText className="text-lg font-bold" style={{ color: '#1A1A2E', fontSize: 18 }}>
+          <PoppinsText style={styles.buttonText}>
             Start Swiping
           </PoppinsText>
         </TouchableOpacity>
@@ -68,20 +51,47 @@ export default function LandingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
   },
+  content: {
+    alignItems: 'center',
+    padding: 24,
+  },
   logoContainer: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 10,
+    marginBottom: 40,
+  },
+  logo: {
+    width: 120,
+    height: 120,
+  },
+  textContainer: {
+    alignItems: 'center',
+    marginBottom: 48,
+  },
+  title: {
+    fontSize: 24,
+    color: '#333333',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#666666',
+    textAlign: 'center',
+    lineHeight: 24,
   },
   button: {
-    shadowColor: '#FF9BE9',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 5,
+    width: '100%',
+    paddingVertical: 16,
+    backgroundColor: '#651B55',
+    borderRadius: 30,
+    alignItems: 'center',
+    maxWidth: 280,
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
