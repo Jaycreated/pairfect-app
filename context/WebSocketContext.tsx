@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useRef } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import { API_CONFIG } from '../config/api';
 import { getAuthToken } from '../services/userService';
+import { getActiveSubscription } from '../services/subscriptionService';
 
 type WebSocketContextType = {
   socket: Socket | null;
@@ -32,6 +33,16 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       console.warn('WebSocket:', error);
       return;
     }
+    
+    // Check if user has an active subscription
+    const subscription = await getActiveSubscription();
+    if (!subscription) {
+      const error = 'No active subscription for socket connection';
+      console.warn('WebSocket:', error);
+      return;
+    }
+    
+    console.log('WebSocket: User has active subscription, proceeding with connection');
     
     console.log('WebSocket: Auth token found, initializing connection');
 
