@@ -48,8 +48,8 @@ const ProfileSetup = () => {
     const loadProfile = async () => {
       try {
         const response = await api.getProfile();
-        if (response.data) {
-          const { name, gender, age, location, orientation, interests } = response.data;
+        if (response.data?.user) {
+          const { name, gender, age, location, orientation, interests } = response.data.user;
           setFormData(prev => ({
             ...prev,
             name: name || '',
@@ -71,12 +71,20 @@ const ProfileSetup = () => {
   }, []);
 
   const handleNext = async () => {
-    if (!canProceed()) return;
+    console.log('handleNext called, step:', step);
+    
+    if (!canProceed()) {
+      console.log('Cannot proceed, validation failed');
+      return;
+    }
 
     if (step < 4) {
+      console.log('Moving to next step:', step + 1);
       setStep(step + 1);
       return;
     }
+
+    console.log('Final step - submitting profile data');
 
     try {
       setIsLoading(true);
@@ -89,20 +97,25 @@ const ProfileSetup = () => {
         'Non-binary': 'non_binary'
       };
 
+      const genderValue = genderMapping[formData.gender] || formData.gender?.toLowerCase();
+      const ageValue = parseInt(formData.age, 10);
+      
       const profileData = {
         name: formData.name,
-        gender: genderMapping[formData.gender] || formData.gender.toLowerCase(),
-        age: parseInt(formData.age, 10),
+        gender: genderValue,
+        age: ageValue,
         location: formData.location,
         orientation: formData.orientation,
         interests: selectedInterests,
       };
 
-      console.log('Sending profile data:', profileData);
+      console.log('📤 [Profile Setup] Sending profile data:', JSON.stringify(profileData, null, 2));
+      
       const response = await api.updateProfile(profileData);
+      console.log('✅ [Profile Setup] API Response:', JSON.stringify(response, null, 2));
       
       if (response.error) {
-        console.error('Profile update error:', response.error);
+        console.error('❌ [Profile Setup] Profile update error:', response.error);
         if (response.error.errors) {
           // Handle validation errors from the API
           const errorMessages = response.error.errors.map((err: any) => 
@@ -113,11 +126,17 @@ const ProfileSetup = () => {
         throw new Error(response.error.message || 'Failed to save profile');
       }
 
-      // Clear temp user data if it exists
-      await Storage.deleteItem('tempUser');
+      console.log('🔑 [Profile Setup] Clearing temp user data and profile setup flag');
+      await Promise.all([
+        Storage.deleteItem('tempUser'),
+        Storage.deleteItem('needsProfileSetup')
+      ]);
       
-      // Navigate to the main app
-      router.replace('/(tabs)');
+      console.log('🔄 [Profile Setup] Navigating to /(tabs)');
+      router.replace({
+        pathname: '/(tabs)',
+        params: { screen: 'swipe' }
+      });
     } catch (err) {
       console.error('Profile setup error:', err);
       setError(err instanceof Error ? err.message : 'Failed to save profile. Please try again.');

@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
+import { Storage } from '@/utils/storage';
 import {
   Alert,
   Image,
@@ -53,6 +54,7 @@ const SignUpScreen = () => {
     
     try {
       setIsLoading(true);
+      console.log('Attempting to register with:', data);
       
       // Call the register API
       const response = await api.register({
@@ -62,11 +64,18 @@ const SignUpScreen = () => {
         sexualOrientation: data.sexualOrientation,
       });
       
+      console.log('Registration response:', response);
+      
       if (response.error) {
+        console.error('Registration error:', response.error);
         throw new Error(response.error.message || 'Registration failed');
       }
       
+      // Set a flag indicating profile setup is needed
+      await Storage.setItem('needsProfileSetup', 'true');
+      
       // Navigate to profile setup on successful registration
+      console.log('Navigating to profile setup');
       router.replace('/(auth)/profile-setup');
     } catch (error) {
       console.error('Sign up error:', error);

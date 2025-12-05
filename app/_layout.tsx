@@ -113,9 +113,18 @@ function AuthLayout() {
           return;
         }
 
-        // User is authenticated, redirect to tabs (which will show the swipe screen)
+        // Check if user needs to complete profile setup
+        const needsProfileSetup = await Storage.getItem('needsProfileSetup');
+        
+        // If user needs to complete profile setup and not already there
+        if (needsProfileSetup === 'true' && segments[0] !== '(auth)') {
+          router.replace('/(auth)/profile-setup');
+          return;
+        }
+        
+        // User is authenticated and profile setup is complete, redirect to tabs
         // if they're in auth or onboarding screens
-        if (inAuthGroup || inOnboarding) {
+        if ((inAuthGroup || inOnboarding) && needsProfileSetup !== 'true') {
           // Replace the current route with the tabs navigation
           // This ensures the user can't go back to the auth screens with the back button
           router.replace({

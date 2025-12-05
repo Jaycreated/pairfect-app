@@ -1,7 +1,6 @@
 import { api } from '@/services/api';
 import { SignInCredentials, SignUpData, User } from '@/types/auth';
 import { Storage } from '@/utils/storage';
-import { router } from 'expo-router';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
 type AuthContextType = {
@@ -163,6 +162,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
+      // Call the logout API endpoint if a token exists
+      const token = await Storage.getItem('auth_token');
+      if (token) {
+        try {
+          await api.logout();
+        } catch (error) {
+          console.warn('Logout API call failed, but continuing with local sign out', error);
+          // Continue with local sign out even if API call fails
+        }
+      }
+
       // Clear all auth state
       await Storage.deleteItem('auth_token');
       setUser(null);
