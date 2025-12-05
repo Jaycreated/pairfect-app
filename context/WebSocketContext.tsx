@@ -1,12 +1,16 @@
-import React, { createContext, useContext, useEffect, useRef } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import { API_CONFIG } from '../config/api';
+import { hasActiveSubscription } from '../services/subscriptionService';
 import { getAuthToken } from '../services/userService';
-import { getActiveSubscription } from '../services/subscriptionService';
 
 type WebSocketContextType = {
   socket: Socket | null;
   isConnected: boolean;
+  hasSubscription: boolean;
+  checkSubscription: () => Promise<boolean>;
+  connect: () => Promise<boolean>;
+  disconnect: () => void;
   emit: (event: string, data?: unknown) => boolean;
   on: (event: string, callback: (...args: any[]) => void) => void;
   off: (event: string) => void;
@@ -16,39 +20,55 @@ const WebSocketContext = createContext<WebSocketContextType | undefined>(undefin
 
 export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const socketRef = useRef<Socket | null>(null);
-  const isConnectedRef = useRef(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [hasActiveSub, setHasActiveSub] = useState(false);
   const listenersRef = useRef<Record<string, (...args: any[]) => void>>({});
+  const connectionAttempted = useRef(false);
 
-  const connect = async () => {
-    console.log('WebSocket: Attempting to connect...');
-    
-    if (socketRef.current?.connected) {
-      console.log('WebSocket: Already connected, skipping new connection');
-      return;
+  const checkSubscription = useCallback(async (): Promise<boolean> => {
+    try {
+      const hasSub = await hasActiveSubscription();
+      setHasActiveSub(hasSub);
+      return hasSub;
+    } catch (error) {
+      console.warn('Failed to check subscription status:', error);
+      return false;
     }
+  }, []);
+
+  const disconnect = useCallback(() => {
+    if (socketRef.current) {
+      console.log('WebSocket: Disconnecting...');
+      socketRef.current.disconnect();
+      socketRef.current = null;
+      setIsConnected(false);
+    }
+  }, []);
+
+  const connect = async (force = false): Promise<boolean> => {
+    // Don't try to connect if we've already attempted and there's no active subscription
+    if (connectionAttempted.current && !hasActiveSub && !force) {
+      console.log('WebSocket: Skipping connection - no active subscription');
+      return false;
+    }
+
+    console.log('WebSocket: Attempting to connect...');
+    connectionAttempted.current = true;
+    
+    // Disconnect existing socket if any
+    disconnect();
 
     const token = await getAuthToken();
     if (!token) {
-      const error = 'No auth token available for socket connection';
-      console.warn('WebSocket:', error);
-      return;
+      console.warn('WebSocket: No auth token available');
+      return false;
     }
     
-    // Check if user has an active subscription
-    const subscription = await getActiveSubscription();
-    if (!subscription) {
-      const error = 'No active subscription for socket connection';
-      console.warn('WebSocket:', error);
-      return;
-    }
-    
-    console.log('WebSocket: User has active subscription, proceeding with connection');
-    
-    console.log('WebSocket: Auth token found, initializing connection');
-
-    // Disconnect existing socket if any
-    if (socketRef.current) {
-      socketRef.current.disconnect();
+    // Check subscription status
+    const hasSub = await checkSubscription();
+    if (!hasSub) {
+      console.warn('WebSocket: No active subscription');
+      return false;
     }
 
     const socketUrl = API_CONFIG.WS_URL;
@@ -75,48 +95,56 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     socketRef.current.on('connect', () => {
       console.log('WebSocket: Successfully connected to server');
       console.log('WebSocket: Socket ID:', socketRef.current?.id);
-      isConnectedRef.current = true;
+      setIsConnected(true);
     });
 
     socketRef.current.on('disconnect', (reason: string) => {
       console.log('WebSocket: Disconnected from server. Reason:', reason);
-      isConnectedRef.current = false;
+      setIsConnected(false);
       
-      // Attempt to reconnect if not explicitly disconnected
-      if (reason !== 'io client disconnect') {
-        console.log('WebSocket: Attempting to reconnect...');
-        setTimeout(() => connect(), 1000);
+      // Only attempt to reconnect if we have an active subscription
+      if (reason !== 'io client disconnect' && hasActiveSub) {
+        const delay = reason === 'io server disconnect' ? 5000 : 1000;
+        console.log(`WebSocket: Attempting to reconnect in ${delay}ms...`);
+        setTimeout(() => connect(), delay);
+      }
+    });
+
+    socketRef.current.on('connect_error', (error: Error) => {
+      console.error('WebSocket: Connection error:', error);
+      setIsConnected(false);
+      
+      // Handle payment required error specifically
+      if (error.message.includes('Payment required')) {
+        console.warn('WebSocket: Payment required for chat access');
+        setHasActiveSub(false);
+        disconnect();
       }
     });
 
     socketRef.current.on('error', (error: Error) => {
-      console.error('WebSocket: Connection error:', error);
-    });
-    
-    socketRef.current.on('connect_error', (error: Error) => {
-      console.error('WebSocket: Connection error:', error);
-    });
-    
-    socketRef.current.on('reconnect_attempt', (attempt: number) => {
-      console.log(`WebSocket: Reconnection attempt ${attempt}`);
-    });
-    
-    socketRef.current.on('reconnect_failed', () => {
-      console.error('WebSocket: Failed to reconnect after all attempts');
+      console.error('WebSocket error:', error);
     });
 
-    // Re-register all existing listeners
-    Object.entries(listenersRef.current).forEach(([event, handler]) => {
-      socketRef.current?.on(event, handler);
+    // Return connection status
+    return new Promise<boolean>((resolve) => {
+      if (!socketRef.current) return resolve(false);
+      
+      if (socketRef.current.connected) {
+        resolve(true);
+      } else {
+        const timeout = setTimeout(() => {
+          console.warn('WebSocket: Connection timeout');
+          resolve(false);
+        }, 10000);
+        
+        socketRef.current.once('connect', () => {
+          clearTimeout(timeout);
+          resolve(true);
+        });
+      }
     });
-  };
 
-  const disconnect = () => {
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-      socketRef.current = null;
-      isConnectedRef.current = false;
-    }
   };
 
   const on = (event: string, callback: (...args: any[]) => void) => {
@@ -163,7 +191,11 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const value = {
     socket: socketRef.current,
-    isConnected: isConnectedRef.current,
+    isConnected,
+    hasSubscription: hasActiveSub,
+    checkSubscription,
+    connect: () => connect(true), // Force connection attempt
+    disconnect,
     emit,
     on,
     off,

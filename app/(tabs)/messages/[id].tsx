@@ -182,7 +182,7 @@ const ChatScreen = () => {
     const messageToSend: ChatMessage = {
       id: tempId,
       text: newMessage,
-      senderId: user.id,
+      senderId: user?.id?.toString() || '', // Add null check with optional chaining
       timestamp: new Date(),
       isSending: true,
     };
@@ -223,7 +223,7 @@ const ChatScreen = () => {
   /** ---- FIXED ⚠️: item now has a proper type ---- **/
   const renderMessage = useCallback(
     ({ item }: { item: ChatMessage }) => {
-      const isCurrentUser = item.senderId === user?.id;
+      const isCurrentUser = item.senderId === user?.id?.toString();
 
       return (
         <View
