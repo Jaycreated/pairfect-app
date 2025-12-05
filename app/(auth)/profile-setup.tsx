@@ -1,11 +1,13 @@
 import { PoppinsText } from '@/components/PoppinsText';
+import { uploadToCloudinary } from '@/config/cloudinary';
 import { api } from '@/services/api';
 import { Storage } from '@/utils/storage';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
+  ActivityIndicator, Alert, Image,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -21,12 +23,13 @@ const ProfileSetup = () => {
     name: '',
     age: '',
     location: '',
-    orientation: '',
   });
 
   const [step, setStep] = useState(1);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const [photos, setPhotos] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const relationshipInterests = [
@@ -41,6 +44,44 @@ const ProfileSetup = () => {
 
   const handleChange = (name: string, value: string) => {
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const pickImage = async () => {
+    try {
+      console.log('📱 [Image Picker] Requesting permissions');
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert('Permission required', 'Please allow access to your photo library to upload images.');
+        return;
+      }
+
+      console.log('📱 [Image Picker] Launching image picker');
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        console.log('📱 [Image Picker] Image selected, starting upload');
+        setIsUploading(true);
+        const uri = result.assets[0].uri;
+        const imageUrl = await uploadToCloudinary(uri);
+        setPhotos(prev => [...prev, imageUrl]);
+        console.log('✅ [Image Picker] Image uploaded successfully');
+      }
+    } catch (error) {
+      console.error('❌ [Image Picker] Error:', error);
+      setError('Failed to upload image. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const removePhoto = (index: number) => {
+    setPhotos(prev => prev.filter((_, i) => i !== index));
   };
 
   // Load profile data when component mounts
@@ -74,12 +115,12 @@ const ProfileSetup = () => {
     console.log('handleNext called, step:', step);
     
     if (!canProceed()) {
-      console.log('Cannot proceed, validation failed');
+      console.log('⏭️ [Profile Setup] Cannot proceed, validation failed');
       return;
     }
 
-    if (step < 4) {
-      console.log('Moving to next step:', step + 1);
+    if (step < 3) {
+      console.log('⏭️ [Profile Setup] Moving to next step:', step + 1);
       setStep(step + 1);
       return;
     }
@@ -100,14 +141,17 @@ const ProfileSetup = () => {
       const genderValue = genderMapping[formData.gender] || formData.gender?.toLowerCase();
       const ageValue = parseInt(formData.age, 10);
       
+      console.log('📝 [Profile Setup] Preparing profile data');
       const profileData = {
         name: formData.name,
         gender: genderValue,
         age: ageValue,
         location: formData.location,
-        orientation: formData.orientation,
         interests: selectedInterests,
+        photos: photos, // Include the uploaded photos
       };
+      
+      console.log('📝 [Profile Setup] Profile data prepared:', JSON.stringify(profileData, null, 2));
 
       console.log('📤 [Profile Setup] Sending profile data:', JSON.stringify(profileData, null, 2));
       
@@ -153,7 +197,7 @@ const ProfileSetup = () => {
   const canProceed = () => {
     if (step === 1) return !!formData.gender;
     if (step === 2) return !!formData.name && !!formData.age && !!formData.location;
-    if (step === 3) return !!formData.orientation;
+    if (step === 3) return photos.length >= 2; // Require at least 2 photos
     if (step === 4) return selectedInterests.length > 0;
     return false;
   };
@@ -237,28 +281,42 @@ const ProfileSetup = () => {
       case 3:
         return (
           <View style={styles.stepContainer}>
-            <PoppinsText style={styles.stepTitle}>I'm interested in</PoppinsText>
-            <View style={styles.orientationContainer}>
-              {['Men', 'Women', 'Everyone'].map((item) => (
-                <TouchableOpacity
-                  key={item}
-                  style={[
-                    styles.orientationButton,
-                    formData.orientation === item && styles.orientationButtonSelected,
-                  ]}
-                  onPress={() => handleChange('orientation', item)}
-                >
-                  <PoppinsText
-                    style={[
-                      styles.orientationText,
-                      formData.orientation === item && styles.orientationTextSelected,
-                    ]}
+            <PoppinsText style={styles.stepTitle}>Add Your Photos</PoppinsText>
+            <PoppinsText style={styles.subtitle}>Upload at least 2 photos to continue</PoppinsText>
+            
+            <View style={styles.photosContainer}>
+              {photos.map((photo, index) => (
+                <View key={index} style={styles.photoContainer}>
+                  <Image source={{ uri: photo }} style={styles.photo} />
+                  <TouchableOpacity 
+                    style={styles.removePhotoButton}
+                    onPress={() => removePhoto(index)}
                   >
-                    {item}
-                  </PoppinsText>
-                </TouchableOpacity>
+                    <Ionicons name="close" size={20} color="#fff" />
+                  </TouchableOpacity>
+                </View>
               ))}
+              
+              {photos.length < 6 && (
+                <TouchableOpacity 
+                  style={styles.addPhotoButton}
+                  onPress={pickImage}
+                  disabled={isUploading}
+                >
+                  {isUploading ? (
+                    <ActivityIndicator color="#666" />
+                  ) : (
+                    <Ionicons name="add" size={40} color="#666" />
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
+            
+            {photos.length < 2 && (
+              <PoppinsText style={styles.errorText}>
+                Please upload at least 2 photos
+              </PoppinsText>
+            )}
           </View>
         );
 
@@ -514,6 +572,48 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#D32F2F',
     textAlign: 'center',
+  },
+  photosContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  photoContainer: {
+    width: '30%',
+    aspectRatio: 1,
+    margin: '1.66%',
+    borderRadius: 12,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  photo: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  removePhotoButton: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addPhotoButton: {
+    width: '30%',
+    aspectRatio: 1,
+    margin: '1.66%',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F9F9F9',
   },
 });
 
