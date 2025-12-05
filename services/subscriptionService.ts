@@ -14,7 +14,7 @@ const DUMMY_SUBSCRIPTION: UserSubscription = {
   endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
   paymentReference: 'pay_123456789',
   amount: 999,
-  currency: 'USD'
+  currency: 'Naira'
 };
 
 const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
@@ -292,7 +292,7 @@ export const hasActiveSubscription = async (): Promise<boolean> => {
     const subscription = await getActiveSubscription();
     if (!subscription) return false;
     
-    const expiresAt = new Date(subscription.currentPeriodEnd);
+    const expiresAt = new Date(subscription.endDate);
     return expiresAt > new Date();
   } catch (error) {
     console.error('Error checking subscription status:', error);

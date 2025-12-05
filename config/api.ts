@@ -41,7 +41,9 @@ export const API_CONFIG = {
       PASS: (userId: string) => `matches/pass/${userId}`,
     },
     MESSAGES: {
+      BASE: 'messages',
       CONVERSATION: (matchId: string) => `messages/${matchId}`,
+      CONVERSATIONS: 'conversations',
     }
   },
 

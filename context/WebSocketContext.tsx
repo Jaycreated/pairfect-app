@@ -1,8 +1,17 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'expo-router';
+import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
+import { Alert } from 'react-native';
 import { io, type Socket } from 'socket.io-client';
 import { API_CONFIG } from '../config/api';
 import { hasActiveSubscription } from '../services/subscriptionService';
 import { getAuthToken } from '../services/userService';
+
+// Create a router instance that can be used outside React components
+let globalRouter: any = null;
+
+export const setGlobalRouter = (router: any) => {
+  globalRouter = router;
+};
 
 type WebSocketContextType = {
   socket: Socket | null;
@@ -24,6 +33,10 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [hasActiveSub, setHasActiveSub] = useState(false);
   const listenersRef = useRef<Record<string, (...args: any[]) => void>>({});
   const connectionAttempted = useRef(false);
+  
+  // Use the router from the hook if available, otherwise use the global one
+  const routerHook = useRouter();
+  const router = routerHook || globalRouter;
 
   const checkSubscription = useCallback(async (): Promise<boolean> => {
     try {
@@ -45,15 +58,12 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, []);
 
-  const connect = async (force = false): Promise<boolean> => {
-    // Don't try to connect if we've already attempted and there's no active subscription
-    if (connectionAttempted.current && !hasActiveSub && !force) {
-      console.log('WebSocket: Skipping connection - no active subscription');
+  const connect = async (): Promise<boolean> => {
+    if (!router) {
+      console.warn('Router not available');
       return false;
     }
-
     console.log('WebSocket: Attempting to connect...');
-    connectionAttempted.current = true;
     
     // Disconnect existing socket if any
     disconnect();
@@ -61,13 +71,38 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const token = await getAuthToken();
     if (!token) {
       console.warn('WebSocket: No auth token available');
+      Alert.alert('Authentication Required', 'Please log in to access the chat.');
       return false;
     }
     
     // Check subscription status
-    const hasSub = await checkSubscription();
-    if (!hasSub) {
-      console.warn('WebSocket: No active subscription');
+    try {
+      const hasSub = await checkSubscription();
+      if (!hasSub) {
+        console.warn('WebSocket: No active subscription');
+        Alert.alert(
+          'Subscription Required',
+          'You need an active subscription to access the chat.',
+          [
+            {
+              text: 'Subscribe',
+              onPress: () => {
+                if (router) {
+                  router.push('/screens/subscribe');
+                }
+              },
+            },
+            {
+              text: 'Cancel',
+              style: 'cancel',
+            },
+          ]
+        );
+        return false;
+      }
+    } catch (error) {
+      console.error('Subscription check failed:', error);
+      Alert.alert('Error', 'Failed to verify subscription status. Please try again.');
       return false;
     }
 
@@ -181,20 +216,14 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  useEffect(() => {
-    connect();
-
-    return () => {
-      disconnect();
-    };
-  }, []);
+  // Removed auto-connect effect to implement lazy loading
 
   const value = {
     socket: socketRef.current,
     isConnected,
     hasSubscription: hasActiveSub,
     checkSubscription,
-    connect: () => connect(true), // Force connection attempt
+    connect,
     disconnect,
     emit,
     on,

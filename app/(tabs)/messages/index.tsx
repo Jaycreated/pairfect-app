@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   RefreshControl,
@@ -14,7 +15,6 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  Alert,
 } from 'react-native';
 
 // ============================================================================
@@ -36,11 +36,19 @@ interface ConversationType {
 }
 
 interface ApiConversation {
-  id?: string;
+  id: number | string;
   _id?: string;
+  name?: string;
+  email?: string;
+  photos?: string[];
+  age?: number;
+  location?: string | null;
+  last_message_at?: string;
+  last_message?: string;
+  unread_count?: string | number;
+  // Legacy fields (keep for backward compatibility)
   participantId?: string;
   userId?: string;
-  name?: string;
   avatar?: string;
   lastMessage?: {
     content?: string;
@@ -105,16 +113,21 @@ const formatMessageTime = (timestamp: string): string => {
  * Transforms API response to app conversation format
  */
 const transformApiConversation = (conv: ApiConversation): ConversationType => {
+  // Use the first photo as avatar if available, otherwise fallback to avatar or placeholder
+  const avatar = Array.isArray(conv.photos) && conv.photos.length > 0 
+    ? conv.photos[0] 
+    : conv.avatar || 'https://via.placeholder.com/56';
+    
   return {
-    id: conv.id || conv._id || '',
+    id: String(conv.id || conv._id || ''),
     user: {
-      id: conv.participantId || conv.userId || '',
+      id: String(conv.id || ''),
       name: conv.name || 'Unknown User',
-      avatar: conv.avatar || 'https://via.placeholder.com/56',
+      avatar: avatar,
     },
-    lastMessage: conv.lastMessage?.content || 'No messages yet',
-    time: conv.updatedAt || new Date().toISOString(),
-    unread: conv.unreadCount || 0,
+    lastMessage: conv.last_message || conv.lastMessage?.content || 'No messages yet',
+    time: conv.last_message_at || conv.updatedAt || new Date().toISOString(),
+    unread: Number(conv.unread_count || conv.unreadCount || 0),
   };
 };
 
@@ -262,23 +275,44 @@ const MessagesScreen = () => {
       
       setError(null);
 
-      console.log('[fetchConversations] Making API request to /api/conversations');
-      const response = await api.get<ApiConversation[]>('/api/conversations');
+      console.log('[fetchConversations] Making API request to get conversations');
+      const response = await api.getConversations();
       
       console.log('[fetchConversations] API response received:', {
-        status: response.status,
-        dataLength: response.data?.length || 0,
+        data: response.data,
+        error: response.error,
       });
+      
+      // Log the raw response for debugging
+      console.log('[fetchConversations] Raw API response:', JSON.stringify(response, null, 2));
+      
+      // Type assertion for the response data
+      const conversationsData = response.data as ApiConversation[];
+      
+      // Log the transformed data for debugging
+      console.log('[fetchConversations] Transformed conversations data:', 
+        JSON.stringify(conversationsData, null, 2)
+      );
 
       if (!isMountedRef.current) {
         console.log('[fetchConversations] Component unmounted, aborting state update');
         return;
       }
 
-      if (response.data && Array.isArray(response.data)) {
-        console.log('[fetchConversations] Processing', response.data.length, 'conversations');
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to fetch conversations');
+      }
+
+      if (conversationsData && Array.isArray(conversationsData)) {
+        console.log('[fetchConversations] Processing', conversationsData.length, 'conversations');
         
-        const formattedConversations = response.data.map(transformApiConversation);
+        if (conversationsData.length === 0) {
+          console.log('[fetchConversations] No conversations found');
+          setConversations([]);
+          return;
+        }
+        
+        const formattedConversations = conversationsData.map(transformApiConversation);
         
         // Sort by most recent first
         formattedConversations.sort((a, b) => 
@@ -339,7 +373,11 @@ const MessagesScreen = () => {
    */
   const handleConversationPress = useCallback((conversationId: string) => {
     console.log('[handleConversationPress] Opening conversation:', conversationId);
-    router.push(`/messages/${conversationId}`);
+    // Navigate to the chat screen with the conversation ID
+    router.push({
+      pathname: '/(tabs)/messages/[id]',
+      params: { id: conversationId }
+    });
   }, [router]);
 
   /**

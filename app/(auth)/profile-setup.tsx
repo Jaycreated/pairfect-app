@@ -119,14 +119,19 @@ const ProfileSetup = () => {
       return;
     }
 
-    if (step < 3) {
+    // If not on the final step, just go to next step
+    if (step < 4) {
       console.log('⏭️ [Profile Setup] Moving to next step:', step + 1);
       setStep(step + 1);
       return;
     }
 
+    // Only submit on the final step (step 4)
     console.log('Final step - submitting profile data');
+    await submitProfile();
+  };
 
+  const submitProfile = async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -148,11 +153,9 @@ const ProfileSetup = () => {
         age: ageValue,
         location: formData.location,
         interests: selectedInterests,
-        photos: photos, // Include the uploaded photos
+        photos: photos,
       };
       
-      console.log('📝 [Profile Setup] Profile data prepared:', JSON.stringify(profileData, null, 2));
-
       console.log('📤 [Profile Setup] Sending profile data:', JSON.stringify(profileData, null, 2));
       
       const response = await api.updateProfile(profileData);
@@ -161,7 +164,6 @@ const ProfileSetup = () => {
       if (response.error) {
         console.error('❌ [Profile Setup] Profile update error:', response.error);
         if (response.error.errors) {
-          // Handle validation errors from the API
           const errorMessages = response.error.errors.map((err: any) => 
             `${err.path}: ${err.msg}`
           ).join('\n');
@@ -197,8 +199,8 @@ const ProfileSetup = () => {
   const canProceed = () => {
     if (step === 1) return !!formData.gender;
     if (step === 2) return !!formData.name && !!formData.age && !!formData.location;
-    if (step === 3) return photos.length >= 2; // Require at least 2 photos
-    if (step === 4) return selectedInterests.length > 0;
+    if (step === 3) return selectedInterests.length > 0; // Interest selection is step 3
+    if (step === 4) return photos.length >= 2; // Require at least 2 photos in step 4
     return false;
   };
 
@@ -281,6 +283,42 @@ const ProfileSetup = () => {
       case 3:
         return (
           <View style={styles.stepContainer}>
+            <PoppinsText style={styles.stepTitle}>What are you looking for?</PoppinsText>
+            <PoppinsText style={styles.subtitle}>Select all that apply</PoppinsText>
+
+            <View style={styles.interestsGrid}>
+              {relationshipInterests.map((interest) => (
+                <TouchableOpacity
+                  key={interest}
+                  style={[
+                    styles.interestButton,
+                    selectedInterests.includes(interest) && styles.interestButtonSelected,
+                  ]}
+                  onPress={() => {
+                    setSelectedInterests(prev =>
+                      prev.includes(interest)
+                        ? prev.filter(i => i !== interest)
+                        : [...prev, interest]
+                    );
+                  }}
+                >
+                  <PoppinsText
+                    style={[
+                      styles.interestButtonText,
+                      selectedInterests.includes(interest) && styles.interestButtonTextSelected,
+                    ]}
+                  >
+                    {interest}
+                  </PoppinsText>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        );
+
+      case 4:
+        return (
+          <View style={styles.stepContainer}>
             <PoppinsText style={styles.stepTitle}>Add Your Photos</PoppinsText>
             <PoppinsText style={styles.subtitle}>Upload at least 2 photos to continue</PoppinsText>
             
@@ -319,8 +357,6 @@ const ProfileSetup = () => {
             )}
           </View>
         );
-
-      case 4:
         return (
           <View style={styles.stepContainer}>
             <PoppinsText style={styles.stepTitle}>What are you looking for?</PoppinsText>
@@ -385,8 +421,8 @@ const ProfileSetup = () => {
         <PoppinsText style={styles.subtitle}>
           {step === 1 ? 'This helps us create your personalized experience' :
            step === 2 ? 'Help others get to know you' :
-           step === 3 ? 'Almost there! Just a few more details' :
-           'What kind of connections are you looking for?'}
+           step === 3 ? 'What kind of connections are you looking for?' :
+           'Almost there! Just a few more details'}
         </PoppinsText>
 
         {renderStep()}

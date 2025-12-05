@@ -278,15 +278,34 @@ export const api = {
     fetchApi(API_CONFIG.ENDPOINTS.MATCHES.BASE),
 
   // Messages
-  getMessages: (matchId: string) => 
-    fetchApi(`/api/messages/${matchId}`),
+  getMessages: (conversationId: string | number) => 
+    fetchApi(`/messages/${conversationId}`),
     
-  sendMessage: (matchId: string, content: string) => {
-    return fetchApi(`/api/messages/${matchId}`, 'POST', { content });
+  sendMessage: (conversationId: string | number, messageData: { content: string; senderId: string | number; recipientId: string | number }) => {
+    return fetchApi(`/messages/${conversationId}`, 'POST', messageData);
   },
-  getUnreadMessageCount: () => {
-    return fetchApi<{ count: number }>('/api/messages/unread/count');
+  
+  getUnreadMessageCount() {
+    return this.get('/messages/unread-count');
   },
+
+  // Conversations
+  getConversations() {
+    return this.get<{ conversations: any[] }>(API_CONFIG.ENDPOINTS.MESSAGES.CONVERSATIONS).then(response => {
+      if (response.data) {
+        // Return the nested conversations array directly
+        return {
+          ...response,
+          data: response.data.conversations || []
+        };
+      }
+      return response;
+    });
+  },
+  
+  // Get single conversation details
+  getConversation: (conversationId: string | number) => 
+    fetchApi(`/conversations/${conversationId}`),
 
   // Generic methods
   get: <T = any>(endpoint: string) => fetchApi<T>(endpoint, 'GET'),
