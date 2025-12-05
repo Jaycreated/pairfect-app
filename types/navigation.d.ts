@@ -11,6 +11,7 @@ declare global {
         'profile-setup': undefined;
       }>;
       '(tabs)': undefined;
+      'screens/subscribe': undefined;
     }
   }
 }

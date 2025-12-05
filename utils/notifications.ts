@@ -42,7 +42,7 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     
     // Get the token that uniquely identifies this device
     try {
-      const projectId = 'your-expo-project-id'; // Replace with your Expo project ID
+      const projectId = '52cdb0e5-ce26-4188-95b1-febc3d7b744f'; // Your Expo project ID
       const expoPushToken = await Notifications.getExpoPushTokenAsync({ projectId });
       token = expoPushToken.data;
       console.log('Push token:', token);

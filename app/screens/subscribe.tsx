@@ -4,7 +4,7 @@ import { createOrder, getSubscriptionPlans, initiatePayment, storePaymentAttempt
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function SubscribeScreen() {
   const router = useRouter();
@@ -148,10 +148,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 24,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
     elevation: 3,
     position: 'relative',
   },

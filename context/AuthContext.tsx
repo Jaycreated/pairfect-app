@@ -1,7 +1,6 @@
 import { api } from '@/services/api';
 import { SignInCredentials, SignUpData, User } from '@/types/auth';
 import { Storage } from '@/utils/storage';
-import { router } from 'expo-router';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
 type AuthContextType = {
@@ -38,13 +37,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsProfileLoading(true);
     try {
       const response = await api.getProfile();
-      if (response.data) {
-        // Backend /users/me returns the user object
-        setUser(response.data as User);
-        setProfile(response.data as User);
+      if (response.data?.user) {
+        // Get the token from storage to include in user object
+        const token = await Storage.getItem('auth_token');
+        const userWithToken = {
+          ...response.data.user,
+          token: token || ''
+        };
+        setUser(userWithToken);
+        setProfile(userWithToken);
       }
     } catch (error) {
       console.error('Failed to load profile:', error);
+      // If profile load fails, token might be invalid
+      throw error;
     } finally {
       setIsProfileLoading(false);
     }
@@ -56,6 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await api.updateProfile(userData);
       if (response.data) {
         setProfile(prev => ({ ...prev, ...response.data } as User));
+        setUser(prev => ({ ...prev, ...response.data } as User));
       }
       return response.data;
     } catch (error) {
@@ -74,13 +81,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const checkAuth = async () => {
       try {
         const token = await Storage.getItem('auth_token');
+        
         if (token) {
-          // If we have a token, load the user profile
-          await loadProfile();
+          // If we have a token, try to load the user profile
+          try {
+            await loadProfile();
+          } catch (error) {
+            // If profile load fails, token is likely invalid
+            console.error('Profile load failed, clearing auth:', error);
+            await Storage.deleteItem('auth_token');
+            setUser(null);
+            setProfile(null);
+          }
         }
+        // If no token, user stays null (will show login screen)
       } catch (error) {
         console.error('Auth check failed:', error);
+        // On error, clear any invalid auth state
+        await Storage.deleteItem('auth_token');
+        setUser(null);
+        setProfile(null);
       } finally {
+        // Always set loading to false so the app can render
         setIsLoading(false);
       }
     };
@@ -89,7 +111,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [loadProfile]);
 
   const signIn = async ({ email, password }: SignInCredentials): Promise<User> => {
-    setIsLoading(true);
     setError(null);
 
     try {
@@ -100,52 +121,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error(message);
       }
 
-      const { token, user } = response.data as { token: string; user: User };
+      const { token, user: userData } = response.data as { token: string; user: User };
 
-      // Persist token so services/api can use it for subsequent requests
+      // Persist token for subsequent API requests
       await Storage.setItem('auth_token', token);
 
-      setUser(user);
-      setProfile(user);
+      // Create user object with token
+      const userWithToken = { ...userData, token };
+      
+      setUser(userWithToken);
+      setProfile(userWithToken);
 
-      // Check if user has seen onboarding
-      const hasSeenOnboarding = await Storage.getItem('hasSeenOnboarding');
-      if (hasSeenOnboarding === 'true') {
-        router.replace('/(tabs)');
-      } else {
-        await Storage.setItem('hasSeenOnboarding', 'true');
-        router.replace('/(tabs)');
-      }
-
-      return user;
+      return userWithToken;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign in';
       setError(errorMessage);
       throw error;
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const signUp = async (data: SignUpData): Promise<User> => {
-    setIsLoading(true);
-    // TODO: Implement real sign-up flow against backend
-    setIsLoading(false);
-    throw new Error('Sign up is not implemented yet');
+    setError(null);
+    
+    try {
+      // TODO: Implement real sign-up flow against backend
+      // const response = await api.signup(data);
+      // const { token, user } = response.data;
+      // await Storage.setItem('auth_token', token);
+      // setUser(user);
+      // setProfile(user);
+      // return user;
+      
+      throw new Error('Sign up is not implemented yet');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to sign up';
+      setError(errorMessage);
+      throw error;
+    }
   };
 
   const signOut = async () => {
     try {
+      // Call the logout API endpoint if a token exists
+      const token = await Storage.getItem('auth_token');
+      if (token) {
+        try {
+          await api.logout();
+        } catch (error) {
+          console.warn('Logout API call failed, but continuing with local sign out', error);
+          // Continue with local sign out even if API call fails
+        }
+      }
+
       // Clear all auth state
       await Storage.deleteItem('auth_token');
       setUser(null);
       setProfile(null);
       setError(null);
 
-      // Redirect to login
-      router.replace('/(auth)/login');
+      // Navigation will be handled by the layout based on user state
     } catch (error) {
-      console.warn('Logout failed:', error);
+      console.error('Logout failed:', error);
       throw error;
     }
   };

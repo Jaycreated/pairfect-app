@@ -2,6 +2,24 @@
 export const API_CONFIG = {
   // Base URL for API requests (Render URL must be in .env)
   BASE_URL: process.env.EXPO_PUBLIC_API_URL as string,
+  
+  // WebSocket configuration
+  get WS_URL() {
+    const url = new URL(this.BASE_URL);
+    // Convert http/https to ws/wss
+    const protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    // Remove any existing /api from the path if present
+    const path = url.pathname.replace(/\/api\/?$/, '');
+    return `${protocol}//${url.host}${path}`;
+  },
+  
+  // WebSocket namespace (path from the URL)
+  get WS_NAMESPACE() {
+    const url = new URL(this.BASE_URL);
+    // Get the base path without /api
+    const path = url.pathname.replace(/\/api\/?$/, '');
+    return path || '/';
+  },
 
   // API endpoints
   ENDPOINTS: {
@@ -23,7 +41,9 @@ export const API_CONFIG = {
       PASS: (userId: string) => `matches/pass/${userId}`,
     },
     MESSAGES: {
+      BASE: 'messages',
       CONVERSATION: (matchId: string) => `messages/${matchId}`,
+      CONVERSATIONS: 'conversations',
     }
   },
 

@@ -4,10 +4,10 @@ import { api } from '@/services/api';
 import { SignUpFormData, signUpSchema } from '@/utils/validations/auth';
 import { Ionicons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Picker } from '@react-native-picker/picker';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
+import { Storage } from '@/utils/storage';
 import {
   Alert,
   Image,
@@ -27,16 +27,10 @@ const SignUpScreen = () => {
   const [isLoading, setIsLoading] = useState(false);
   
   const sexualOrientations = [
-    { label: 'Select your sexual orientation', value: '' },
     { label: 'Straight', value: 'straight' },
     { label: 'Gay', value: 'gay' },
     { label: 'Lesbian', value: 'lesbian' },
     { label: 'Bisexual', value: 'bisexual' },
-    { label: 'Asexual', value: 'asexual' },
-    { label: 'Demisexual', value: 'demisexual' },
-    { label: 'Pansexual', value: 'pansexual' },
-    { label: 'Queer', value: 'queer' },
-    { label: 'Questioning', value: 'questioning' },
     { label: 'Other', value: 'other' },
   ];
 
@@ -60,6 +54,7 @@ const SignUpScreen = () => {
     
     try {
       setIsLoading(true);
+      console.log('Attempting to register with:', data);
       
       // Call the register API
       const response = await api.register({
@@ -69,11 +64,18 @@ const SignUpScreen = () => {
         sexualOrientation: data.sexualOrientation,
       });
       
+      console.log('Registration response:', response);
+      
       if (response.error) {
+        console.error('Registration error:', response.error);
         throw new Error(response.error.message || 'Registration failed');
       }
       
+      // Set a flag indicating profile setup is needed
+      await Storage.setItem('needsProfileSetup', 'true');
+      
       // Navigate to profile setup on successful registration
+      console.log('Navigating to profile setup');
       router.replace('/(auth)/profile-setup');
     } catch (error) {
       console.error('Sign up error:', error);
@@ -164,31 +166,34 @@ const SignUpScreen = () => {
 
           <View style={styles.inputContainer}>
             <PoppinsText style={styles.label}>Sexual Orientation</PoppinsText>
-            <View style={[
-              styles.pickerContainer,
-              errors.sexualOrientation && styles.inputError
-            ]}>
-              <Controller
-                control={control}
-                name="sexualOrientation"
-                render={({ field: { onChange, value } }) => (
-                  <Picker
-                    selectedValue={value}
-                    onValueChange={onChange}
-                    style={styles.picker}
-                    dropdownIconColor="#666"
-                  >
-                    {sexualOrientations.map((orientation) => (
-                      <Picker.Item 
-                        key={orientation.value} 
-                        label={orientation.label} 
-                        value={orientation.value} 
-                      />
-                    ))}
-                  </Picker>
-                )}
-              />
-            </View>
+            <Controller
+              control={control}
+              name="sexualOrientation"
+              render={({ field: { onChange, value } }) => (
+                <TextInput
+                  style={[styles.input, errors.sexualOrientation && styles.inputError]}
+                  value={value}
+                  onChangeText={onChange}
+                  placeholder="Select orientation"
+                  onFocus={() => {
+                    Alert.alert(
+                      'Select Orientation',
+                      undefined,
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Straight', onPress: () => onChange('straight') },
+                        { text: 'Gay', onPress: () => onChange('gay') },
+                        { text: 'Lesbian', onPress: () => onChange('lesbian') },
+                        { text: 'Bisexual', onPress: () => onChange('bisexual') },
+                        { text: 'Other', onPress: () => onChange('other') },
+                      ],
+                      { cancelable: true }
+                    );
+                  }}
+                  showSoftInputOnFocus={false}
+                />
+              )}
+            />
             {errors.sexualOrientation && (
               <PoppinsText style={styles.errorText}>
                 {errors.sexualOrientation.message}
@@ -299,17 +304,40 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
+  inputContainer: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 14,
+    color: '#4B5563',
+    marginBottom: 6,
+    marginLeft: 4,
+    fontWeight: '500',
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 24,
+    backgroundColor: '#f5f5f5',
+    marginBottom: 4,
+    overflow: 'hidden',
+  },
+  picker: {
+    width: '100%',
+    height: 50,
+    color: '#333',
+  },
   scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
+    padding: 40,
+    paddingBottom: 60,
   },
   logoContainer: {
     alignItems: 'center',
     marginBottom: 32,
   },
   logo: {
-    width: 120,
-    height: 120,
+    width: 80,
+    height: 80,
     marginBottom: 16,
   },
   title: {
@@ -329,30 +357,9 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     alignSelf: 'center',
   },
-  inputContainer: {
-    marginBottom: 16,
-    width: '100%',
-  },
-  pickerContainer: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-    marginTop: 6,
-    backgroundColor: '#F9FAFB',
-    overflow: 'hidden',
-  },
-  picker: {
-    height: 48,
-    paddingHorizontal: 12,
-  },
-  label: {
-    fontSize: 16,
-    marginBottom: 8,
-    color: '#333',
-  },
   input: {
     backgroundColor: '#f5f5f5',
-    borderRadius: 10,
+    borderRadius: 24,
     padding: 15,
     fontSize: 16,
     borderWidth: 1,
@@ -362,7 +369,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f5f5f5',
-    borderRadius: 10,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
@@ -386,7 +393,7 @@ const styles = StyleSheet.create({
   button: {
     backgroundColor: '#651B55',
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 24,
     alignItems: 'center',
     marginTop: 16,
   },

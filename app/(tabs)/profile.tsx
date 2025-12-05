@@ -254,7 +254,6 @@ export default function ProfileScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View style={{ width: 24 }} /> {/* Spacer to balance the header */}
         <PoppinsText style={styles.title}>My Profile</PoppinsText>
         <View style={styles.headerIcons}>
           <TouchableOpacity 
@@ -445,30 +444,45 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   mainPhotoContainer: {
-    width: '100%',
-    aspectRatio: 3/4,
+    width: 96,
+    height: 96,
     backgroundColor: '#f0f0f0',
-    borderRadius: 12,
+    borderRadius: 48,
     overflow: 'hidden',
     marginBottom: 16,
+    alignSelf: 'center',
+    borderWidth: 2,
+    borderColor: '#FF35D3',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
   },
   mainProfileImage: {
     width: '100%',
     height: '100%',
+    resizeMode: 'cover',
   },
   photoGallery: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     marginBottom: 24,
     paddingHorizontal: 8,
+    width: '100%',
   },
   thumbnailContainer: {
-    width: '23%',
+    width: '48%',
     aspectRatio: 1,
-    borderRadius: 8,
+    borderRadius: 24,
     overflow: 'hidden',
     borderWidth: 2,
     borderColor: 'transparent',
+    marginBottom: 16,
   },
   selectedThumbnail: {
     borderColor: '#651B55',
@@ -537,7 +551,7 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
