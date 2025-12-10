@@ -24,6 +24,10 @@ import 'react-native-reanimated';
 import { queryClient } from '../lib/queryClient';
 import './global.css';
 
+// Temporary development override - remove in production
+Storage.setItem('onboarding_completed', 'false').catch(console.error);
+Storage.setItem('hasLaunched', 'false').catch(console.error);
+
 // Configure notification behavior
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -197,17 +201,17 @@ function RootLayoutNav() {
 export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <WebSocketProvider>
-          <NotificationProvider>
-            <SubscriptionProvider>
-              <ToastProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <WebSocketProvider>
+            <NotificationProvider>
+              <SubscriptionProvider>
                 <RootLayoutNav />
-              </ToastProvider>
-            </SubscriptionProvider>
-          </NotificationProvider>
-        </WebSocketProvider>
-      </AuthProvider>
+              </SubscriptionProvider>
+            </NotificationProvider>
+          </WebSocketProvider>
+        </AuthProvider>
+      </ToastProvider>
     </QueryClientProvider>
   );
 }

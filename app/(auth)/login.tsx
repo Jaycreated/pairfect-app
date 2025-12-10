@@ -13,7 +13,7 @@ const LoginScreen = () => {
   const [showPassword, setShowPassword] = React.useState(false);
   const { signIn, isLoading, error } = useAuth();
   const { showToast } = useToast();
-  
+
   const {
     control,
     handleSubmit,
@@ -21,8 +21,8 @@ const LoginScreen = () => {
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: 'test@example.com', // Pre-fill for testing
-      password: 'password123',  // Pre-fill for testing
+      email: '',
+      password: '',
     },
   });
 
@@ -48,9 +48,9 @@ const LoginScreen = () => {
   };
 
   const navigateToForgotPassword = () => {
-    // TODO: Implement forgot password flow
-    showToast('Please contact support to reset your password.', 'info');
+    router.push('/(auth)/forgot-password');
   };
+
 
   return (
     <View style={styles.container}>
@@ -59,7 +59,7 @@ const LoginScreen = () => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
       >
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -71,6 +71,13 @@ const LoginScreen = () => {
               resizeMode="contain"
             />
           </View>
+
+          <PoppinsText style={styles.welcomeText}>
+            Welcome Back
+          </PoppinsText>
+           <PoppinsText style={styles.welcomeText2}>
+            Sign In to Your Account
+          </PoppinsText>
 
           <View style={styles.formContainer}>
             <Controller
@@ -113,10 +120,10 @@ const LoginScreen = () => {
                     style={styles.eyeIcon}
                     onPress={() => setShowPassword(!showPassword)}
                   >
-                    <Ionicons 
-                      name={showPassword ? 'eye-off' : 'eye'} 
-                      size={20} 
-                      color="#666" 
+                    <Ionicons
+                      name={showPassword ? 'eye-off' : 'eye'}
+                      size={20}
+                      color="#666"
                     />
                   </TouchableOpacity>
                 </View>
@@ -138,7 +145,7 @@ const LoginScreen = () => {
               </PoppinsText>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.forgotPasswordButton}
               onPress={navigateToForgotPassword}
             >
@@ -167,6 +174,21 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
+  welcomeText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 8,
+    color: '#000',
+    fontFamily: 'Poppins_500Bold',
+  },
+  welcomeText2: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 32,
+    color: '#636363',
+    fontFamily: 'Poppins_400Regular',
+  },
   keyboardAvoidingView: {
     flex: 1,
   },
@@ -180,8 +202,8 @@ const styles = StyleSheet.create({
     marginVertical: 20,
   },
   logo: {
-    width: 80,
-    height: 80,
+    width: 70,
+    height: 70,
   },
   formContainer: {
     flex: 1,
@@ -193,6 +215,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     paddingHorizontal: 12,
     paddingVertical: 8,
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
   },
   passwordInput: {
     flexDirection: 'row',

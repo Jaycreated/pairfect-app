@@ -422,6 +422,7 @@ const styles = StyleSheet.create({
     height: 400,
     maxWidth: 350,
     alignSelf: 'center',
+    padding: 10,
  
   },
   card: {
@@ -533,9 +534,9 @@ const styles = StyleSheet.create({
   },
   cardFooter: {
     paddingTop: 12,
-    paddingRight: 40,
+    paddingRight: 20,
     color: '#000000',
-    paddingLeft: 40,
+    paddingLeft: 20,
     marginHorizontal: -20,
   
   },
@@ -571,8 +572,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: 10,
-    paddingRight: 40,
-    paddingLeft: 40,
+    paddingRight: 0,
+    paddingLeft: 0,
   },
   button: {
     width: 50,

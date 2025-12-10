@@ -1,13 +1,13 @@
 import { PoppinsText } from '@/components/PoppinsText';
 import { useAuth } from '@/context/AuthContext';
 import { useSubscription, withSubscription } from '@/context/SubscriptionContext';
+import { useToast } from '@/context/ToastContext';
 import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Image,
   RefreshControl,
@@ -216,6 +216,7 @@ const MessagesScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   // ========== Refs ==========
   const isMountedRef = useRef(true);
@@ -341,13 +342,9 @@ const MessagesScreen = () => {
 
       setError('Failed to load conversations. Please check your connection and try again.');
       
-      // Show alert on refresh errors (user-initiated action)
+      // Show toast on refresh errors (user-initiated action)
       if (isRefresh) {
-        Alert.alert(
-          'Refresh Failed',
-          'Could not refresh conversations. Please try again.',
-          [{ text: 'OK' }]
-        );
+        showToast('Could not refresh conversations. Please try again.', 'error');
       }
     } finally {
       if (isMountedRef.current) {

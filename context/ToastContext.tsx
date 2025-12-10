@@ -30,7 +30,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({
   } | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(-100)).current;
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = (message: string, type: ToastType = 'info', customDuration = duration) => {
     // Clear any existing timeout

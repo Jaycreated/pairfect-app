@@ -9,6 +9,7 @@ declare global {
         'select-interests': undefined;
         'photo-upload': undefined;
         'profile-setup': undefined;
+        'forgot-password': undefined;
       }>;
       '(tabs)': undefined;
       'screens/subscribe': undefined;

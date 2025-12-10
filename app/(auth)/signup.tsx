@@ -6,6 +6,7 @@ import { Storage } from '@/utils/storage';
 import { SignUpFormData, signUpSchema } from '@/utils/validations/auth';
 import { Ionicons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Picker } from '@react-native-picker/picker';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
@@ -32,6 +33,7 @@ const SignUpScreen = () => {
     { label: 'Gay', value: 'gay' },
     { label: 'Lesbian', value: 'lesbian' },
     { label: 'Bisexual', value: 'bisexual' },
+    { label: 'Transgender', value: 'transgender' },
     { label: 'Other', value: 'other' },
   ];
 
@@ -74,6 +76,9 @@ const SignUpScreen = () => {
       
       // Set a flag indicating profile setup is needed
       await Storage.setItem('needsProfileSetup', 'true');
+      
+      // Show success message
+      showToast('Registration successful! Please complete your profile.', 'success');
       
       // Navigate to profile setup on successful registration
       console.log('Navigating to profile setup');
@@ -172,29 +177,30 @@ const SignUpScreen = () => {
               control={control}
               name="sexualOrientation"
               render={({ field: { onChange, value } }) => (
-                <TextInput
-                  style={[styles.input, errors.sexualOrientation && styles.inputError]}
-                  value={value}
-                  onChangeText={onChange}
-                  placeholder="Select orientation"
-                  onFocus={() => {
-                    // Using a simple approach - you might want to implement a custom modal for better UX
-                    const options = [
-                      { text: 'Straight', onPress: () => onChange('straight') },
-                      { text: 'Gay', onPress: () => onChange('gay') },
-                      { text: 'Lesbian', onPress: () => onChange('lesbian') },
-                      { text: 'Bisexual', onPress: () => onChange('bisexual') },
-                      { text: 'Other', onPress: () => onChange('other') },
-                    ];
-                    
-                    // Show a toast with instructions
-                    showToast('Please select your sexual orientation', 'info', 3000);
-                    
-                    // You might want to implement a custom picker/modal here
-                    // for a better user experience
-                  }}
-                  showSoftInputOnFocus={false}
-                />
+                <View style={[styles.pickerContainer, errors.sexualOrientation && styles.inputError]}>
+                  <Picker
+                    selectedValue={value}
+                    onValueChange={onChange}
+                    style={styles.picker}
+                    dropdownIconColor="#666"
+                    mode="dropdown"
+                    dropdownIconRippleColor="#651B55"
+                  >
+                    <Picker.Item 
+                      label="Select orientation" 
+                      value="" 
+                      color="#999"
+                    />
+                    {sexualOrientations.map((orientation) => (
+                      <Picker.Item 
+                        key={orientation.value} 
+                        label={orientation.label} 
+                        value={orientation.value}
+                        color="#000"
+                      />
+                    ))}
+                  </Picker>
+                </View>
               )}
             />
             {errors.sexualOrientation && (
@@ -306,6 +312,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+    fontFamily: 'Poppins_600SemiBold',
+    paddingTop: 10,
   },
   inputContainer: {
     marginBottom: 16,
@@ -323,12 +331,14 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     backgroundColor: '#f5f5f5',
     marginBottom: 4,
-    overflow: 'hidden',
+    justifyContent: 'center',
+    minHeight: 50,
   },
   picker: {
     width: '100%',
-    height: 50,
     color: '#333',
+    padding: 0,
+    margin: 0,
   },
   scrollContent: {
     padding: 40,
@@ -339,8 +349,8 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   logo: {
-    width: 80,
-    height: 80,
+    width: 60,
+    height: 60,
     marginBottom: 16,
   },
   title: {

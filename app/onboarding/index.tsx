@@ -2,13 +2,14 @@ import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import React, { useState } from 'react';
 import {
-    Dimensions,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Dimensions,
+  Image,
+  ImageSourcePropType,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
@@ -17,33 +18,32 @@ interface Slide {
   id: string;
   title: string;
   subTitle: string;
-  bgImage: string;
+  bgImage: ImageSourcePropType;
 }
+
+// Import the local images
+const onboarding1 = require('@/assets/images/onboarding1.png');
+const onboarding2 = require('@/assets/images/onboarding2.png');
+const onboarding3 = require('@/assets/images/onboarding3.png');
 
 const slides: Slide[] = [
   {
     id: '1',
-    title: 'Welcome to Pairfect',
-    subTitle: 'Find your perfect match with our smart matching algorithm',
-    bgImage: 'https://placehold.co/400x400/651B55/FFFFFF/png?text=Welcome',
+    title: 'Meet People Who Feel Right',
+    subTitle: 'Forget the endless swipes, make it easy to connect with who match your vibe',
+    bgImage: onboarding1,
   },
   {
     id: '2',
-    title: 'Swipe & Match',
+    title: 'Skip small talk, Meet your match',
     subTitle: 'Swipe right to like and left to pass on potential matches',
-    bgImage: 'https://placehold.co/400x400/FF9BE9/333333/png?text=Swipe',
+    bgImage: onboarding2,
   },
   {
     id: '3',
-    title: 'Start Chatting',
-    subTitle: 'Connect with your matches and start meaningful conversations',
-    bgImage: 'https://placehold.co/400x400/FFDEF8/333333/png?text=Chat',
-  },
-  {
-    id: '4',
-    title: 'Get Started',
-    subTitle: 'Begin your journey to find your perfect match',
-    bgImage: 'https://placehold.co/400x400/651B55/FFFFFF/png?text=Get+Started',
+    title: 'You choose the vibe',
+    subTitle: 'Date, chat , connect - your call, we bring the people the spark',
+    bgImage: onboarding3,
   },
 ];
 
@@ -97,10 +97,6 @@ export default function OnboardingScreen() {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-        <Text style={styles.skipText}>Skip</Text>
-      </TouchableOpacity>
-
       <ScrollView
         horizontal
         pagingEnabled
@@ -113,20 +109,29 @@ export default function OnboardingScreen() {
       >
         {slides.map((slide, index) => (
           <View key={slide.id} style={styles.slide}>
-            <Image 
-              source={{ uri: slide.bgImage }} 
-              style={styles.image} 
-              resizeMode="contain"
-            />
-            <Text style={styles.title}>{slide.title}</Text>
-            <Text style={styles.subtitle}>{slide.subTitle}</Text>
+            <View style={styles.imageContainer}>
+              <Image 
+                source={slide.bgImage} 
+                style={styles.image} 
+                resizeMode="cover"
+              />
+            </View>
+            {renderDots()}
+            <View style={styles.textContainer}>
+              <Text style={styles.title}>{slide.title}</Text>
+              <Text style={styles.subtitle}>{slide.subTitle}</Text>
+            </View>
           </View>
         ))}
       </ScrollView>
 
-      {renderDots()}
-
       <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={styles.skipButton}
+          onPress={handleSkip}
+        >
+          <Text style={styles.skipText}>Skip</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={[
             styles.button,
@@ -146,34 +151,56 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: '#fff', 
-    position: 'relative' 
+    backgroundColor: '#fff',
+    position: 'relative',
+    margin: 0,
+    padding: 0,
+    width: '100%',
   },
   skipButton: {
-    position: 'absolute',
-    top: 60,
-    right: 20,
-    zIndex: 1,
     padding: 10,
+    marginRight: 10,
+    justifyContent: 'center',
   },
   skipText: {
     fontSize: 16,
-    color: '#666',
+    color: '#171717',
+    fontWeight: '500',
+    lineHeight: 24,
+    fontFamily: 'Poppins_500Medium',
   },
   scrollView: {
     flexGrow: 1,
+    margin: 0,
+    padding: 0,
+    width: width * slides.length, // Total width of all slides
   },
   slide: {
-    width,
-    flex: 1,
-    justifyContent: 'center',
+    width: width, // Each slide takes full screen width
+    height: '100%',
     alignItems: 'center',
+    padding: 0,
+    margin: 0,
+  },
+  textContainer: {
     padding: 20,
+    paddingHorizontal: 0,
+    fontFamily: 'Poppins_500Medium',
+  },
+  imageContainer: {
+    width: width, // Match screen width
+    height: height * 0.65,
+    overflow: 'hidden',
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
   },
   image: {
-    width: width * 0.8,
-    height: width * 0.8,
-    marginBottom: 30,
+    width: width,
+    height: '100%',
+    resizeMode: 'cover',
+    margin: 0,
+    padding: 0,
+    alignSelf: 'center',
   },
   title: {
     fontSize: 24,
@@ -189,12 +216,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
   },
   pagination: {
-    right: 0,
+    width: '100%',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 10,
-    zIndex: 10,
+    paddingVertical: 15,
   },
   paginationDot: {
     width: 10,
@@ -219,18 +245,21 @@ const styles = StyleSheet.create({
     bottom: 40, 
     left: 0, 
     right: 0, 
-    alignItems: 'center', 
-    padding: 20 
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingVertical: 20,
   },
   button: {
     backgroundColor: '#651B55',
     padding: 16,
-    borderRadius: 30,
+    borderRadius: 24,
     alignItems: 'center',
-    width: '80%',
+    minWidth: 84,
     elevation: 5,
     boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
   },
-  getStartedButton: { backgroundColor: '#FF9BE9' },
+  getStartedButton: { backgroundColor: '#651B55' },
   buttonText: { color: '#fff', fontSize: 16 },
 });

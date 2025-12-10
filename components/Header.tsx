@@ -21,7 +21,7 @@ export const Header = ({ showNotification = true, onNotificationPress }: HeaderP
           activeOpacity={0.7}
         >
           <View style={styles.notificationIconInner}>
-            <Ionicons name="notifications" size={24} color="#333" />
+            <Ionicons name="notifications" size={24} color="#651B55" />
           </View>
         </TouchableOpacity>
       )}

@@ -1,10 +1,11 @@
+import { useToast } from '@/context/ToastContext';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Dimensions, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { width } = Dimensions.get('window');
 const CARD_HEIGHT = 240; // Fixed height of 240px
@@ -25,6 +26,7 @@ type Match = {
 export default function MatchesScreen() {
   const router = useRouter();
   const { profile } = useAuth();
+  const { showToast } = useToast();
   const [matches, setMatches] = useState<Match[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -54,7 +56,7 @@ lastMessage: '',
         setMatches(formattedMatches);
       } catch (error) {
         console.error('Error fetching matches:', error);
-        Alert.alert('Error', 'Failed to load matches. Please try again later.');
+        showToast('Failed to load matches. Please try again later.', 'error');
       } finally {
         setIsLoading(false);
       }
@@ -304,6 +306,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
+    backgroundColor: '#fff',
   },
   emptyText: {
     fontSize: 18,

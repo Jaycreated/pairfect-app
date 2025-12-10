@@ -2,6 +2,7 @@ import { api } from '@/services/api';
 import { SignInCredentials, SignUpData, User } from '@/types/auth';
 import { Storage } from '@/utils/storage';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { useToast } from './ToastContext';
 
 type AuthContextType = {
   // User state
@@ -110,6 +111,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkAuth();
   }, [loadProfile]);
 
+  const { showToast } = useToast();
+
   const signIn = async ({ email, password }: SignInCredentials): Promise<User> => {
     setError(null);
 
@@ -131,6 +134,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       setUser(userWithToken);
       setProfile(userWithToken);
+      
+      // Show success toast
+      showToast('Login successful!', 'success');
 
       return userWithToken;
     } catch (error) {
