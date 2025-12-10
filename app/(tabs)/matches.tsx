@@ -1,23 +1,25 @@
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Dimensions, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = (width - 48) / 2; // 16px padding on each side + 16px gap between cards
+const CARD_HEIGHT = 240; // Fixed height of 240px
+const CARD_WIDTH = (width - 40) / 2; // 16px padding on each side + 8px gap between cards
 
 type Match = {
   id: number;
   name: string;
   age: number;
-  bio: string | null;
+  location: string;
   photos: string[];
   matched_at: string;
   lastMessage?: string;
   unreadCount?: number;
-  interests?: string[];
+  interest: string; // Changed from interests: string[]
 };
 
 export default function MatchesScreen() {
@@ -44,10 +46,9 @@ export default function MatchesScreen() {
           bio: match.bio,
           photos: match.photos,
           matched_at: match.matched_at,
-          // Add some default values for the UI
-          lastMessage: '',
+lastMessage: '',
           unreadCount: 0,
-          interests: []
+          interest: match.interest || ''
         }));
         
         setMatches(formattedMatches);
@@ -73,15 +74,26 @@ export default function MatchesScreen() {
         resizeMode="cover"
         defaultSource={{ uri: 'https://via.placeholder.com/150' }}
       />
-      <View style={styles.cardContent}>
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.8)']}
+        start={{ x: 0, y: 0.7 }}
+        end={{ x: 0, y: 1 }}
+        style={styles.gradientOverlay}
+      >
+        <View style={styles.cardContent}>
         <View style={styles.nameContainer}>
           <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
-          <Text style={styles.age}>{item.age}</Text>
+          <Text style={styles.age}>, {item.age}</Text>
         </View>
-        {item.bio && (
+        <View style={styles.locationContainer}>
+          <Ionicons name="location" size={12} color="#fff" style={styles.locationIcon} />
+          <Text style={styles.locationText} numberOfLines={1}>{item.location}</Text>
+        </View>
+        {item.interest && (
           <View style={styles.interestsContainer}>
-            <Text style={styles.bioText} numberOfLines={2}>
-              {item.bio}
+            <Ionicons name="heart" size={12} color="#fff" style={styles.interestIcon} />
+            <Text style={styles.interestsText} numberOfLines={1}>
+              {item.interest}
             </Text>
           </View>
         )}
@@ -93,6 +105,7 @@ export default function MatchesScreen() {
           </View>
         ) : null}
       </View>
+      </LinearGradient>
     </TouchableOpacity>
   );
 
@@ -148,20 +161,37 @@ const styles = StyleSheet.create({
   },
   matchCard: {
     width: CARD_WIDTH,
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: '#000',
+    borderRadius: 24,
     overflow: 'hidden',
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-    elevation: 2,
+    height: CARD_HEIGHT, // Fixed height of 240px
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   cardImage: {
     width: '100%',
-    height: CARD_WIDTH * 1.2,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+    height: '100%',
+    position: 'absolute',
   },
   cardContent: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     padding: 12,
+    backgroundColor: 'transparent',
+  },
+  gradientOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '100%',
+    justifyContent: 'flex-end',
   },
   nameContainer: {
     flexDirection: 'row',
@@ -169,17 +199,21 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   name: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,  // Increased from 16
+    fontWeight: '700',
     marginRight: 6,
-    flexShrink: 1,
+    color: '#fff',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   age: {
-    fontSize: 14,
-    color: '#666',
-  },
-  interestsContainer: {
-    marginBottom: 6,
+    fontSize: 16,  // Increased from 14
+    color: '#fff',
+    fontWeight: '600',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   interestTag: {
     backgroundColor: '#f0f0f0',
@@ -193,11 +227,35 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
   },
-  bioText: {
-    fontSize: 12,
-    color: '#666',
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  locationIcon: {
+    marginRight: 4,
+  },
+  locationText: {
+    fontSize: 14,  // Increased from 12
+    color: '#fff',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  interestsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginTop: 4,
-    lineHeight: 16,
+  },
+  interestIcon: {
+    marginRight: 4,
+  },
+  interestsText: {
+    fontSize: 14,  // Increased from 12
+    color: '#fff',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   moreInterests: {
     fontSize: 10,

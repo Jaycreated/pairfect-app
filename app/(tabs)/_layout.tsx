@@ -37,7 +37,7 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: '#651B55',
           borderTopWidth: 0,
-          height: 80,
+          height: 92,
           paddingBottom: 12,
           paddingTop: 8,
           paddingRight: 32,
@@ -48,10 +48,20 @@ export default function TabLayout() {
           left: 0,
           right: 0,
           bottom: 0,
+          shadowColor: '#000',
+          shadowOffset: {
+            width: 0,
+            height: -5,
+          },
+          shadowOpacity: 0.15,
+          shadowRadius: 8,
+          elevation: 8,
         },
         tabBarLabelStyle: {
           fontSize: 12,
           marginBottom: 4,
+          fontFamily: 'Poppins_500Medium',
+          includeFontPadding: false,
         },
       }}
     >
@@ -65,10 +75,10 @@ export default function TabLayout() {
       <Tabs.Screen
         name="swipe"
         options={{
-          title: 'Swipe',
+          title: 'Discover',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
-              name={focused ? 'swap-horizontal' : 'swap-horizontal-outline'} 
+              name={focused ? 'home' : 'home-outline'} 
               size={24} 
               color={color} 
             />

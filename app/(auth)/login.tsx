@@ -1,16 +1,18 @@
 import { PoppinsText } from '@/components/PoppinsText';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import { LoginFormData, loginSchema } from '@/utils/validations/auth';
 import { Ionicons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router } from 'expo-router';
 import React, { useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
 const LoginScreen = () => {
   const [showPassword, setShowPassword] = React.useState(false);
   const { signIn, isLoading, error } = useAuth();
+  const { showToast } = useToast();
   
   const {
     control,
@@ -27,7 +29,7 @@ const LoginScreen = () => {
   // Handle auth errors
   useEffect(() => {
     if (error) {
-      Alert.alert('Login Failed', error);
+      showToast(error, 'error');
     }
   }, [error]);
 
@@ -47,7 +49,7 @@ const LoginScreen = () => {
 
   const navigateToForgotPassword = () => {
     // TODO: Implement forgot password flow
-    Alert.alert('Forgot Password', 'Please contact support to reset your password.');
+    showToast('Please contact support to reset your password.', 'info');
   };
 
   return (

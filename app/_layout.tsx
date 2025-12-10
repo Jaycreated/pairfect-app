@@ -2,9 +2,17 @@
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { NotificationProvider } from '@/context/NotificationContext';
 import { SubscriptionProvider } from '@/context/SubscriptionContext';
+import { ToastProvider } from '@/context/ToastContext';
 import { WebSocketProvider } from '@/context/WebSocketContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Storage } from '@/utils/storage';
+import {
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+  useFonts,
+} from '@expo-google-fonts/poppins';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { QueryClientProvider } from '@tanstack/react-query';
 import * as Notifications from 'expo-notifications';
@@ -28,13 +36,24 @@ Notifications.setNotificationHandler({
   } as Notifications.NotificationBehavior),
 });
 
-// This is a wrapper component to apply the font to all children
-function FontWrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <View style={{ flex: 1 }}>
-      {children}
-    </View>
-  );
+// This component ensures fonts are loaded before rendering the app
+function FontLoader({ children }: { children: React.ReactNode }) {
+  const [fontsLoaded] = useFonts({
+    Poppins_400Regular,
+    Poppins_500Medium,
+    Poppins_600SemiBold,
+    Poppins_700Bold,
+  });
+
+  if (!fontsLoaded) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
+  return <>{children}</>;
 }
 
 // This component will handle the auth state and redirects
@@ -167,10 +186,10 @@ function RootLayoutNav() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <FontWrapper>
+      <FontLoader>
         <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
         <AuthLayout />
-      </FontWrapper>
+      </FontLoader>
     </ThemeProvider>
   );
 }
@@ -182,7 +201,9 @@ export default function RootLayout() {
         <WebSocketProvider>
           <NotificationProvider>
             <SubscriptionProvider>
-              <RootLayoutNav />
+              <ToastProvider>
+                <RootLayoutNav />
+              </ToastProvider>
             </SubscriptionProvider>
           </NotificationProvider>
         </WebSocketProvider>

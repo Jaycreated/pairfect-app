@@ -1,15 +1,15 @@
 // In app/(auth)/signup.tsx
 import { PoppinsText } from '@/components/PoppinsText';
+import { useToast } from '@/context/ToastContext';
 import { api } from '@/services/api';
+import { Storage } from '@/utils/storage';
 import { SignUpFormData, signUpSchema } from '@/utils/validations/auth';
 import { Ionicons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { Storage } from '@/utils/storage';
 import {
-  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -22,6 +22,7 @@ import {
 import { ActivityIndicator } from 'react-native-paper';
 
 const SignUpScreen = () => {
+  const { showToast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -79,9 +80,10 @@ const SignUpScreen = () => {
       router.replace('/(auth)/profile-setup');
     } catch (error) {
       console.error('Sign up error:', error);
-      Alert.alert(
-        'Registration Error',
-        error instanceof Error ? error.message : 'An error occurred during registration. Please try again.'
+      showToast(
+        error instanceof Error ? error.message : 'An error occurred during registration. Please try again.',
+        'error',
+        5000
       );
     } finally {
       setIsLoading(false);
@@ -176,19 +178,20 @@ const SignUpScreen = () => {
                   onChangeText={onChange}
                   placeholder="Select orientation"
                   onFocus={() => {
-                    Alert.alert(
-                      'Select Orientation',
-                      undefined,
-                      [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Straight', onPress: () => onChange('straight') },
-                        { text: 'Gay', onPress: () => onChange('gay') },
-                        { text: 'Lesbian', onPress: () => onChange('lesbian') },
-                        { text: 'Bisexual', onPress: () => onChange('bisexual') },
-                        { text: 'Other', onPress: () => onChange('other') },
-                      ],
-                      { cancelable: true }
-                    );
+                    // Using a simple approach - you might want to implement a custom modal for better UX
+                    const options = [
+                      { text: 'Straight', onPress: () => onChange('straight') },
+                      { text: 'Gay', onPress: () => onChange('gay') },
+                      { text: 'Lesbian', onPress: () => onChange('lesbian') },
+                      { text: 'Bisexual', onPress: () => onChange('bisexual') },
+                      { text: 'Other', onPress: () => onChange('other') },
+                    ];
+                    
+                    // Show a toast with instructions
+                    showToast('Please select your sexual orientation', 'info', 3000);
+                    
+                    // You might want to implement a custom picker/modal here
+                    // for a better user experience
                   }}
                   showSoftInputOnFocus={false}
                 />

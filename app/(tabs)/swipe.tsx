@@ -1,21 +1,10 @@
 import { PoppinsText } from '@/components/PoppinsText';
+import { useToast } from '@/context/ToastContext';
 import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Dimensions,
-  Image,
-  PanResponder,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
-} from 'react-native';
+import { ActivityIndicator, Animated, Dimensions, Image, PanResponder, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 const SWIPE_THRESHOLD = width * 0.4;
@@ -40,6 +29,7 @@ const SwipeScreen = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isProcessingSwipe, setIsProcessingSwipe] = useState(false);
+  const { showToast } = useToast();
   
   const position = useRef(new Animated.ValueXY()).current;
   const rotate = position.x.interpolate({
@@ -150,7 +140,7 @@ const SwipeScreen = () => {
           : response.error.message || 'Unknown error';
         
         console.error(`Error ${isLike ? 'liking' : 'passing'} user:`, errorMessage);
-        Alert.alert('Error', `Failed to ${isLike ? 'like' : 'pass'} user: ${errorMessage}`);
+        showToast(`Failed to ${isLike ? 'like' : 'pass'} user: ${errorMessage}`, 'error', 3000);
         setIsProcessingSwipe(false);
         return;
       }
@@ -160,14 +150,9 @@ const SwipeScreen = () => {
       // Show match alert only if it's a like and the response has a match property that is true
       if (isLike && response.data && 'match' in response.data && response.data.match === true) {
         console.log('Match found with:', currentUser.name);
-        Alert.alert(
-          "It's a match! 💕",
-          `You and ${currentUser.name} have liked each other!`,
-          [
-            { text: 'Keep Swiping', style: 'cancel' },
-            { text: 'Send Message', onPress: () => router.push('/matches') }
-          ]
-        );
+        showToast(`It's a match! You and ${currentUser.name} have liked each other!`, 'success', 5000);
+        // Note: The toast system doesn't support actions in this implementation.
+        // You might want to add a separate button or UI element for the message action.
       } else if (isLike) {
         console.log('No match with:', currentUser.name);
       }
@@ -197,7 +182,7 @@ const SwipeScreen = () => {
       
     } catch (err) {
       console.error('Error processing swipe:', err);
-      Alert.alert('Error', 'An error occurred while processing your action. Please try again.');
+      showToast('An error occurred while processing your action. Please try again.', 'error', 3000);
       setIsProcessingSwipe(false);
     }
   }, [currentIndex, users, position, isProcessingSwipe]);
@@ -338,9 +323,14 @@ const SwipeScreen = () => {
         <TouchableOpacity onPress={() => router.replace('/(tabs)')}>
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
-        <PoppinsText weight="bold" style={styles.headerTitle}>
-          <Text>Discover people around you</Text>
-        </PoppinsText>
+        <View style={styles.headerTextContainer}>
+          <PoppinsText weight="bold" style={styles.headerTitle}>
+            <Text>Discover people around you</Text>
+          </PoppinsText>
+          <PoppinsText style={styles.subtitle}>
+            <Text>Keep swiping to meet your match</Text>
+          </PoppinsText>
+        </View>
         <View style={{ width: 24 }} />
       </View>
 
@@ -396,29 +386,48 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
     padding: 16,
-    paddingTop: 10,
+
+  
   },
   headerTitle: {
     fontSize: 20,
     color: '#000',
+    textShadowColor: 'rgba(0, 0, 0, 0.1)',
+    textShadowOffset: { width: 0.5, height: 0.5 },
+    textShadowRadius: 1,
+  },
+  headerTextContainer: {
+    alignItems: 'center',
+    flex: 1,
+    marginTop: 4,
+ 
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 2,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.05)',
+    textShadowOffset: { width: 0.5, height: 0.5 },
+    textShadowRadius: 1,
   },
   swiperContainer: {
     width: '100%',
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: 0,
   },
   cardContainer: {
     width: '100%',
-    height: 300,
+    height: 400,
     maxWidth: 350,
     alignSelf: 'center',
+ 
   },
   card: {
     width: '100%',
     height: '100%',
-    borderRadius: 20,
+    borderRadius: 24,
     backgroundColor: '#FFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -524,10 +533,11 @@ const styles = StyleSheet.create({
   },
   cardFooter: {
     paddingTop: 12,
-    paddingRight: 12,
+    paddingRight: 40,
     color: '#000000',
-    paddingLeft: 12,
+    paddingLeft: 40,
     marginHorizontal: -20,
+  
   },
   cardName: {
     fontSize: 24,
@@ -561,6 +571,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: 10,
+    paddingRight: 40,
+    paddingLeft: 40,
   },
   button: {
     width: 50,
