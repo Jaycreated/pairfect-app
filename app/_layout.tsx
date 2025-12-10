@@ -24,10 +24,6 @@ import 'react-native-reanimated';
 import { queryClient } from '../lib/queryClient';
 import './global.css';
 
-// Temporary development override - remove in production
-Storage.setItem('onboarding_completed', 'false').catch(console.error);
-Storage.setItem('hasLaunched', 'false').catch(console.error);
-
 // Configure notification behavior
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
