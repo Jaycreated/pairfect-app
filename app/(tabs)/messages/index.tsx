@@ -1,6 +1,6 @@
 import { PoppinsText } from '@/components/PoppinsText';
 import { useAuth } from '@/context/AuthContext';
-import { useSubscription, withSubscription } from '@/context/SubscriptionContext';
+import { useSubscription } from '@/context/SubscriptionContext';
 import { useToast } from '@/context/ToastContext';
 import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,12 +9,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
-  Image,
-  RefreshControl,
+  Image, Linking, RefreshControl,
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 
 // ============================================================================
@@ -206,7 +205,7 @@ const MessagesScreen = () => {
   console.log('[MessagesScreen] Rendering component');
 
   // ========== Context Hooks ==========
-  const { subscription, isLoading: isSubscriptionLoading } = useSubscription();
+  const { subscription, isLoading: isSubscriptionLoading, refreshSubscription } = useSubscription();
   const { user } = useAuth();
   const router = useRouter();
 
@@ -216,6 +215,7 @@ const MessagesScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [requiresSubscription, setRequiresSubscription] = useState(false);
   const { showToast } = useToast();
 
   // ========== Refs ==========
@@ -278,15 +278,36 @@ const MessagesScreen = () => {
 
       console.log('[fetchConversations] Making API request to get conversations');
       const response = await api.getConversations();
-      
+
       console.log('[fetchConversations] API response received:', {
         data: response.data,
         error: response.error,
       });
-      
-      // Log the raw response for debugging
-      console.log('[fetchConversations] Raw API response:', JSON.stringify(response, null, 2));
-      
+
+      // If server indicates subscription required, handle gracefully
+      if (response.error) {
+        const msg = (response.error.message || '').toString().toLowerCase();
+        const status = response.error.status as number | undefined;
+
+        if (status === 402 || msg.includes('subscription') || msg.includes('payment required') || msg.includes('active subscription')) {
+          console.warn('[fetchConversations] Server requires active subscription:', response.error);
+          // Try to refresh local subscription state from server
+          try {
+            await refreshSubscription();
+          } catch (e) {
+            console.error('Failed to refresh subscription after server response', e);
+          }
+
+          // Set flag to show subscription UI
+          setRequiresSubscription(true);
+          setConversations([]);
+          return;
+        }
+
+        // For other API errors, throw to be handled by catch below
+        throw new Error(response.error.message || 'Failed to fetch conversations');
+      }
+
       // Type assertion for the response data
       const conversationsData = response.data as ApiConversation[];
       
@@ -327,24 +348,25 @@ const MessagesScreen = () => {
         setConversations([]);
       }
     } catch (err) {
-      console.error('[fetchConversations] Error occurred:', err);
-      
+      console.error('[fetchConversations] Error occurred:', err instanceof Error ? err.message : err);
+
       if (!isMountedRef.current) {
         console.log('[fetchConversations] Component unmounted, skipping error handling');
         return;
       }
 
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      console.error('[fetchConversations] Error details:', {
-        message: errorMessage,
-        type: err instanceof Error ? err.name : typeof err,
-      });
 
-      setError('Failed to load conversations. Please check your connection and try again.');
-      
-      // Show toast on refresh errors (user-initiated action)
-      if (isRefresh) {
-        showToast('Could not refresh conversations. Please try again.', 'error');
+      // If the error indicates subscription is required, set flag and avoid noisy stack
+      if (errorMessage.toLowerCase().includes('subscription') || errorMessage.toLowerCase().includes('payment required')) {
+        setRequiresSubscription(true);
+        setError(null);
+      } else {
+        setError('Failed to load conversations. Please check your connection and try again.');
+        // Show toast on refresh errors (user-initiated action)
+        if (isRefresh) {
+          showToast('Could not refresh conversations. Please try again.', 'error');
+        }
       }
     } finally {
       if (isMountedRef.current) {
@@ -483,28 +505,50 @@ const MessagesScreen = () => {
   }
 
   /**
-   * Show subscription required message
-   * Note: withSubscription HOC should prevent reaching here,
-   * but keeping as fallback
+   * If the user does not have an active subscription, show a prominent
+   * message with a button that opens the external subscription website.
+   * Falls back to the in-app subscribe screen if no external URL is configured.
    */
-  if (!subscription) {
+  if (!subscription || requiresSubscription) {
+    // Default to the production subscribe URL if not provided in env
+    const externalSubscribeUrl = process.env.EXPO_PUBLIC_SUBSCRIBE_URL ?? 'https://dating-g2mc.onrender.com/';
+
+    const handleOpenSubscribe = async () => {
+      try {
+        if (externalSubscribeUrl) {
+          const supported = await Linking.canOpenURL(externalSubscribeUrl);
+          if (supported) {
+            await Linking.openURL(externalSubscribeUrl);
+            return;
+          }
+        }
+
+        // Fallback to in-app subscribe screen
+        router.push('/screens/subscribe' as any);
+      } catch (err) {
+        console.error('Failed to open subscribe URL:', err);
+        router.push('/screens/subscribe' as any);
+      }
+    };
+
     return (
       <View style={styles.subscriptionContainer}>
         <Ionicons name="lock-closed-outline" size={80} color="#651B55" />
         <PoppinsText style={styles.subscriptionTitle}>
-          Subscription Required
+          No Active Subscription
         </PoppinsText>
         <PoppinsText style={styles.subscriptionText}>
-          A subscription is required to view and send messages.
+          You need an active subscription to view and send messages. Subscribe to
+          unlock chat features.
         </PoppinsText>
         <TouchableOpacity
-          onPress={() => router.push('/screens/subscribe' as any)}
+          onPress={handleOpenSubscribe}
           style={styles.subscribeButton}
           accessibilityLabel="Subscribe now"
           accessibilityRole="button"
         >
           <PoppinsText style={styles.subscribeButtonText}>
-            Subscribe Now
+            Subscribe
           </PoppinsText>
         </TouchableOpacity>
       </View>
@@ -583,6 +627,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+    fontFamily: 'Poppins-Regular',
   },
   header: {
     flexDirection: 'row',
@@ -665,23 +710,26 @@ const styles = StyleSheet.create({
     color: '#333',
     marginTop: 16,
     marginBottom: 8,
+    fontFamily: 'Poppins-Bold',
   },
   subscriptionText: {
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
     marginBottom: 24,
+    fontFamily: 'Poppins-Regular',
   },
   subscribeButton: {
     backgroundColor: '#651B55',
     paddingHorizontal: 32,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 12,
   },
   subscribeButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+    fontFamily: 'Poppins-SemiBold', 
   },
   emptyState: {
     flex: 1,
@@ -773,6 +821,4 @@ const styles = StyleSheet.create({
 // EXPORT WITH SUBSCRIPTION PROTECTION
 // ============================================================================
 
-export default withSubscription(MessagesScreen, {
-  redirectTo: '/subscribe' as any,
-});
+export default MessagesScreen;
