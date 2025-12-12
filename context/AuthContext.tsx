@@ -115,6 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async ({ email, password }: SignInCredentials): Promise<User> => {
     setError(null);
+    setIsLoading(true);
 
     try {
       const response = await api.login(email, password);
@@ -143,12 +144,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign in';
       setError(errorMessage);
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const signUp = async (data: SignUpData): Promise<User> => {
     setError(null);
-    
+    setIsLoading(true);
+
     try {
       // TODO: Implement real sign-up flow against backend
       // const response = await api.signup(data);
@@ -163,6 +167,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign up';
       setError(errorMessage);
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 

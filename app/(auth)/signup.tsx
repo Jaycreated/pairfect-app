@@ -286,7 +286,10 @@ const SignUpScreen = () => {
             disabled={isLoading}
           >
             {isLoading ? (
-              <ActivityIndicator color="#fff" />
+              <View style={styles.loadingRow}>
+                <ActivityIndicator color="#fff" />
+                <PoppinsText style={[styles.buttonText, styles.loadingText]}>Registering...</PoppinsText>
+              </View>
             ) : (
               <PoppinsText style={styles.buttonText}>
                 Create Account
@@ -429,6 +432,13 @@ const styles = StyleSheet.create({
   loginLink: {
     color: '#651B55',
     fontWeight: '600',
+  },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginLeft: 12,
   },
 });
 
