@@ -121,11 +121,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await api.login(email, password);
 
       if (!response.data || response.error) {
-        const message = response.error?.message || 'Failed to sign in';
-        throw new Error(message);
+        let errorMessage = 'Failed to sign in';
+        
+        // Handle specific error cases
+        if (response.error?.status === 401) {
+          errorMessage = 'Incorrect email or password';
+        } else if (response.error?.message) {
+          errorMessage = response.error.message;
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const { token, user: userData } = response.data as { token: string; user: User };
+
+      if (!token || !userData) {
+        throw new Error('Authentication failed: Invalid response from server');
+      }
 
       // Persist token for subsequent API requests
       await Storage.setItem('auth_token', token);
@@ -143,6 +155,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign in';
       setError(errorMessage);
+      showToast(errorMessage, 'error'); // Show error toast
       throw error;
     } finally {
       setIsLoading(false);
