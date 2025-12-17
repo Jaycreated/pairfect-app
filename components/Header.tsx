@@ -18,8 +18,11 @@ export const Header = ({ showNotification = true, onNotificationPress }: HeaderP
         <TouchableOpacity
           style={styles.notificationIcon}
           onPress={onNotificationPress}
+          activeOpacity={0.7}
         >
-          <Ionicons name="notifications-outline" size={24} color="#000" />
+          <View style={styles.notificationIconInner}>
+            <Ionicons name="notifications" size={24} color="#651B55" />
+          </View>
         </TouchableOpacity>
       )}
     </View>
@@ -32,18 +35,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 30,
+    paddingTop: 40,
     paddingBottom: 0,
     boxShadow: '0 2px 3.84px rgba(0, 0, 0, 0.25)',
     elevation: 5,
     backgroundColor: '#fff',
-    height: 100,
+    height: 80,
   },
   logo: {
-    width: 120,
+    width: 70,
     height: 30,
   },
   notificationIcon: {
     padding: 8,
+  },
+  notificationIconInner: {
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 4,
   },
 });

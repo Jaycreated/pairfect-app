@@ -2,18 +2,24 @@ import { API_CONFIG, getApiUrl } from '@/config/api';
 import { Storage } from '@/utils/storage';
 
 export interface NotificationType {
-  id: string;
+  id: number;
+  user_id: number;
+  from_user_id: number;
   type: 'like' | 'match' | 'message' | 'view' | 'other';
-  user: {
+  message: string;
+  is_read: boolean;
+  created_at: string;
+  from_user_name: string;
+  from_user_photo: string[];
+  user?: {
     id: string;
     name: string;
     avatar: string;
   };
-  message: string;
-  time: string;
-  read: boolean;
+  time?: string;
+  read?: boolean;
   isSubscriptionPrompt?: boolean;
-  createdAt: string;
+  createdAt?: string;
 }
 
 // Types
@@ -327,13 +333,13 @@ export const api = {
   getUnreadNotificationCount: () => 
     fetchApi<{ count: number }>('/notifications/unread/count', 'GET'),
   
-  markNotificationAsRead: (notificationId: string) => 
+  markNotificationAsRead: (notificationId: number) => 
     fetchApi(`/notifications/${notificationId}/read`, 'PUT'),
   
   markAllNotificationsAsRead: () => 
     fetchApi('/notifications/read-all', 'PUT'),
   
-  deleteNotification: (notificationId: string) => 
+  deleteNotification: (notificationId: number) => 
     fetchApi(`/notifications/${notificationId}`, 'DELETE'),
 };
 

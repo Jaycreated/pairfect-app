@@ -64,8 +64,8 @@ export default function PublicProfileScreen() {
         console.log(`Fetching user profile for ID: ${id}`);
         const response = await api.get<any>(`/users/${id}`);
         
-        // The API returns the user data in the data property
-        const userData = response.data;
+        // The API returns the user data nested under the "user" key
+        const userData = response.data?.user;
         console.log('Received user data:', userData);
         
         if (!userData) {
@@ -176,6 +176,16 @@ export default function PublicProfileScreen() {
             {user.age && <PoppinsText style={styles.age}>{user.age}</PoppinsText>}
           </View>
           
+          {/* Location */}
+          {user.location && (
+            <View style={styles.section}>
+              <View style={styles.locationContainer}>
+                <Ionicons name="location-outline" size={20} color="#651B55" />
+                <PoppinsText style={styles.locationText}>{user.location}</PoppinsText>
+              </View>
+            </View>
+          )}
+
           {/* Bio */}
           <View style={styles.section}>
             <PoppinsText style={styles.bio}>{user.bio}</PoppinsText>
@@ -247,6 +257,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+    fontFamily: 'Poppins_400Regular',
+    paddingTop: 20,
   },
   loadingContainer: {
     flex: 1,
@@ -408,6 +420,16 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+    marginLeft: 8,
+  },
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  locationText: {
+    fontSize: 16,
+    color: '#651B55',
     marginLeft: 8,
   },
 });

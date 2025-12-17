@@ -1,3 +1,5 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/*
+  This file is intentionally left mostly empty.
+  In React Native, we apply fonts through the Text component styles.
+  The Poppins font is loaded in _layout.tsx and can be used in your components.
+*/

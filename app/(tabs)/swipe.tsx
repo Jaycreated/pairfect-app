@@ -1,27 +1,18 @@
 import { PoppinsText } from '@/components/PoppinsText';
+import { useToast } from '@/context/ToastContext';
 import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Dimensions,
-  Image,
-  PanResponder,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
-} from 'react-native';
+import { ActivityIndicator, Animated, Dimensions, Image, PanResponder, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 const SWIPE_THRESHOLD = width * 0.4;
 const SWIPE_OUT_DURATION = 250;
 
-// Updated type to match API response
+// Placeholder image for users without photos
+const PLACEHOLDER_IMAGE = 'https://via.placeholder.com/400x600/651B55/FFFFFF?text=No+Photo';
+
 type User = {
   id: string;
   name: string;
@@ -40,6 +31,11 @@ const SwipeScreen = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isProcessingSwipe, setIsProcessingSwipe] = useState(false);
+  const { showToast } = useToast();
+  
+  // Use ref to track users array for immediate access in callbacks
+  const usersRef = useRef<User[]>([]);
+  const currentIndexRef = useRef(0);
   
   const position = useRef(new Animated.ValueXY()).current;
   const rotate = position.x.interpolate({
@@ -58,25 +54,46 @@ const SwipeScreen = () => {
     extrapolate: 'clamp',
   });
 
-  // Fetch potential matches on component mount
   useEffect(() => {
     fetchPotentialMatches();
   }, []);
 
-  const fetchPotentialMatches = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const matches = await api.getPotentialMatches();
-      setUsers(matches);
+const fetchPotentialMatches = async () => {
+  try {
+    setLoading(true);
+    setError(null);
+    console.log('Fetching potential matches...');
+    const matches = await api.getPotentialMatches();
+    console.log('Received matches:', matches);
+    
+    // Map users and add placeholder image if needed (don't filter out users without images)
+    const validUsers = matches.map((user: User) => ({
+      ...user,
+      // Use placeholder if no images exist
+      images: user.images && user.images.length > 0 ? user.images : [PLACEHOLDER_IMAGE]
+    }));
+    
+    console.log('Valid users after mapping:', validUsers.length);
+    
+    if (validUsers.length === 0) {
+      setError('No profiles available at the moment. Please check back later.');
+      setUsers([]);
+      usersRef.current = [];
+    } else {
+      setUsers(validUsers);
+      usersRef.current = validUsers;
       setCurrentIndex(0);
-    } catch (err) {
-      console.error('Error fetching matches:', err);
-      setError('Failed to load profiles. Please try again.');
-    } finally {
-      setLoading(false);
+      currentIndexRef.current = 0;
     }
-  };
+  } catch (err) {
+    console.error('Error fetching matches:', err);
+    setError('Failed to load profiles. Please try again.');
+    setUsers([]);
+    usersRef.current = [];
+  } finally {
+    setLoading(false);
+  }
+};
 
   const panResponder = useRef(
     PanResponder.create({
@@ -90,11 +107,9 @@ const SwipeScreen = () => {
         if (isProcessingSwipe) return;
         
         if (Math.abs(dx) > SWIPE_THRESHOLD) {
-          // Swipe right (like) or left (nope)
           const direction = dx > 0 ? 1 : -1;
           swipeCard(direction);
         } else {
-          // Return to original position
           Animated.spring(position, {
             toValue: { x: 0, y: 0 },
             useNativeDriver: false,
@@ -106,7 +121,14 @@ const SwipeScreen = () => {
 
   type SwipeResponse = {
     data?: {
-      match?: boolean;
+      match?: boolean | {
+        id: number;
+        user_id: number;
+        target_user_id: number;
+        action: string;
+        created_at: string;
+        is_mutual?: boolean;
+      };
       success?: boolean;
     };
     error?: string | {
@@ -117,25 +139,41 @@ const SwipeScreen = () => {
   };
 
   const swipeCard = useCallback(async (direction: number) => {
-    if (isProcessingSwipe || currentIndex >= users.length) {
-      console.log('Swipe prevented - isProcessingSwipe:', isProcessingSwipe, 'currentIndex:', currentIndex, 'users.length:', users.length);
+    // Use refs for immediate access to current state
+    const currentUsers = usersRef.current;
+    const currentIdx = currentIndexRef.current;
+    
+    // Add extra validation
+    if (isProcessingSwipe) {
+      console.log('Swipe prevented - already processing');
+      return;
+    }
+    
+    if (currentIdx >= currentUsers.length || currentUsers.length === 0) {
+      console.log('Swipe prevented - no users available', {
+        currentIndex: currentIdx,
+        usersLength: currentUsers.length
+      });
       return;
     }
     
     setIsProcessingSwipe(true);
-    const currentUser = users[currentIndex];
+    const currentUser = currentUsers[currentIdx];
     const isLike = direction > 0;
+    const nextIndex = currentIdx + 1;
+    const isLastCard = nextIndex >= currentUsers.length;
 
     console.log('Starting swipe action:', {
       action: isLike ? 'like' : 'pass',
       userId: currentUser.id,
       userName: currentUser.name,
-      currentIndex,
-      totalUsers: users.length
+      currentIndex: currentIdx,
+      nextIndex,
+      totalUsers: currentUsers.length,
+      isLastCard
     });
 
     try {
-      // Call API based on swipe direction
       console.log(`Sending ${isLike ? 'like' : 'pass'} for user:`, currentUser.id);
       
       const response: SwipeResponse = isLike 
@@ -150,29 +188,36 @@ const SwipeScreen = () => {
           : response.error.message || 'Unknown error';
         
         console.error(`Error ${isLike ? 'liking' : 'passing'} user:`, errorMessage);
-        Alert.alert('Error', `Failed to ${isLike ? 'like' : 'pass'} user: ${errorMessage}`);
+        showToast(`Failed to ${isLike ? 'like' : 'pass'} user: ${errorMessage}`, 'error', 3000);
         setIsProcessingSwipe(false);
+        // Reset position on error
+        Animated.spring(position, {
+          toValue: { x: 0, y: 0 },
+          useNativeDriver: false,
+        }).start();
         return;
       }
       
       console.log(`${isLike ? 'Liked' : 'Passed'}:`, currentUser.name, 'Match data:', response.data);
       
-      // Show match alert only if it's a like and the response has a match property that is true
-      if (isLike && response.data && 'match' in response.data && response.data.match === true) {
-        console.log('Match found with:', currentUser.name);
-        Alert.alert(
-          "It's a match! 💕",
-          `You and ${currentUser.name} have liked each other!`,
-          [
-            { text: 'Keep Swiping', style: 'cancel' },
-            { text: 'Send Message', onPress: () => router.push('/matches') }
-          ]
-        );
-      } else if (isLike) {
-        console.log('No match with:', currentUser.name);
+      // Check if it's a mutual match
+      // The API returns an object with match details, and may include is_mutual property
+      if (isLike && response.data && response.data.match) {
+        const matchData = response.data.match;
+        // Check if it's a mutual match (could be a boolean or object with is_mutual property)
+        const isMutualMatch = typeof matchData === 'boolean' 
+          ? matchData 
+          : (matchData as any).is_mutual === true;
+        
+        if (isMutualMatch) {
+          console.log('Mutual match found with:', currentUser.name);
+          showToast(`It's a match! You and ${currentUser.name} have liked each other!`, 'success', 5000);
+        } else {
+          console.log('Like registered, but no mutual match yet with:', currentUser.name);
+        }
       }
       
-      // Animate card off screen after successful API call
+      // Animate card off screen
       Animated.timing(position, {
         toValue: { 
           x: direction * (width + 100), 
@@ -181,33 +226,48 @@ const SwipeScreen = () => {
         duration: SWIPE_OUT_DURATION,
         useNativeDriver: false,
       }).start(() => {
-        // Move to next card
-        const isLastCard = currentIndex >= users.length - 1;
+        // Reset position immediately for next card
+        position.setValue({ x: 0, y: 0 });
         
         if (isLastCard) {
-          // Fetch more matches
+          console.log('Last card - fetching more matches');
+          // Reset to show loading state
+          setCurrentIndex(0);
+          currentIndexRef.current = 0;
+          setUsers([]);
+          usersRef.current = [];
+          setIsProcessingSwipe(false);
+          // Fetch new matches
           fetchPotentialMatches();
         } else {
-          setCurrentIndex(currentIndex + 1);
+          console.log('Moving to next card:', nextIndex);
+          setCurrentIndex(nextIndex);
+          currentIndexRef.current = nextIndex;
+          setIsProcessingSwipe(false);
         }
-        
-        position.setValue({ x: 0, y: 0 });
-        setIsProcessingSwipe(false);
       });
       
     } catch (err) {
       console.error('Error processing swipe:', err);
-      Alert.alert('Error', 'An error occurred while processing your action. Please try again.');
+      showToast('An error occurred while processing your action. Please try again.', 'error', 3000);
       setIsProcessingSwipe(false);
+      // Reset position on error
+      Animated.spring(position, {
+        toValue: { x: 0, y: 0 },
+        useNativeDriver: false,
+      }).start();
     }
-  }, [currentIndex, users, position, isProcessingSwipe]);
+  }, [isProcessingSwipe, showToast, position]);
 
   const handleCardPress = useCallback((userId: string) => {
-    // Navigate to the user's public profile
-    router.push(`/user/${userId}`);
-  }, [router]);
+    if (!isProcessingSwipe) {
+      router.push(`/user/${userId}`);
+    }
+  }, [router, isProcessingSwipe]);
 
   const renderCard = (user: User) => {
+    if (!user) return null;
+
     const panResponderHandlers = panResponder.panHandlers;
     const cardStyle = [
       styles.card,
@@ -220,7 +280,10 @@ const SwipeScreen = () => {
       },
     ];
 
-    if (!user) return null;
+    // Use placeholder if no image
+    const imageUri = user.images && user.images.length > 0 
+      ? user.images[0] 
+      : PLACEHOLDER_IMAGE;
 
     return (
       <View style={styles.cardContainer}>
@@ -235,7 +298,11 @@ const SwipeScreen = () => {
             style={cardStyle}
             {...panResponderHandlers}
           >
-            <Image source={{ uri: user.images[0] }} style={styles.cardImage} />
+            <Image 
+              source={{ uri: imageUri }} 
+              style={styles.cardImage}
+              defaultSource={{ uri: PLACEHOLDER_IMAGE }}
+            />
             <View style={styles.cardOverlay}>
               <Animated.View 
                 style={[styles.likeBadgeContainer, { opacity: likeOpacity }]}
@@ -256,16 +323,20 @@ const SwipeScreen = () => {
                 <PoppinsText weight="bold" style={styles.cardName}>
                   {user.name}
                 </PoppinsText>
-                <PoppinsText style={styles.cardAge}>
-                  , {user.age}
-                </PoppinsText>
+                {user.age > 0 && (
+                  <PoppinsText style={styles.cardAge}>
+                    , {user.age}
+                  </PoppinsText>
+                )}
               </View>
-              <View style={styles.cardLocation}>
-                <Ionicons name="location-sharp" size={16} color="#651B55" style={{ marginRight: 4 }} />
-                <PoppinsText style={{ fontSize: 16 }}>
-                  {user.location}
-                </PoppinsText>
-              </View>
+              {user.location && (
+                <View style={styles.cardLocation}>
+                  <Ionicons name="location-sharp" size={16} color="#651B55" style={{ marginRight: 4 }} />
+                  <PoppinsText style={{ fontSize: 16 }}>
+                    {user.location}
+                  </PoppinsText>
+                </View>
+              )}
             </View>
             {user.interest && (
               <View>
@@ -299,14 +370,15 @@ const SwipeScreen = () => {
   };
   
   const handleLike = useCallback(() => {
+    console.log('Like button pressed');
     swipeCard(1);
   }, [swipeCard]);
   
   const handleNope = useCallback(() => {
+    console.log('Nope button pressed');
     swipeCard(-1);
   }, [swipeCard]);
 
-  // Loading state
   if (loading) {
     return (
       <View style={[styles.container, styles.centerContent]}>
@@ -316,7 +388,6 @@ const SwipeScreen = () => {
     );
   }
 
-  // Error state
   if (error) {
     return (
       <View style={[styles.container, styles.centerContent]}>
@@ -338,9 +409,14 @@ const SwipeScreen = () => {
         <TouchableOpacity onPress={() => router.replace('/(tabs)')}>
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
-        <PoppinsText weight="bold" style={styles.headerTitle}>
-          <Text>Discover people around you</Text>
-        </PoppinsText>
+        <View style={styles.headerTextContainer}>
+          <PoppinsText weight="bold" style={styles.headerTitle}>
+            <Text>Discover people around you</Text>
+          </PoppinsText>
+          <PoppinsText style={styles.subtitle}>
+            <Text>Keep swiping to meet your match</Text>
+          </PoppinsText>
+        </View>
         <View style={{ width: 24 }} />
       </View>
 
@@ -351,9 +427,7 @@ const SwipeScreen = () => {
       >
         <View style={styles.swiperContainer}>
           {users.length > 0 && currentIndex < users.length ? (
-            <View style={styles.cardContainer}>
-              {renderCard(users[currentIndex])}
-            </View>
+            renderCard(users[currentIndex])
           ) : (
             <View style={styles.noMoreCards}>
               <Ionicons name="people-outline" size={64} color="#666" />
@@ -396,29 +470,45 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
     padding: 16,
-    paddingTop: 10,
   },
   headerTitle: {
     fontSize: 20,
     color: '#000',
+    textShadowColor: 'rgba(0, 0, 0, 0.1)',
+    textShadowOffset: { width: 0.5, height: 0.5 },
+    textShadowRadius: 1,
+  },
+  headerTextContainer: {
+    alignItems: 'center',
+    flex: 1,
+    marginTop: 4,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 2,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.05)',
+    textShadowOffset: { width: 0.5, height: 0.5 },
+    textShadowRadius: 1,
   },
   swiperContainer: {
     width: '100%',
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: 0,
   },
   cardContainer: {
     width: '100%',
-    height: 300,
+    height: 400,
     maxWidth: 350,
     alignSelf: 'center',
+    padding: 10,
   },
   card: {
     width: '100%',
     height: '100%',
-    borderRadius: 20,
+    borderRadius: 24,
     backgroundColor: '#FFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -524,9 +614,9 @@ const styles = StyleSheet.create({
   },
   cardFooter: {
     paddingTop: 12,
-    paddingRight: 12,
+    paddingRight: 20,
     color: '#000000',
-    paddingLeft: 12,
+    paddingLeft: 20,
     marginHorizontal: -20,
   },
   cardName: {
@@ -561,6 +651,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: 10,
+    paddingRight: 0,
+    paddingLeft: 0,
   },
   button: {
     width: 50,

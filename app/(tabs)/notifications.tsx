@@ -40,18 +40,24 @@ const formatTimeAgo = (dateString: string) => {
 };
 
 type NotificationType = {
-  id: string;
+  id: number;
+  user_id: number;
+  from_user_id: number;
   type: 'like' | 'match' | 'message' | 'view' | 'other';
-  user: {
+  message: string;
+  is_read: boolean;
+  created_at: string;
+  from_user_name: string;
+  from_user_photo: string[];
+  user?: {
     id: string;
     name: string;
     avatar: string;
   };
-  message: string;
-  time: string;
-  read: boolean;
+  time?: string;
+  read?: boolean;
   isSubscriptionPrompt?: boolean;
-  createdAt: string;
+  createdAt?: string;
 };
 
 const NotificationsScreen = () => {
@@ -73,12 +79,14 @@ const NotificationsScreen = () => {
       if (notificationsRes.data) {
         const formattedNotifications = notificationsRes.data.map((n: any) => ({
           ...n,
-          user: n.user || {
-            id: 'unknown',
-            name: 'Unknown User',
-            avatar: 'https://i.pravatar.cc/150?img=32' // Default avatar
+          user: {
+            id: n.from_user_id?.toString() || 'unknown',
+            name: n.from_user_name || 'Unknown User',
+            avatar: n.from_user_photo?.[0] || 'https://i.pravatar.cc/150?img=32'
           },
-          time: formatTimeAgo(n.createdAt || new Date().toISOString())
+          read: n.is_read,
+          time: formatTimeAgo(n.created_at || new Date().toISOString()),
+          createdAt: n.created_at
         }));
         setNotifications(formattedNotifications);
       }
@@ -96,11 +104,11 @@ const NotificationsScreen = () => {
     }
   };
 
-  const markAsRead = async (id: string) => {
+  const markAsRead = async (id: number) => {
     try {
       await api.markNotificationAsRead(id);
       setNotifications(prev => 
-        prev.map(n => n.id === id ? { ...n, read: true } : n)
+        prev.map(n => n.id === id ? { ...n, read: true, is_read: true } : n)
       );
       setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (err) {
@@ -111,14 +119,14 @@ const NotificationsScreen = () => {
   const markAllAsRead = async () => {
     try {
       await api.markAllNotificationsAsRead();
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      setNotifications(prev => prev.map(n => ({ ...n, read: true, is_read: true })));
       setUnreadCount(0);
     } catch (err) {
       console.error('Error marking all as read:', err);
     }
   };
 
-  const deleteNotification = async (id: string) => {
+  const deleteNotification = async (id: number) => {
     try {
       await api.deleteNotification(id);
       setNotifications(prev => prev.filter(n => n.id !== id));
@@ -177,12 +185,12 @@ const NotificationsScreen = () => {
     }
 
     // Mark as read if not already read
-    if (!notification.read) {
+    if (!notification.read && !notification.is_read) {
       await markAsRead(notification.id);
     }
 
     // Navigate based on notification type
-    if (notification.type === 'message') {
+    if (notification.type === 'message' && notification.user?.id) {
       router.push(`/messages/${notification.user.id}`);
     } else if (notification.type === 'match') {
       router.push(`/matches`);
@@ -195,14 +203,14 @@ const NotificationsScreen = () => {
     <TouchableOpacity 
       style={[
         styles.notificationItem,
-        !item.read && styles.unreadNotification,
+        (!item.read && !item.is_read) && styles.unreadNotification,
         item.isSubscriptionPrompt && styles.subscriptionPrompt,
       ]}
       onPress={() => handleNotificationPress(item)}
     >
-      <View style={styles.avatarContainer}>
+    <View style={styles.avatarContainer}>
         <Image 
-          source={{ uri: item.user?.avatar || 'https://i.pravatar.cc/150?img=32' }} 
+          source={{ uri: item.user?.avatar || item.from_user_photo?.[0] || 'https://i.pravatar.cc/150?img=32' }} 
           style={styles.avatar} 
           defaultSource={{ uri: 'https://i.pravatar.cc/150?img=32' }}
         />
@@ -219,12 +227,12 @@ const NotificationsScreen = () => {
       </View>
       <View style={styles.notificationContent}>
         <PoppinsText style={styles.notificationText}>
-          <PoppinsText style={styles.userName}>{item.user.name} </PoppinsText>
+          <PoppinsText style={styles.userName}>{item.user?.name || item.from_user_name} </PoppinsText>
           {item.message}
         </PoppinsText>
         <PoppinsText style={styles.timeAgo}>{item.time}</PoppinsText>
       </View>
-      {!item.read && <View style={styles.unreadDot} />}
+      {(!item.read && !item.is_read) && <View style={styles.unreadDot} />}
     </TouchableOpacity>
   );
 
@@ -274,7 +282,7 @@ const NotificationsScreen = () => {
       <FlatList
         data={notifications}
         renderItem={renderNotification}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={styles.notificationList}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -303,6 +311,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+    fontFamily: 'Poppins_400Regular',
   },
   header: {
     flexDirection: 'row',

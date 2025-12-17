@@ -1,8 +1,9 @@
+import { useToast } from '@/context/ToastContext';
 import { Storage } from '@/utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { PoppinsText } from '../PoppinsText';
 
 interface PhotoUploadProps {
@@ -13,6 +14,7 @@ interface PhotoUploadProps {
 const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/image/upload`;
 
 export const PhotoUpload = ({ onPhotosSelected, onContinue }: PhotoUploadProps) => {
+  const { showToast } = useToast();
   const [photos, setPhotos] = useState<string[]>(['', '']);
   const [uploading, setUploading] = useState(false);
 
@@ -20,7 +22,7 @@ export const PhotoUpload = ({ onPhotosSelected, onContinue }: PhotoUploadProps) 
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission required', 'We need camera roll permissions to upload photos');
+        showToast('We need camera roll permissions to upload photos', 'error');
         return;
       }
 
@@ -38,7 +40,7 @@ export const PhotoUpload = ({ onPhotosSelected, onContinue }: PhotoUploadProps) 
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image. Please try again.');
+      showToast('Failed to pick image. Please try again.', 'error');
     }
   };
 
@@ -68,7 +70,7 @@ export const PhotoUpload = ({ onPhotosSelected, onContinue }: PhotoUploadProps) 
 
   const handleContinue = async () => {
     if (photos.filter(photo => photo).length === 0) {
-      Alert.alert('Please add at least one photo');
+      showToast('Please add at least one photo', 'error');
       return;
     }
 
@@ -85,7 +87,7 @@ export const PhotoUpload = ({ onPhotosSelected, onContinue }: PhotoUploadProps) 
       onContinue();
     } catch (error) {
       console.error('Error uploading photos:', error);
-      Alert.alert('Error', 'Failed to upload photos. Please try again.');
+      showToast('Failed to upload photos. Please try again.', 'error');
     } finally {
       setUploading(false);
     }

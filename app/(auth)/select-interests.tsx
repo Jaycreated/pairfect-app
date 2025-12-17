@@ -1,4 +1,5 @@
 import { PoppinsText } from '@/components/PoppinsText';
+import { useToast } from '@/context/ToastContext';
 import { Storage } from '@/utils/storage';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
@@ -16,6 +17,7 @@ const INTERESTS = [
 
 const SelectInterests = () => {
   const router = useRouter();
+  const { showToast } = useToast();
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
 
   const toggleInterest = (interest: string) => {
@@ -26,7 +28,7 @@ const SelectInterests = () => {
 
   const handleContinue = async () => {
     if (selectedInterests.length === 0) {
-      alert('Please select an interest');
+      showToast('Please select an interest', 'error');
       return;
     }
     
@@ -52,7 +54,7 @@ const SelectInterests = () => {
       router.push('/(auth)/photo-upload');
     } catch (error) {
       console.error('Error saving interests:', error);
-      alert('Failed to save interests. Please try again.');
+      showToast('Failed to save interests. Please try again.', 'error');
     }
   };
 

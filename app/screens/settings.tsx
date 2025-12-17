@@ -1,14 +1,16 @@
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import { getUserSettings, updateUserSettings, UserSettings } from '@/services/userService';
 import { Storage } from '@/utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 
 const SettingsScreen = () => {
   const { signOut } = useAuth();
   const router = useRouter();
+  const { showToast } = useToast();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -24,7 +26,7 @@ const SettingsScreen = () => {
         
         if (!token) {
           console.log('⚠️ [Settings] No token found, user might need to log in');
-          Alert.alert('Authentication Required', 'Please log in to access settings');
+          showToast('Please log in to access settings', 'error');
           router.replace('/(auth)/login');
           return;
         }
@@ -35,7 +37,7 @@ const SettingsScreen = () => {
         setSettings(userSettings);
       } catch (error) {
         console.error('❌ [Settings] Failed to load settings:', error);
-        Alert.alert('Error', 'Failed to load settings. Please try again.');
+        showToast('Failed to load settings. Please try again.', 'error');
         router.replace('/(auth)/login');
       } finally {
         setIsLoading(false);
@@ -81,7 +83,7 @@ const SettingsScreen = () => {
       console.error('Failed to update notification settings:', error);
       // Revert to previous settings on error
       setSettings(settings);
-      Alert.alert('Error', 'Failed to update notification settings. Please try again.');
+      showToast('Failed to update notification settings. Please try again.', 'error');
     }
   };
 
@@ -91,7 +93,7 @@ const SettingsScreen = () => {
       // The signOut function already handles navigation to login
     } catch (error) {
       console.error('Failed to sign out:', error);
-      Alert.alert('Error', 'Failed to sign out. Please try again.');
+      showToast('Failed to sign out. Please try again.', 'error');
     }
   };
 
@@ -103,7 +105,7 @@ const SettingsScreen = () => {
             <Ionicons name="arrow-back" size={24} color="#000" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Settings</Text>
-          <View style={{ width: 24 }} /> {/* For alignment */}
+          <View style={styles.headerSpacer} />
         </View>
         <View style={[styles.loadingContainer, { flex: 1 }]}>
           <ActivityIndicator size="large" color="#651B55" />
@@ -120,7 +122,7 @@ const SettingsScreen = () => {
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Settings</Text>
-        <View style={{ width: 24 }} /> {/* For alignment */}
+        <View style={styles.headerSpacer} />
       </View>
       <ScrollView style={styles.scrollView}>
         <View style={styles.section}>
@@ -248,7 +250,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    paddingTop: 16,
+    paddingTop: 20,
     height: 100,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
@@ -261,6 +263,9 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
     marginLeft: -8,
+  },
+  headerSpacer: {
+    width: 24,
   },
   section: {
     backgroundColor: '#fff',

@@ -2,6 +2,7 @@ import { api } from '@/services/api';
 import { SignInCredentials, SignUpData, User } from '@/types/auth';
 import { Storage } from '@/utils/storage';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { useToast } from './ToastContext';
 
 type AuthContextType = {
   // User state
@@ -110,18 +111,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkAuth();
   }, [loadProfile]);
 
+  const { showToast } = useToast();
+
   const signIn = async ({ email, password }: SignInCredentials): Promise<User> => {
     setError(null);
+    setIsLoading(true);
 
     try {
       const response = await api.login(email, password);
 
       if (!response.data || response.error) {
-        const message = response.error?.message || 'Failed to sign in';
-        throw new Error(message);
+        let errorMessage = 'Failed to sign in';
+        
+        // Handle specific error cases
+        if (response.error?.status === 401) {
+          errorMessage = 'Incorrect email or password';
+        } else if (response.error?.message) {
+          errorMessage = response.error.message;
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const { token, user: userData } = response.data as { token: string; user: User };
+
+      if (!token || !userData) {
+        throw new Error('Authentication failed: Invalid response from server');
+      }
 
       // Persist token for subsequent API requests
       await Storage.setItem('auth_token', token);
@@ -131,18 +147,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       setUser(userWithToken);
       setProfile(userWithToken);
+      
+      // Show success toast
+      showToast('Login successful!', 'success');
 
       return userWithToken;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign in';
       setError(errorMessage);
+      showToast(errorMessage, 'error'); // Show error toast
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const signUp = async (data: SignUpData): Promise<User> => {
     setError(null);
-    
+    setIsLoading(true);
+
     try {
       // TODO: Implement real sign-up flow against backend
       // const response = await api.signup(data);
@@ -157,6 +180,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign up';
       setError(errorMessage);
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 

@@ -1,6 +1,5 @@
 import { useRouter } from 'expo-router';
 import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
-import { Alert } from 'react-native';
 import { io, type Socket } from 'socket.io-client';
 import { API_CONFIG } from '../config/api';
 import { hasActiveSubscription } from '../services/subscriptionService';
@@ -18,7 +17,7 @@ type WebSocketContextType = {
   isConnected: boolean;
   hasSubscription: boolean;
   checkSubscription: () => Promise<boolean>;
-  connect: () => Promise<boolean>;
+  connect: (onError?: (message: string) => void) => Promise<boolean>;
   disconnect: () => void;
   emit: (event: string, data?: unknown) => boolean;
   on: (event: string, callback: (...args: any[]) => void) => void;
@@ -33,7 +32,6 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [hasActiveSub, setHasActiveSub] = useState(false);
   const listenersRef = useRef<Record<string, (...args: any[]) => void>>({});
   const connectionAttempted = useRef(false);
-  
   // Use the router from the hook if available, otherwise use the global one
   const routerHook = useRouter();
   const router = routerHook || globalRouter;
@@ -58,7 +56,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, []);
 
-  const connect = async (): Promise<boolean> => {
+  const connect = async (onError?: (message: string) => void): Promise<boolean> => {
     if (!router) {
       console.warn('Router not available');
       return false;
@@ -71,7 +69,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const token = await getAuthToken();
     if (!token) {
       console.warn('WebSocket: No auth token available');
-      Alert.alert('Authentication Required', 'Please log in to access the chat.');
+      onError?.('Please log in to access the chat.');
       return false;
     }
     
@@ -80,29 +78,18 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const hasSub = await checkSubscription();
       if (!hasSub) {
         console.warn('WebSocket: No active subscription');
-        Alert.alert(
-          'Subscription Required',
-          'You need an active subscription to access the chat.',
-          [
-            {
-              text: 'Subscribe',
-              onPress: () => {
-                if (router) {
-                  router.push('/screens/subscribe');
-                }
-              },
-            },
-            {
-              text: 'Cancel',
-              style: 'cancel',
-            },
-          ]
-        );
+        onError?.('You need an active subscription to access the chat');
+        if (router) {
+          // Small delay to allow toast to show before navigation
+          setTimeout(() => {
+            router.push('/screens/subscribe');
+          }, 1500);
+        }
         return false;
       }
     } catch (error) {
       console.error('Subscription check failed:', error);
-      Alert.alert('Error', 'Failed to verify subscription status. Please try again.');
+      onError?.('Failed to verify subscription status. Please try again.');
       return false;
     }
 
@@ -152,6 +139,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       // Handle payment required error specifically
       if (error.message.includes('Payment required')) {
         console.warn('WebSocket: Payment required for chat access');
+        onError?.('Payment required for chat access');
         setHasActiveSub(false);
         disconnect();
       }

@@ -1,5 +1,6 @@
 import { PoppinsText } from '@/components/PoppinsText';
 import { uploadToCloudinary } from '@/config/cloudinary';
+import { useToast } from '@/context/ToastContext';
 import { api } from '@/services/api';
 import { Storage } from '@/utils/storage';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,7 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Image,
+  ActivityIndicator, Image,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -30,7 +31,7 @@ const ProfileSetup = () => {
   const [photos, setPhotos] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   const relationshipInterests = [
     'Relationship',
@@ -50,9 +51,9 @@ const ProfileSetup = () => {
     try {
       console.log('📱 [Image Picker] Requesting permissions');
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
+
       if (status !== 'granted') {
-        Alert.alert('Permission required', 'Please allow access to your photo library to upload images.');
+        showToast('Please allow access to your photo library to upload images.', 'error');
         return;
       }
 
@@ -74,7 +75,7 @@ const ProfileSetup = () => {
       }
     } catch (error) {
       console.error('❌ [Image Picker] Error:', error);
-      setError('Failed to upload image. Please try again.');
+      showToast('Failed to upload image. Please try again.', 'error');
     } finally {
       setIsUploading(false);
     }
@@ -113,7 +114,7 @@ const ProfileSetup = () => {
 
   const handleNext = async () => {
     console.log('handleNext called, step:', step);
-    
+
     if (!canProceed()) {
       console.log('⏭️ [Profile Setup] Cannot proceed, validation failed');
       return;
@@ -134,7 +135,6 @@ const ProfileSetup = () => {
   const submitProfile = async () => {
     try {
       setIsLoading(true);
-      setError(null);
 
       // Convert gender to lowercase to match backend expectations
       const genderMapping: Record<string, string> = {
@@ -145,7 +145,7 @@ const ProfileSetup = () => {
 
       const genderValue = genderMapping[formData.gender] || formData.gender?.toLowerCase();
       const ageValue = parseInt(formData.age, 10);
-      
+
       console.log('📝 [Profile Setup] Preparing profile data');
       const profileData = {
         name: formData.name,
@@ -155,19 +155,20 @@ const ProfileSetup = () => {
         interests: selectedInterests,
         photos: photos,
       };
-      
+
       console.log('📤 [Profile Setup] Sending profile data:', JSON.stringify(profileData, null, 2));
-      
+
       const response = await api.updateProfile(profileData);
       console.log('✅ [Profile Setup] API Response:', JSON.stringify(response, null, 2));
-      
+
       if (response.error) {
         console.error('❌ [Profile Setup] Profile update error:', response.error);
         if (response.error.errors) {
-          const errorMessages = response.error.errors.map((err: any) => 
+          const errorMessages = response.error.errors.map((err: any) =>
             `${err.path}: ${err.msg}`
           ).join('\n');
-          throw new Error(`Validation failed:\n${errorMessages}`);
+          showToast(`Validation failed: ${errorMessages}`, 'error');
+          return;
         }
         throw new Error(response.error.message || 'Failed to save profile');
       }
@@ -177,7 +178,7 @@ const ProfileSetup = () => {
         Storage.deleteItem('tempUser'),
         Storage.deleteItem('needsProfileSetup')
       ]);
-      
+
       console.log('🔄 [Profile Setup] Navigating to /(tabs)');
       router.replace({
         pathname: '/(tabs)',
@@ -185,7 +186,7 @@ const ProfileSetup = () => {
       });
     } catch (err) {
       console.error('Profile setup error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to save profile. Please try again.');
+      showToast(err instanceof Error ? err.message : 'Failed to save profile. Please try again.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -223,7 +224,7 @@ const ProfileSetup = () => {
                   <Ionicons
                     name={
                       gender === 'Woman' ? 'female' :
-                      gender === 'Man' ? 'male' : 'male-female'
+                        gender === 'Man' ? 'male' : 'male-female'
                     }
                     size={32}
                     color={formData.gender === gender ? '#fff' : '#651B55'}
@@ -321,12 +322,12 @@ const ProfileSetup = () => {
           <View style={styles.stepContainer}>
             <PoppinsText style={styles.stepTitle}>Add Your Photos</PoppinsText>
             <PoppinsText style={styles.subtitle}>Upload at least 2 photos to continue</PoppinsText>
-            
+
             <View style={styles.photosContainer}>
               {photos.map((photo, index) => (
                 <View key={index} style={styles.photoContainer}>
                   <Image source={{ uri: photo }} style={styles.photo} />
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.removePhotoButton}
                     onPress={() => removePhoto(index)}
                   >
@@ -334,9 +335,9 @@ const ProfileSetup = () => {
                   </TouchableOpacity>
                 </View>
               ))}
-              
+
               {photos.length < 6 && (
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.addPhotoButton}
                   onPress={pickImage}
                   disabled={isUploading}
@@ -349,46 +350,12 @@ const ProfileSetup = () => {
                 </TouchableOpacity>
               )}
             </View>
-            
+
             {photos.length < 2 && (
               <PoppinsText style={styles.errorText}>
                 Please upload at least 2 photos
               </PoppinsText>
             )}
-          </View>
-        );
-        return (
-          <View style={styles.stepContainer}>
-            <PoppinsText style={styles.stepTitle}>What are you looking for?</PoppinsText>
-            <PoppinsText style={styles.subtitle}>Select all that apply</PoppinsText>
-
-            <View style={styles.interestsGrid}>
-              {relationshipInterests.map((interest) => (
-                <TouchableOpacity
-                  key={interest}
-                  style={[
-                    styles.interestButton,
-                    selectedInterests.includes(interest) && styles.interestButtonSelected,
-                  ]}
-                  onPress={() => {
-                    setSelectedInterests(prev =>
-                      prev.includes(interest)
-                        ? prev.filter(i => i !== interest)
-                        : [...prev, interest]
-                    );
-                  }}
-                >
-                  <PoppinsText
-                    style={[
-                      styles.interestButtonText,
-                      selectedInterests.includes(interest) && styles.interestButtonTextSelected,
-                    ]}
-                  >
-                    {interest}
-                  </PoppinsText>
-                </TouchableOpacity>
-              ))}
-            </View>
           </View>
         );
 
@@ -420,9 +387,9 @@ const ProfileSetup = () => {
 
         <PoppinsText style={styles.subtitle}>
           {step === 1 ? 'This helps us create your personalized experience' :
-           step === 2 ? 'Help others get to know you' :
-           step === 3 ? 'What kind of connections are you looking for?' :
-           'Almost there! Just a few more details'}
+            step === 2 ? 'Help others get to know you' :
+              step === 3 ? 'What kind of connections are you looking for?' :
+                'Almost there! Just a few more details'}
         </PoppinsText>
 
         {renderStep()}
@@ -430,11 +397,6 @@ const ProfileSetup = () => {
 
       {/* Footer Action Button */}
       <View style={styles.footer}>
-        {error && (
-          <View style={styles.errorContainer}>
-            <PoppinsText style={styles.errorText}>{error}</PoppinsText>
-          </View>
-        )}
         <TouchableOpacity
           style={[styles.button, (!canProceed() || isLoading) && styles.buttonDisabled]}
           onPress={handleNext}
@@ -457,6 +419,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+    fontFamily: 'Poppins_600SemiBold',
+    paddingTop: 20,
+
   },
   progressContainer: {
     flexDirection: 'row',
@@ -483,14 +448,19 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: '#000',
+    fontFamily: 'Poppins_600SemiBold',
   },
   subtitle: {
     fontSize: 16,
     color: '#666',
     marginBottom: 30,
+    fontFamily: 'Poppins_600SemiBold',
+
   },
   stepContainer: {
     marginTop: 20,
+    fontFamily: 'Poppins_600SemiBold',
+
   },
   stepTitle: {
     fontSize: 24,

@@ -1,14 +1,16 @@
 // app/(tabs)/subscribe.tsx
 import { useSubscription } from '@/context/SubscriptionContext';
+import { useToast } from '@/context/ToastContext';
 import { createOrder, getSubscriptionPlans, initiatePayment, storePaymentAttempt } from '@/services/subscriptionService';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function SubscribeScreen() {
   const router = useRouter();
   const { subscription, refreshSubscription } = useSubscription();
+  const { showToast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   
@@ -53,10 +55,8 @@ export default function SubscribeScreen() {
       router.replace('/(tabs)/messages');
     } catch (error) {
       console.error('Payment error:', error);
-      Alert.alert(
-        'Payment Failed',
-        error instanceof Error ? error.message : 'Failed to process payment. Please try again.'
-      );
+      const errorMessage = error instanceof Error ? error.message : 'Failed to process payment. Please try again.';
+      showToast(errorMessage, 'error');
     } finally {
       setSelectedPlan(null);
       setIsProcessing(false);
