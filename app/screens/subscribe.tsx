@@ -1,11 +1,12 @@
 // app/(tabs)/subscribe.tsx
 import { useSubscription } from '@/context/SubscriptionContext';
 import { useToast } from '@/context/ToastContext';
+import { connectToIAP, disconnectIAP, IOS_PRODUCT_IDS, purchaseItem } from '@/services/iapService';
 import { createOrder, getSubscriptionPlans, initiatePayment, storePaymentAttempt } from '@/services/subscriptionService';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function SubscribeScreen() {
   const router = useRouter();
@@ -19,49 +20,78 @@ export default function SubscribeScreen() {
   const handleSubscribe = async (planId: string) => {
     if (isProcessing) return;
     
+    // Define the deep link handler function
+    const handleDeepLink = (event: { url: string }) => {
+      console.log('Received deep link:', event.url);
+      // When we get a deep link, refresh the subscription status
+      refreshSubscription().then(() => {
+        // Navigate to messages tab after subscription is refreshed
+        router.replace('/(tabs)/messages');
+      });
+    };
+    
+    let subscription: { remove: () => void } | null = null;
+    
     try {
       setIsProcessing(true);
       setSelectedPlan(planId);
       
-      // 1. Create an order first
+      // If iOS use IAP, Android -> redirect to website
+      if (Platform.OS === 'ios') {
+        const productId = planId === 'daily' ? IOS_PRODUCT_IDS.daily : IOS_PRODUCT_IDS.monthly;
+        await purchaseItem(productId);
+        // After purchaseListener verifies and backend verifies, refresh subscription
+        await refreshSubscription();
+        router.replace('/(tabs)/messages');
+        return;
+      }
+
+      // For Android/Web: Create order and initiate payment
       const { orderId } = await createOrder(planId);
+      const { paymentId, authorizationUrl, reference } = await initiatePayment(orderId, planId);
+      await storePaymentAttempt({ paymentId, orderId, reference, planId });
       
-      // 2. Initiate payment with the order ID
-      const { paymentId, authorizationUrl, reference } = await initiatePayment(orderId);
-      
-      // 3. Store payment attempt for recovery
-      await storePaymentAttempt({
-        paymentId,
-        orderId,
-        reference,
-        planId,
-      });
-      
-      // 4. In a real app, you would open the payment URL in a WebView or deep link
-      console.log('Payment URL:', authorizationUrl);
-      
-      // 5. For demo purposes, we'll simulate a successful payment
-      // In a real app, you would:
-      // - Open WebView with the authorization URL
-      // - Listen for payment completion
-      // - Verify payment status
-      // - Update subscription status
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // 6. Refresh subscription status
-      await refreshSubscription();
-      
-      // 7. Navigate to success screen
-      router.replace('/(tabs)/messages');
+      // Open the payment URL in the browser
+      if (authorizationUrl) {
+        // Add the event listener
+        subscription = Linking.addEventListener('url', handleDeepLink);
+        
+        // Check if we can open the URL
+        const canOpen = await Linking.canOpenURL(authorizationUrl);
+        if (!canOpen) {
+          throw new Error('Cannot open payment URL');
+        }
+        
+        // Open the payment URL in the browser
+        await Linking.openURL(authorizationUrl);
+        
+        // Clean up the listener after 10 minutes
+        setTimeout(() => {
+          if (subscription) {
+            subscription.remove();
+          }
+        }, 600000); // 10 minutes
+      }
     } catch (error) {
       console.error('Payment error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to process payment. Please try again.';
       showToast(errorMessage, 'error');
     } finally {
+      // Clean up the subscription if it was created
+      if (subscription) {
+        subscription.remove();
+      }
       setSelectedPlan(null);
       setIsProcessing(false);
     }
   };
+
+  React.useEffect(() => {
+    connectToIAP();
+    return () => {
+      disconnectIAP();
+    };
+  }, []);
 
   return (
     <ScrollView style={styles.container}>

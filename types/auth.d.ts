@@ -29,4 +29,5 @@ export type SignInCredentials = {
 
 export type SignUpData = SignInCredentials & {
   name: string;
+  sexualOrientation?: string;
 };

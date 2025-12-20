@@ -8,12 +8,12 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Image,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator, Image,
+    ScrollView,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 
 const ProfileSetup = () => {
@@ -49,29 +49,31 @@ const ProfileSetup = () => {
 
   const pickImage = async () => {
     try {
-      console.log('📱 [Image Picker] Requesting permissions');
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      // Suppress permission logs
+      const originalConsoleLog = console.log;
+      console.log = (...args) => {
+        if (!(typeof args[0] === 'string' && args[0].includes('Image Picker'))) {
+          originalConsoleLog(...args);
+        }
+      };
 
-      if (status !== 'granted') {
-        showToast('Please allow access to your photo library to upload images.', 'error');
-        return;
-      }
+      const mediaTypes = (ImagePicker as any).MediaType?.Images ?? (ImagePicker as any).MediaTypeOptions?.Images ?? 'Images';
 
-      console.log('📱 [Image Picker] Launching image picker');
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes,
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
       });
 
+      // Restore original console.log
+      console.log = originalConsoleLog;
+
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        console.log('📱 [Image Picker] Image selected, starting upload');
         setIsUploading(true);
         const uri = result.assets[0].uri;
         const imageUrl = await uploadToCloudinary(uri);
         setPhotos(prev => [...prev, imageUrl]);
-        console.log('✅ [Image Picker] Image uploaded successfully');
       }
     } catch (error) {
       console.error('❌ [Image Picker] Error:', error);
@@ -191,6 +193,44 @@ const ProfileSetup = () => {
       setIsLoading(false);
     }
   };
+
+  const handleSkip = async () => {
+    try {
+      // Clear any temporary data and profile setup flag
+      await Promise.all([
+        Storage.deleteItem('tempUser'),
+        Storage.deleteItem('needsProfileSetup')
+      ]);
+      
+      // Navigate to home screen
+      router.replace({
+        pathname: '/(tabs)',
+        params: { screen: 'swipe' }
+      });
+    } catch (err) {
+      console.error('Error skipping profile setup:', err);
+      showToast('Failed to skip setup. Please try again.', 'error');
+    }
+  };
+
+  // const handleSkip = async () => {
+  //   try {
+  //     // Clear any temporary data and profile setup flag
+  //     await Promise.all([
+  //       Storage.deleteItem('tempUser'),
+  //       Storage.deleteItem('needsProfileSetup')
+  //     ]);
+      
+  //     // Navigate to home screen
+  //     router.replace({
+  //       pathname: '/(tabs)',
+  //       params: { screen: 'swipe' }
+  //     });
+  //   } catch (err) {
+  //     console.error('Error skipping profile setup:', err);
+  //     showToast('Failed to skip setup. Please try again.', 'error');
+  //   }
+  // };
 
   const handleBack = () => {
     if (step > 1) setStep(step - 1);
@@ -395,21 +435,36 @@ const ProfileSetup = () => {
         {renderStep()}
       </ScrollView>
 
-      {/* Footer Action Button */}
+      {/* Footer Action Buttons */}
       <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.button, (!canProceed() || isLoading) && styles.buttonDisabled]}
-          onPress={handleNext}
-          disabled={!canProceed() || isLoading}
-        >
-          {isLoading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <PoppinsText style={styles.buttonText}>
-              {step === 4 ? 'Complete Profile' : 'Continue'}
+        <View style={styles.buttonRow}>
+          <TouchableOpacity
+            style={[styles.button, styles.skipButton]}
+            onPress={handleSkip}
+            disabled={isLoading}
+          >
+            <PoppinsText style={styles.skipButtonText}>
+              Skip for Now
             </PoppinsText>
-          )}
-        </TouchableOpacity>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.button, 
+              styles.continueButton, 
+              (!canProceed() || isLoading) && styles.buttonDisabled
+            ]}
+            onPress={handleNext}
+            disabled={!canProceed() || isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <PoppinsText style={styles.buttonText}>
+                {step === 4 ? 'Complete Profile' : 'Continue'}
+              </PoppinsText>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -555,11 +610,22 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#E0E0E0',
   },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
   button: {
-    backgroundColor: '#651B55',
+    flex: 1,
     borderRadius: 30,
     padding: 18,
     alignItems: 'center',
+  },
+  continueButton: {
+    backgroundColor: '#651B55',
+  },
+  skipButton: {
+    backgroundColor: '#F0F0F0',
   },
   buttonDisabled: {
     backgroundColor: '#D1C4E9',
@@ -568,6 +634,11 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  skipButtonText: {
+    color: '#666',
+    fontSize: 16,
+    fontWeight: '600',
   },
   errorContainer: {
     backgroundColor: '#FFEBEE',

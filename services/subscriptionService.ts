@@ -2,7 +2,37 @@ import { getApiUrl } from '@/config/api';
 import { SubscriptionPlan, UserSubscription } from '@/types/subscription';
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
-import { Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
+
+export type OrderResponse = {
+  id: string;
+  user_id: string;
+  amount: number;
+  status: string;
+};
+
+export type InitializePaymentResponse = {
+  payment_url: string;
+  redirect_url: string;
+  reference: string;
+  provider_transaction_id: string;
+  amount: number;
+  planType: string;
+};
+
+export type VerifyPaymentResponse = {
+  paid: boolean;
+  planType: string;
+  expiryDate: string;
+  message: string;
+};
+
+export type AccessStatusResponse = {
+  hasAccess: boolean;
+  planType?: string;
+  expiryDate?: string;
+  reference?: string;
+};
 
 // Dummy subscription data for development
 const DUMMY_SUBSCRIPTION: UserSubscription = {
@@ -48,13 +78,11 @@ const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
 
 // Helper function to get auth token
 const getAuthToken = async (): Promise<string | null> => {
-  // In development, return a dummy token
-  if (__DEV__) {
-    return 'dummy_auth_token';
-  }
-  
   try {
     const token = await SecureStore.getItemAsync('auth_token');
+    if (!token) {
+      console.warn('No auth token found in SecureStore');
+    }
     return token;
   } catch (error) {
     console.error('Error getting auth token:', error);
@@ -82,37 +110,29 @@ export const getSubscriptionPlans = (): SubscriptionPlan[] => {
 };
 
 export const getActiveSubscription = async (): Promise<UserSubscription | null> => {
-  // In development, return the dummy subscription
-  if (__DEV__) {
-    console.log('Using dummy subscription data for development');
-    return DUMMY_SUBSCRIPTION;
-  }
-
   try {
-    const headers = await createHeaders();
-    const response = await fetch(getApiUrl('/subscriptions/me'), {
-      method: 'GET',
-      headers,
-    });
+    // First check chat access status
+    const accessStatus = await checkChatAccess();
     
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('Subscription fetch failed:', {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorData
-      });
-      
-      if (response.status === 401 || response.status === 403) {
-        return null;
-      }
-      
-      throw new Error(`Failed to fetch subscription: ${response.status}`);
+    if (!accessStatus.hasAccess) {
+      console.log('No active subscription found or access not granted');
+      return null;
     }
     
-    return await response.json();
+    // If we have access, return a subscription object
+    return {
+      id: `sub_${Date.now()}`,
+      userId: '', // This will be filled in by the backend
+      planId: accessStatus.planType || 'premium',
+      status: 'active',
+      startDate: new Date().toISOString(),
+      endDate: accessStatus.expiryDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      paymentReference: accessStatus.reference || '',
+      amount: 0, // This should be set by the backend
+      currency: 'USD' // Default currency
+    };
   } catch (error) {
-    console.error('Error fetching subscription:', error);
+    console.error('Error checking subscription status:', error);
     return null;
   }
 };
@@ -157,7 +177,7 @@ export const createOrder = async (planId: string): Promise<CreateOrderResponse> 
   }
 };
 
-export const initiatePayment = async (orderId: string): Promise<{ 
+export const initiatePayment = async (orderId: string, planId: string): Promise<{ 
   paymentId: string;
   authorizationUrl: string; 
   reference: string;
@@ -168,16 +188,41 @@ export const initiatePayment = async (orderId: string): Promise<{
       'Idempotency-Key': idempotencyKey,
     });
     
-    const callbackUrl = Platform.OS === 'web' 
-      ? `${window.location.origin}/payment-callback` 
-      : 'pairfect://payment-callback';
+    // For web, use the payment-callback route
+    // For mobile, use a deep link that will open the app
+    let callbackUrl: string;
+    
+    if (Platform.OS === 'web') {
+      // For web, redirect to a dedicated payment callback page
+      callbackUrl = `${window.location.origin}/payment-callback`;
+    } else {
+      // For mobile, use a deep link that will open the app
+      // Include the order ID and plan ID in the callback URL for verification
+      callbackUrl = `pairfect://payment-callback?orderId=${orderId}&planId=${planId}`;
+      
+      // Also handle the case where the app is opened via the callback URL
+      const handleDeepLink = (event: { url: string }) => {
+        // Handle the deep link here if needed
+        console.log('Received deep link:', event.url);
+      };
+      
+      // Add the event listener
+      Linking.addEventListener('url', handleDeepLink);
+      
+      // Clean up the event listener when done
+      setTimeout(() => {
+        Linking.removeAllListeners('url');
+      }, 10000); // Clean up after 10 seconds
+    }
     
     const response = await fetch(getApiUrl('/subscriptions/initiate-payment'), {
       method: 'POST',
       headers,
       body: JSON.stringify({
         orderId,
+        planId,
         callbackUrl,
+        platform: Platform.OS
       }),
     });
     
@@ -197,33 +242,42 @@ export const initiatePayment = async (orderId: string): Promise<{
   }
 };
 
-export const verifyPayment = async (reference: string): Promise<{ 
-  success: boolean; 
-  subscription?: UserSubscription;
-  message?: string;
-}> => {
+// Verify iOS in-app purchase receipt with backend
+export const verifyIapReceipt = async (receiptData: string, productId?: string): Promise<{ success: boolean; subscription?: UserSubscription; message?: string }> => {
   try {
-    const headers = await createHeaders();
-    const response = await fetch(getApiUrl(`/subscriptions/verify-payment/${reference}`), {
-      method: 'GET',
-      headers,
+    const headers = await createHeaders({
+      'Content-Type': 'application/json',
     });
-    
+
+    const response = await fetch(getApiUrl('api/payments/verify-iap'), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        receipt: receiptData,
+        productId,
+        platform: 'ios'
+      })
+    });
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('Payment verification failed:', {
-        status: response.status,
-        error: errorData
-      });
-      throw new Error(errorData.message || 'Payment verification failed');
+      const error = await response.json();
+      return {
+        success: false,
+        message: error.message || 'Failed to verify receipt'
+      };
     }
-    
-    return await response.json();
+
+    const data = await response.json();
+    return {
+      success: true,
+      subscription: data.subscription,
+      message: data.message
+    };
   } catch (error) {
-    console.error('Error verifying payment:', error);
-    return { 
-      success: false, 
-      message: error instanceof Error ? error.message : 'Payment verification failed'
+    console.error('Error verifying receipt:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'An unknown error occurred'
     };
   }
 };
@@ -249,7 +303,7 @@ export const storePaymentAttempt = async (paymentData: {
     ];
     
     // Store all payments under a single key
-    await SecureStore.setItemAsync(
+    return SecureStore.setItemAsync(
       'pending_payments',
       JSON.stringify(updatedPayments)
     );
@@ -279,7 +333,7 @@ export const clearPaymentAttempt = async (paymentId: string): Promise<void> => {
   try {
     const payments = await getPendingPayments();
     const updatedPayments = payments.filter(payment => payment.paymentId !== paymentId);
-    await SecureStore.setItemAsync('pending_payments', JSON.stringify(updatedPayments));
+    return SecureStore.setItemAsync('pending_payments', JSON.stringify(updatedPayments));
   } catch (error) {
     console.error('Error clearing payment attempt:', error);
     throw error;
@@ -289,13 +343,22 @@ export const clearPaymentAttempt = async (paymentId: string): Promise<void> => {
 // Utility function to check if user has active subscription
 export const hasActiveSubscription = async (): Promise<boolean> => {
   try {
-    const subscription = await getActiveSubscription();
-    if (!subscription) return false;
+    console.log('Checking chat access status...');
+    const { hasAccess, planType, expiryDate } = await checkChatAccess();
+    console.log(`Chat access status: ${hasAccess ? 'GRANTED' : 'DENIED'}`);
     
-    const expiresAt = new Date(subscription.endDate);
-    return expiresAt > new Date();
+    if (hasAccess) {
+      console.log(`Subscription details - Plan: ${planType || 'N/A'}, Expires: ${expiryDate || 'N/A'}`);
+    } else {
+      console.warn('No active subscription found or access denied');
+    }
+    
+    return hasAccess;
   } catch (error) {
-    console.error('Error checking subscription status:', error);
+    console.error('Error checking subscription status:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    });
     return false;
   }
 };
@@ -303,19 +366,198 @@ export const hasActiveSubscription = async (): Promise<boolean> => {
 // Clean up expired payment attempts (older than 24 hours)
 export const cleanupExpiredPayments = async (): Promise<void> => {
   try {
-    const payments = await getPendingPayments();
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    
-    const validPayments = payments.filter(payment => {
-      const paymentDate = new Date(payment.timestamp);
-      return paymentDate > oneDayAgo;
-    });
-    
-    if (validPayments.length !== payments.length) {
-      await SecureStore.setItemAsync('pending_payments', JSON.stringify(validPayments));
-      console.log(`Cleaned up ${payments.length - validPayments.length} expired payment attempts`);
+    const pendingPayments = await getPendingPayments();
+    const now = Date.now();
+    const twentyFourHoursAgo = now - 24 * 60 * 60 * 1000;
+
+    for (const payment of pendingPayments) {
+      const paymentTime = new Date(payment.timestamp).getTime();
+      if (paymentTime < twentyFourHoursAgo) {
+        await clearPaymentAttempt(payment.paymentId);
+      }
     }
   } catch (error) {
     console.error('Error cleaning up expired payments:', error);
   }
+};
+
+/**
+ * Create a new payment order
+ */
+export const createPaymentOrder = async (amount: number): Promise<OrderResponse> => {
+  const headers = await createHeaders();
+  const idempotencyKey = generateIdempotencyKey();
+  
+  const response = await fetch(getApiUrl('/api/subscriptions/orders'), {
+    method: 'POST',
+    headers: {
+      ...headers,
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify({ amount, id: idempotencyKey }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to create payment order');
+  }
+
+  const data = await response.json();
+  return data.data;
+};
+
+/**
+ * Initialize payment with payment provider
+ */
+export const initializeChatPayment = async (
+  orderId: string,
+  planType: string,
+  callbackUrl?: string
+): Promise<InitializePaymentResponse> => {
+  const headers = await createHeaders();
+  const payload: any = { orderId, planType };
+  
+  if (callbackUrl) {
+    payload.callbackUrl = callbackUrl;
+  }
+
+  const response = await fetch(getApiUrl('/api/payments/chat/initialize'), {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to initialize payment');
+  }
+
+  const data = await response.json();
+  return data.data;
+};
+
+/**
+ * Verify payment status
+ */
+export const verifyChatPayment = async (
+  reference: string,
+  token?: string
+): Promise<VerifyPaymentResponse> => {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  // Add auth header if token is provided
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  } else {
+    const authToken = await getAuthToken();
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+  }
+
+  const response = await fetch(getApiUrl('/api/payments/chat/verify'), {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ reference }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to verify payment');
+  }
+
+  return await response.json();
+};
+
+/**
+ * Check chat access status
+ */
+export const checkChatAccess = async (): Promise<AccessStatusResponse> => {
+  try {
+    const headers = await createHeaders();
+    const url = getApiUrl('payments/chat/access');
+    
+    console.log('Checking chat access at:', url);
+    const response = await fetch(url, {
+      headers,
+      credentials: 'include' // Include cookies if needed
+    });
+
+    const responseText = await response.text();
+    let data;
+    
+    try {
+      data = responseText ? JSON.parse(responseText) : {};
+    } catch (e) {
+      console.error('Failed to parse response as JSON:', responseText);
+      throw new Error(`Invalid response format: ${responseText.substring(0, 100)}...`);
+    }
+
+    if (!response.ok) {
+      console.error('Chat access check failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        url,
+        response: data
+      });
+      
+      // Return default access denied if it's a 401 or 403
+      if (response.status === 401 || response.status === 403) {
+        return { hasAccess: false };
+      }
+      
+      throw new Error(`Failed to check chat access: ${response.status} - ${response.statusText}`);
+    }
+
+    console.log('Chat access response:', data);
+    return data;
+  } catch (error) {
+    console.error('Error checking chat access:', error);
+    // Return default access denied on error
+    return { hasAccess: false };
+  }
+};
+
+/**
+ * Get subscription plans from the server
+ */
+export const fetchSubscriptionPlans = async (): Promise<SubscriptionPlan[]> => {
+  const response = await fetch(getApiUrl('/api/payments/subscription/plans'));
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch subscription plans');
+  }
+
+  const data = await response.json();
+  return data.data || [];
+};
+
+/**
+ * Verify in-app purchase receipt
+ */
+export const verifyInAppPurchase = async (
+  provider: 'apple' | 'google',
+  receipt: string,
+  productId?: string
+): Promise<{ reference: string }> => {
+  const headers = await createHeaders();
+  
+  const response = await fetch(getApiUrl('/api/subscriptions/verify-iap'), {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ 
+      provider, 
+      receipt, 
+      ...(productId && { productId }) 
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to verify in-app purchase');
+  }
+
+  const data = await response.json();
+  return data.data;
 };

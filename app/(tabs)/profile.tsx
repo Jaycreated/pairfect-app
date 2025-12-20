@@ -9,15 +9,16 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Dimensions,
-  Image,
-  Modal, Platform, ScrollView,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View
+    ActivityIndicator,
+    Dimensions,
+    Image,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View
 } from 'react-native';
 
 interface UserProfile {
@@ -193,28 +194,29 @@ export default function ProfileScreen() {
       return;
     }
 
-    // Request permission to access the photo library
-    if (Platform.OS !== 'web') {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        showToast('We need access to your photo library to upload images.', 'warning');
-        return;
-      }
-    }
-
     try {
+      // Suppress permission logs
+      const originalConsoleLog = console.log;
+      console.log = (...args) => {
+        if (!(typeof args[0] === 'string' && args[0].includes('Image Picker'))) {
+          originalConsoleLog(...args);
+        }
+      };
+
+      const mediaTypes = (ImagePicker as any).MediaType?.Images ?? (ImagePicker as any).MediaTypeOptions?.Images ?? 'Images';
+
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
       });
 
+      // Restore original console.log
+      console.log = originalConsoleLog;
+
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const selectedImage = result.assets[0];
-        
-        // In a real app, you would upload the image to your server here
-        // For now, we'll just add the local URI to the photos array
         setProfile({
           ...profile,
           photos: [...profile.photos, selectedImage.uri]

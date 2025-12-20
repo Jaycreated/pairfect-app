@@ -1,9 +1,16 @@
+import { PoppinsText } from '@/components/PoppinsText';
 import { useAuth } from '@/context/AuthContext';
+import { useSubscription } from '@/context/SubscriptionContext';
+import { useToast } from '@/context/ToastContext';
 import { api } from '@/services/api';
+import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
+  Linking,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -15,7 +22,10 @@ import {
 const ChatScreen = () => {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
+  const { subscription, refreshSubscription } = useSubscription();
   const router = useRouter();
+  const { showToast } = useToast();
+  const [requiresSubscription, setRequiresSubscription] = useState(false);
   
   const [messages, setMessages] = useState<Array<{
     id: string;
@@ -37,6 +47,31 @@ const ChatScreen = () => {
         setIsLoading(true);
         const response = await api.getMessages(id);
         
+        // Check for subscription required error
+        if (response.error) {
+          const msg = (response.error.message || '').toString().toLowerCase();
+          const status = response.error.status as number | undefined;
+          const code = (response.error.code || '').toString();
+
+          // Detect subscription-required responses
+          const isSubscriptionRequired =
+            status === 402 ||
+            status === 403 ||
+            code === 'SUBSCRIPTION_REQUIRED' ||
+            msg.includes('subscription') ||
+            msg.includes('payment required') ||
+            msg.includes('active subscription') ||
+            msg.includes('upgrade') ||
+            msg.includes('premium');
+
+          if (isSubscriptionRequired) {
+            setRequiresSubscription(true);
+            return;
+          }
+          
+          throw new Error(response.error.message || 'Failed to load messages');
+        }
+
         if (response?.data?.messages) {
           const formattedMessages = response.data.messages.map((msg: any) => ({
             id: String(msg.id || `msg-${Date.now()}`),
@@ -46,20 +81,56 @@ const ChatScreen = () => {
           }));
           
           setMessages(formattedMessages);
+          setRequiresSubscription(false);
         }
       } catch (error) {
         console.error('Error loading messages:', error);
+        showToast('Failed to load messages. Please try again.', 'error');
       } finally {
         setIsLoading(false);
       }
     };
     
     loadMessages();
-  }, [id]);
+  }, [id, subscription]);
+
+  // Handle subscription button press
+  const handleSubscribe = async () => {
+    try {
+      // Default to the production subscribe URL if not provided in env
+      const baseUrl = process.env.EXPO_PUBLIC_SUBSCRIBE_URL 
+        ? `${process.env.EXPO_PUBLIC_SUBSCRIBE_URL}/pricing` 
+        : 'https://dating-g2mc.onrender.com/pricing';
+      
+      // On iOS, use in-app subscription flow
+      if (Platform.OS === 'ios') {
+        router.push('/screens/subscribe' as any);
+        return;
+      }
+
+      // On Android, open external browser with deep link back
+      const timestamp = Date.now();
+      const callbackUrl = `pairfect://messages/${id}?ts=${timestamp}`;
+      const externalSubscribeUrl = `${baseUrl}?redirect_uri=${encodeURIComponent(callbackUrl)}`;
+      
+      const supported = await Linking.canOpenURL(externalSubscribeUrl);
+      if (supported) {
+        await Linking.openURL(externalSubscribeUrl);
+      } else {
+        throw new Error('Cannot open subscription URL');
+      }
+    } catch (error) {
+      console.error('Failed to open subscribe URL:', error);
+      showToast('Failed to open subscription page. Please try again.', 'error');
+    }
+  };
+
+  // Check if user can send messages
+  const canSendMessage = !requiresSubscription && user?.id && id;
 
   // Handle sending a new message
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !user?.id || !id) return;
+    if (!newMessage.trim() || !canSendMessage) return;
     
     const tempId = `temp-${Date.now()}`;
     const messageToSend = {
@@ -75,16 +146,29 @@ const ChatScreen = () => {
     
     try {
       // Send the message via API
-      await api.sendMessage(id, {
+      const response = await api.sendMessage(id, {
         content: newMessage,
         senderId: user.id,
         recipientId: id,
       });
+
+      // Check for subscription required error in response
+      if (response?.error) {
+        const msg = (response.error.message || '').toString().toLowerCase();
+        if (msg.includes('subscription') || msg.includes('payment required')) {
+          setRequiresSubscription(true);
+          // Remove the optimistic message
+          setMessages(prev => prev.filter(msg => msg.id !== tempId));
+          setNewMessage(messageToSend.text);
+          return;
+        }
+        throw new Error(response.error.message || 'Failed to send message');
+      }
       
       // Refresh messages
-      const response = await api.getMessages(id);
-      if (response?.data?.messages) {
-        setMessages(response.data.messages.map((msg: any) => ({
+      const messagesResponse = await api.getMessages(id);
+      if (messagesResponse?.data?.messages) {
+        setMessages(messagesResponse.data.messages.map((msg: any) => ({
           id: String(msg.id),
           text: msg.content || '',
           senderId: String(msg.senderId || ''),
@@ -97,6 +181,7 @@ const ChatScreen = () => {
       // Remove the optimistic message on error
       setMessages(prev => prev.filter(msg => msg.id !== tempId));
       setNewMessage(messageToSend.text); // Restore the message
+      showToast('Failed to send message. Please try again.', 'error');
     }
   };
 
@@ -125,10 +210,69 @@ const ChatScreen = () => {
     );
   };
 
+  // Show subscription required overlay if needed
+  if (requiresSubscription) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.subscriptionOverlay}>
+          <View style={styles.subscriptionContent}>
+            <Ionicons name="lock-closed" size={60} color="#651B55" style={styles.lockIcon} />
+            <PoppinsText style={styles.subscriptionTitle}>
+              Upgrade to Premium
+            </PoppinsText>
+            <PoppinsText style={styles.subscriptionText}>
+              Subscribe to unlock unlimited messaging and connect with your matches
+            </PoppinsText>
+            <TouchableOpacity
+              style={styles.subscribeButton}
+              onPress={handleSubscribe}
+              accessibilityLabel="Subscribe to unlock chat"
+            >
+              <PoppinsText style={styles.subscribeButtonText}>
+                Subscribe Now
+              </PoppinsText>
+            </TouchableOpacity>
+          </View>
+        </View>
+        
+        {/* Show blurred messages in the background */}
+        <View style={styles.blurredContainer}>
+          {messages.length > 0 && (
+            <FlatList
+              data={messages}
+              keyExtractor={(item) => item.id}
+              renderItem={renderMessage}
+              contentContainerStyle={styles.messagesList}
+              style={{ opacity: 0.5 }}
+            />
+          )}
+        </View>
+        
+        {/* Disabled input */}
+        <View style={[styles.inputContainer, { opacity: 0.5 }]}>
+          <TextInput
+            style={styles.messageInput}
+            placeholder="Subscribe to send messages"
+            placeholderTextColor="#999"
+            editable={false}
+            multiline
+          />
+          <TouchableOpacity 
+            style={[styles.sendButton, styles.sendButtonDisabled]}
+            disabled={true}
+          >
+            <Text style={styles.sendButtonText}>Send</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <Text>Loading messages...</Text>
+        <ActivityIndicator size="large" color="#651B55" />
+        <PoppinsText style={styles.loadingText}>Loading messages...</PoppinsText>
       </View>
     );
   }
@@ -154,14 +298,18 @@ const ChatScreen = () => {
           style={styles.messageInput}
           value={newMessage}
           onChangeText={setNewMessage}
-          placeholder="Type a message..."
+          placeholder={canSendMessage ? "Type a message..." : "Subscribe to send messages"}
           placeholderTextColor="#999"
           multiline
+          editable={!!canSendMessage}
         />
         <TouchableOpacity 
-          style={[styles.sendButton, !newMessage.trim() && styles.sendButtonDisabled]}
+          style={[
+            styles.sendButton, 
+            (!newMessage.trim() || !canSendMessage) && styles.sendButtonDisabled
+          ]}
           onPress={handleSendMessage}
-          disabled={!newMessage.trim()}
+          disabled={!newMessage.trim() || !canSendMessage}
         >
           <Text style={styles.sendButtonText}>Send</Text>
         </TouchableOpacity>
@@ -174,6 +322,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+    position: 'relative',
   },
   messagesContainer: {
     flex: 1,
@@ -183,6 +332,70 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#fff',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#666',
+    fontFamily: 'Poppins_400Regular',
+  },
+  subscriptionOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+    padding: 20,
+  },
+  subscriptionContent: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 25,
+    width: '90%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+    alignItems: 'center',
+  },
+  lockIcon: {
+    marginBottom: 15,
+  },
+  subscriptionTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 10,
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  subscriptionText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 25,
+    lineHeight: 24,
+    fontFamily: 'Poppins_400Regular',
+  },
+  subscribeButton: {
+    backgroundColor: '#651B55',
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 30,
+    width: '100%',
+    alignItems: 'center',
+  },
+  subscribeButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  blurredContainer: {
+    flex: 1,
+    opacity: 0.5,
+    filter: 'blur(2px)',
   },
   messagesList: {
     padding: 16,

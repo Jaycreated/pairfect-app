@@ -3,17 +3,20 @@ import { useAuth } from '@/context/AuthContext';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { useToast } from '@/context/ToastContext';
 import { api } from '@/services/api';
+import { Storage } from '@/utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Image, Linking, RefreshControl,
+  Image, Linking,
+  Platform,
+  RefreshControl,
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
 
 // ============================================================================
@@ -99,7 +102,7 @@ const formatMessageTime = (timestamp: string): string => {
 
   // Older than a week - show date
   const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
-  
+
   // If different year, add year
   if (messageDate.getFullYear() !== now.getFullYear()) {
     options.year = 'numeric';
@@ -113,10 +116,10 @@ const formatMessageTime = (timestamp: string): string => {
  */
 const transformApiConversation = (conv: ApiConversation): ConversationType => {
   // Use the first photo as avatar if available, otherwise fallback to avatar or placeholder
-  const avatar = Array.isArray(conv.photos) && conv.photos.length > 0 
-    ? conv.photos[0] 
+  const avatar = Array.isArray(conv.photos) && conv.photos.length > 0
+    ? conv.photos[0]
     : conv.avatar || 'https://via.placeholder.com/56';
-    
+
   return {
     id: String(conv.id || conv._id || ''),
     user: {
@@ -158,7 +161,7 @@ const ConversationItem = React.memo<ConversationItemProps>(({ item, onPress }) =
         style={styles.avatar}
         accessibilityLabel={`${item.user.name}'s avatar`}
       />
-      
+
       <View style={styles.conversationContent}>
         {/* Header: Name and Time */}
         <View style={styles.conversationHeader}>
@@ -237,7 +240,7 @@ const MessagesScreen = () => {
    */
   useEffect(() => {
     isMountedRef.current = true;
-    
+
     return () => {
       isMountedRef.current = false;
     };
@@ -273,7 +276,7 @@ const MessagesScreen = () => {
       } else {
         setIsLoading(true);
       }
-      
+
       setError(null);
 
       console.log('[fetchConversations] Making API request to get conversations');
@@ -288,8 +291,20 @@ const MessagesScreen = () => {
       if (response.error) {
         const msg = (response.error.message || '').toString().toLowerCase();
         const status = response.error.status as number | undefined;
+        const code = (response.error.code || '').toString();
 
-        if (status === 402 || msg.includes('subscription') || msg.includes('payment required') || msg.includes('active subscription')) {
+        // Detect subscription-required responses from various providers/backends
+        const isSubscriptionRequired =
+          status === 402 ||
+          status === 403 ||
+          code === 'SUBSCRIPTION_REQUIRED' ||
+          msg.includes('subscription') ||
+          msg.includes('payment required') ||
+          msg.includes('active subscription') ||
+          msg.includes('upgrade') ||
+          msg.includes('premium');
+
+        if (isSubscriptionRequired) {
           console.warn('[fetchConversations] Server requires active subscription:', response.error);
           // Try to refresh local subscription state from server
           try {
@@ -310,9 +325,9 @@ const MessagesScreen = () => {
 
       // Type assertion for the response data
       const conversationsData = response.data as ApiConversation[];
-      
+
       // Log the transformed data for debugging
-      console.log('[fetchConversations] Transformed conversations data:', 
+      console.log('[fetchConversations] Transformed conversations data:',
         JSON.stringify(conversationsData, null, 2)
       );
 
@@ -320,24 +335,25 @@ const MessagesScreen = () => {
         console.log('[fetchConversations] Component unmounted, aborting state update');
         return;
       }
-
       if (response.error) {
-        throw new Error(response.error.message || 'Failed to fetch conversations');
+        const errorMessage = typeof response.error === 'object' && response.error !== null
+          ? (response.error as { message?: string }).message
+          : 'Failed to fetch conversations';
+        throw new Error(errorMessage);
       }
-
       if (conversationsData && Array.isArray(conversationsData)) {
         console.log('[fetchConversations] Processing', conversationsData.length, 'conversations');
-        
+
         if (conversationsData.length === 0) {
           console.log('[fetchConversations] No conversations found');
           setConversations([]);
           return;
         }
-        
+
         const formattedConversations = conversationsData.map(transformApiConversation);
-        
+
         // Sort by most recent first
-        formattedConversations.sort((a, b) => 
+        formattedConversations.sort((a, b) =>
           new Date(b.time).getTime() - new Date(a.time).getTime()
         );
 
@@ -510,26 +526,88 @@ const MessagesScreen = () => {
    * Falls back to the in-app subscribe screen if no external URL is configured.
    */
   if (!subscription || requiresSubscription) {
-    // Default to the production subscribe URL if not provided in env
-    const externalSubscribeUrl = process.env.EXPO_PUBLIC_SUBSCRIBE_URL ?? 'https://dating-g2mc.onrender.com/';
+    // Default to the production pricing URL if not provided in env
+    const baseUrl = process.env.EXPO_PUBLIC_SUBSCRIBE_URL 
+      ? `${process.env.EXPO_PUBLIC_SUBSCRIBE_URL}/pricing` 
+      : 'https://dating-g2mc.onrender.com/pricing';
+    
+    // Create a deep link that will redirect back to the app after subscription
+    const callbackUrl = 'pairfect://messages';
+    const externalSubscribeUrl = `${baseUrl}?redirect_uri=${encodeURIComponent(callbackUrl)}`;
 
-    const handleOpenSubscribe = async () => {
+    const verifySubscription = async () => {
       try {
-        if (externalSubscribeUrl) {
-          const supported = await Linking.canOpenURL(externalSubscribeUrl);
-          if (supported) {
-            await Linking.openURL(externalSubscribeUrl);
-            return;
+        const response = await fetch('https://dating-g2mc.onrender.com/api/subscription/status', {
+          headers: {
+            'Authorization': `Bearer ${user?.token || ''}`
           }
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to verify subscription');
         }
-
-        // Fallback to in-app subscribe screen
-        router.push('/screens/subscribe' as any);
-      } catch (err) {
-        console.error('Failed to open subscribe URL:', err);
-        router.push('/screens/subscribe' as any);
+        
+        const data = await response.json();
+        if (data.isActive) {
+          await refreshSubscription();
+        } else {
+          throw new Error('Subscription not active');
+        }
+      } catch (error) {
+        console.error('Subscription verification failed:', error);
+        throw error;
       }
     };
+
+   const handleOpenSubscribe = async () => {
+  try {
+    // On iOS we prefer the in-app subscribe screen (IAP).
+    if (Platform.OS === 'ios') {
+      router.push('/screens/subscribe' as any);
+      return;
+    }
+
+    // Get the auth token
+    const token = await Storage.getItem('auth_token');
+    if (!token) {
+      showToast('Please log in to subscribe', 'error');
+      return;
+    }
+
+    // Add a timestamp to make each redirect unique
+    const timestamp = Date.now();
+    const callbackUrl = `pairfect://messages?ts=${timestamp}`;
+    const externalSubscribeUrl = `${baseUrl}?redirect_uri=${encodeURIComponent(callbackUrl)}&token=${encodeURIComponent(token)}`;
+
+    console.log('Opening subscription URL:', externalSubscribeUrl);
+
+    // Set up deep link listener
+    const subscription = Linking.addEventListener('url', async (event) => {
+      console.log('App opened with URL:', event.url);
+      subscription.remove();
+
+      // Verify the subscription with your backend
+      try {
+        await verifySubscription();
+      } catch (error) {
+        console.error('Subscription verification failed:', error);
+        showToast('Failed to verify subscription. Please try again.', 'error');
+      }
+    });
+
+    // Open the subscription URL in the browser
+    const supported = await Linking.canOpenURL(externalSubscribeUrl);
+    if (supported) {
+      await Linking.openURL(externalSubscribeUrl);
+    } else {
+      throw new Error('Cannot open subscription URL');
+    }
+  } catch (err) {
+    console.error('Failed to open subscribe URL:', err);
+    // Fallback to in-app subscribe screen if external URL fails
+    router.push('/screens/subscribe' as any);
+  }
+};
 
     return (
       <View style={styles.subscriptionContainer}>
@@ -729,7 +807,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-    fontFamily: 'Poppins-SemiBold', 
+    fontFamily: 'Poppins-SemiBold',
   },
   emptyState: {
     flex: 1,

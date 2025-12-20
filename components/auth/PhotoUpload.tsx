@@ -20,11 +20,13 @@ export const PhotoUpload = ({ onPhotosSelected, onContinue }: PhotoUploadProps) 
 
   const pickImage = async (index: number) => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        showToast('We need camera roll permissions to upload photos', 'error');
-        return;
-      }
+      // Suppress permission logs
+      const originalConsoleLog = console.log;
+      console.log = (...args) => {
+        if (!(typeof args[0] === 'string' && args[0].includes('Image Picker'))) {
+          originalConsoleLog(...args);
+        }
+      };
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -33,10 +35,14 @@ export const PhotoUpload = ({ onPhotosSelected, onContinue }: PhotoUploadProps) 
         quality: 0.8,
       });
 
-      if (!result.canceled && result.assets && result.assets[0].uri) {
+      // Restore original console.log
+      console.log = originalConsoleLog;
+
+      if (!result.canceled && result.assets?.[0]?.uri) {
         const newPhotos = [...photos];
         newPhotos[index] = result.assets[0].uri;
         setPhotos(newPhotos);
+        onPhotosSelected(newPhotos.filter(photo => photo !== ''));
       }
     } catch (error) {
       console.error('Error picking image:', error);
