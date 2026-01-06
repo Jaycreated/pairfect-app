@@ -3,20 +3,18 @@ import { useAuth } from '@/context/AuthContext';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { useToast } from '@/context/ToastContext';
 import { api } from '@/services/api';
-import { Storage } from '@/utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Image, Linking,
-  Platform,
-  RefreshControl,
+  Image, Linking, RefreshControl,
   StyleSheet,
   TextInput,
   TouchableOpacity,
   View,
+  Platform,
 } from 'react-native';
 
 // ============================================================================
@@ -526,10 +524,10 @@ const MessagesScreen = () => {
    * Falls back to the in-app subscribe screen if no external URL is configured.
    */
   if (!subscription || requiresSubscription) {
-    // Default to the production pricing URL if not provided in env
+    // Default to the production subscribe URL if not provided in env
     const baseUrl = process.env.EXPO_PUBLIC_SUBSCRIBE_URL 
-      ? `${process.env.EXPO_PUBLIC_SUBSCRIBE_URL}/pricing` 
-      : 'https://dating-g2mc.onrender.com/pricing';
+      ? `${process.env.EXPO_PUBLIC_SUBSCRIBE_URL}/subscribe` 
+      : 'https://dating-g2mc.onrender.com/subscribe';
     
     // Create a deep link that will redirect back to the app after subscription
     const callbackUrl = 'pairfect://messages';
@@ -559,55 +557,46 @@ const MessagesScreen = () => {
       }
     };
 
-   const handleOpenSubscribe = async () => {
-  try {
-    // On iOS we prefer the in-app subscribe screen (IAP).
-    if (Platform.OS === 'ios') {
-      router.push('/screens/subscribe' as any);
-      return;
-    }
-
-    // Get the auth token
-    const token = await Storage.getItem('auth_token');
-    if (!token) {
-      showToast('Please log in to subscribe', 'error');
-      return;
-    }
-
-    // Add a timestamp to make each redirect unique
-    const timestamp = Date.now();
-    const callbackUrl = `pairfect://messages?ts=${timestamp}`;
-    const externalSubscribeUrl = `${baseUrl}?redirect_uri=${encodeURIComponent(callbackUrl)}&token=${encodeURIComponent(token)}`;
-
-    console.log('Opening subscription URL:', externalSubscribeUrl);
-
-    // Set up deep link listener
-    const subscription = Linking.addEventListener('url', async (event) => {
-      console.log('App opened with URL:', event.url);
-      subscription.remove();
-
-      // Verify the subscription with your backend
+    const handleOpenSubscribe = async () => {
       try {
-        await verifySubscription();
-      } catch (error) {
-        console.error('Subscription verification failed:', error);
-        showToast('Failed to verify subscription. Please try again.', 'error');
-      }
-    });
+        // On iOS we prefer the in-app subscribe screen (IAP).
+        if (Platform.OS === 'ios') {
+          router.push('/screens/subscribe' as any);
+          return;
+        }
 
-    // Open the subscription URL in the browser
-    const supported = await Linking.canOpenURL(externalSubscribeUrl);
-    if (supported) {
-      await Linking.openURL(externalSubscribeUrl);
-    } else {
-      throw new Error('Cannot open subscription URL');
-    }
-  } catch (err) {
-    console.error('Failed to open subscribe URL:', err);
-    // Fallback to in-app subscribe screen if external URL fails
-    router.push('/screens/subscribe' as any);
-  }
-};
+        // Add a timestamp to make each redirect unique
+        const timestamp = Date.now();
+        const callbackUrl = `pairfect://messages?ts=${timestamp}`;
+        const externalSubscribeUrl = `${baseUrl}?redirect_uri=${encodeURIComponent(callbackUrl)}`;
+
+        // Set up deep link listener
+        const subscription = Linking.addEventListener('url', async (event) => {
+          console.log('App opened with URL:', event.url);
+          subscription.remove();
+
+          // Verify the subscription with your backend
+          try {
+            await verifySubscription();
+          } catch (error) {
+            console.error('Subscription verification failed:', error);
+            showToast('Failed to verify subscription. Please try again.', 'error');
+          }
+        });
+
+        // Open the subscription URL in the browser
+        const supported = await Linking.canOpenURL(externalSubscribeUrl);
+        if (supported) {
+          await Linking.openURL(externalSubscribeUrl);
+        } else {
+          throw new Error('Cannot open subscription URL');
+        }
+      } catch (err) {
+        console.error('Failed to open subscribe URL:', err);
+        // Fallback to in-app subscribe screen if external URL fails
+        router.push('/screens/subscribe' as any);
+      }
+    };
 
     return (
       <View style={styles.subscriptionContainer}>

@@ -2,8 +2,10 @@
 import { useSubscription } from '@/context/SubscriptionContext';
 import { useToast } from '@/context/ToastContext';
 import { connectToIAP, disconnectIAP, IOS_PRODUCT_IDS, purchaseItem } from '@/services/iapService';
-import { createOrder, getSubscriptionPlans, initiatePayment, storePaymentAttempt } from '@/services/subscriptionService';
+import { initializePayment } from '@/services/paymentService';
+import { Storage } from '@/utils/storage';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -15,7 +17,26 @@ export default function SubscribeScreen() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   
-  const plans = getSubscriptionPlans();
+  const plans = [
+    {
+      id: 'daily',
+      name: 'Daily',
+      price: 300,
+      duration: 'day',
+      description: '24 hours chat access',
+      features: ['Unlimited messaging', 'Chat access for 24 hours'],
+      isPopular: true,
+    },
+    {
+      id: 'monthly',
+      name: 'Monthly',
+      price: 3000,
+      duration: 'month',
+      description: '30 days chat access',
+      features: ['Unlimited messaging', 'Chat access for 30 days'],
+      isPopular: false,
+    },
+  ];
 
   const handleSubscribe = async (planId: string) => {
     if (isProcessing) return;
@@ -46,32 +67,43 @@ export default function SubscribeScreen() {
         return;
       }
 
-      // For Android/Web: Create order and initiate payment
-      const { orderId } = await createOrder(planId);
-      const { paymentId, authorizationUrl, reference } = await initiatePayment(orderId, planId);
-      await storePaymentAttempt({ paymentId, orderId, reference, planId });
-      
-      // Open the payment URL in the browser
-      if (authorizationUrl) {
-        // Add the event listener
-        subscription = Linking.addEventListener('url', handleDeepLink);
-        
-        // Check if we can open the URL
-        const canOpen = await Linking.canOpenURL(authorizationUrl);
-        if (!canOpen) {
-          throw new Error('Cannot open payment URL');
-        }
-        
-        // Open the payment URL in the browser
-        await Linking.openURL(authorizationUrl);
-        
-        // Clean up the listener after 10 minutes
-        setTimeout(() => {
-          if (subscription) {
-            subscription.remove();
-          }
-        }, 600000); // 10 minutes
+      // Android/Web: Use chat payment initialization (Paystack) + HTTPS callback that deep-links back to app
+      const token = await Storage.getItem('auth_token');
+      if (!token) {
+        showToast('Please log in to subscribe', 'error');
+        return;
       }
+
+      const plan = plans.find(p => p.id === planId);
+      if (!plan) {
+        throw new Error('Invalid plan');
+      }
+
+      const webCallbackBaseUrl =
+        Constants.expoConfig?.extra?.webCallbackBaseUrl || process.env.EXPO_PUBLIC_WEB_CALLBACK_BASE_URL;
+
+      if (!webCallbackBaseUrl) {
+        throw new Error('Missing web callback base URL configuration');
+      }
+
+      const deepLinkRedirect = 'pairfect://payment-success';
+      const callbackUrl = `${String(webCallbackBaseUrl).replace(/\/$/, '')}/payment/callback?redirect=${encodeURIComponent(deepLinkRedirect)}`;
+
+      // Add the event listener (fallback; the app also has a global listener in SubscriptionContext)
+      subscription = Linking.addEventListener('url', handleDeepLink);
+
+      const payment = await initializePayment(plan.price, planId, token, callbackUrl);
+
+      if (!payment?.payment_url) {
+        throw new Error('Missing payment URL');
+      }
+
+      const canOpen = await Linking.canOpenURL(payment.payment_url);
+      if (!canOpen) {
+        throw new Error('Cannot open payment URL');
+      }
+
+      await Linking.openURL(payment.payment_url);
     } catch (error) {
       console.error('Payment error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to process payment. Please try again.';

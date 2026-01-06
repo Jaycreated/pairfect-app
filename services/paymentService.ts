@@ -21,9 +21,7 @@ export type OrderResponse = {
 
 export type InitializePaymentResponse = {
   payment_url: string;
-  redirect_url: string;
   reference: string;
-  provider_transaction_id: string;
   amount: number;
   planType: string;
 };
@@ -63,12 +61,12 @@ export const createOrder = async (amount: number, token: string): Promise<OrderR
 };
 
 export const initializePayment = async (
-  orderId: string, 
+  amount: number,
   planType: string, 
   token: string,
   callbackUrl?: string
 ): Promise<InitializePaymentResponse> => {
-  const payload: any = { orderId, planType };
+  const payload: any = { amount, planType };
   if (callbackUrl) {
     payload.callbackUrl = callbackUrl;
   }

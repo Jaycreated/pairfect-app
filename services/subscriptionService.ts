@@ -111,7 +111,7 @@ export const getSubscriptionPlans = (): SubscriptionPlan[] => {
 
 export const getActiveSubscription = async (): Promise<UserSubscription | null> => {
   try {
-    // First check chat access status
+    // Use the existing checkChatAccess endpoint
     const accessStatus = await checkChatAccess();
     
     if (!accessStatus.hasAccess) {
@@ -119,18 +119,22 @@ export const getActiveSubscription = async (): Promise<UserSubscription | null> 
       return null;
     }
     
-    // If we have access, return a subscription object
-    return {
-      id: `sub_${Date.now()}`,
-      userId: '', // This will be filled in by the backend
+    // If we have access, create a subscription object with the available data
+    const subscription: UserSubscription = {
+      id: `sub_${accessStatus.reference || Date.now()}`,
+      userId: '', // This would come from auth context
       planId: accessStatus.planType || 'premium',
       status: 'active',
       startDate: new Date().toISOString(),
+      // Use the expiry date from the response if available, otherwise default to 30 days
       endDate: accessStatus.expiryDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       paymentReference: accessStatus.reference || '',
-      amount: 0, // This should be set by the backend
-      currency: 'USD' // Default currency
+      amount: 0, // This would come from the payment verification
+      currency: 'NGN' // Default to Naira since this is a Nigerian app
     };
+
+    console.log('Active subscription:', subscription);
+    return subscription;
   } catch (error) {
     console.error('Error checking subscription status:', error);
     return null;
@@ -476,7 +480,7 @@ export const verifyChatPayment = async (
 export const checkChatAccess = async (): Promise<AccessStatusResponse> => {
   try {
     const headers = await createHeaders();
-    const url = getApiUrl('payments/chat/access');
+    const url = getApiUrl('/payments/chat/access');
     
     console.log('Checking chat access at:', url);
     const response = await fetch(url, {
