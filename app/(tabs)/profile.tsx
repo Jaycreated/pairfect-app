@@ -663,15 +663,14 @@ const styles = StyleSheet.create({
     borderRadius: 48,
     overflow: 'hidden',
     marginRight: 16,
-    borderWidth: 2,
-    borderColor: '#FF35D3',
+    // Use shadow instead of visible border for a cleaner look
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 4,
     },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
     elevation: 6,
   },
   profileInfo: {
