@@ -795,6 +795,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 20,
     marginHorizontal: 20,
+    marginBottom: 200,
   },
   buttonText: {
     color: '#fff',
@@ -900,6 +901,7 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
     padding: 20,
+    paddingBottom: 80,
   },
   photoSection: {
     alignItems: 'center',
@@ -1004,8 +1006,8 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 40,
+    marginHorizontal: 20,
+    marginBottom: 10,
   },
   signOutText: {
     color: '#d32f2f',

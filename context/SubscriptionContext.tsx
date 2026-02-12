@@ -1,4 +1,4 @@
-import { getActiveSubscription, verifyPayment, getPendingPayments, clearPaymentAttempt } from '@/services/subscriptionService';
+import { getActiveSubscription, verifyChatPayment, getPendingPayments, clearPaymentAttempt } from '@/services/subscriptionService';
 import { UserSubscription } from '@/types/subscription';
 import { useToast } from '@/context/ToastContext';
 import { Linking } from 'react-native';
@@ -47,13 +47,12 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         const query = url.includes('?') ? url.split('?')[1] : '';
         const params = new URLSearchParams(query);
         const reference = params.get('reference') || params.get('ref') || params.get('payment_reference');
-
         if (!reference) return;
 
         // Verify payment with backend
-        const result = await verifyPayment(reference);
+        const result = await verifyChatPayment(reference);
 
-        if (result && result.success) {
+        if (result && result.paid) {
           // Clear any pending payment attempts that match this reference
           try {
             const pending = await getPendingPayments();

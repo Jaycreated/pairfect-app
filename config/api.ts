@@ -44,6 +44,11 @@ export const API_CONFIG = {
       BASE: 'messages',
       CONVERSATION: (matchId: string) => `messages/${matchId}`,
       CONVERSATIONS: 'conversations',
+      SEND: 'messages/send',
+    },
+    PAYMENTS: {
+      CHAT_ACCESS: 'payments/chat/access',
+      CHAT_RESET: 'payments/chat/reset',
     }
   },
 

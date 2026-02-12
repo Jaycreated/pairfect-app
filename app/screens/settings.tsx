@@ -1,11 +1,11 @@
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
-import { getUserSettings, updateUserSettings, UserSettings } from '@/services/userService';
+import { deleteAccount, getUserSettings, updateUserSettings, UserSettings } from '@/services/userService';
 import { Storage } from '@/utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 
 const SettingsScreen = () => {
   const { signOut } = useAuth();
@@ -95,6 +95,37 @@ const SettingsScreen = () => {
       console.error('Failed to sign out:', error);
       showToast('Failed to sign out. Please try again.', 'error');
     }
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently lost.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsLoading(true);
+              await deleteAccount();
+              showToast('Account deleted successfully', 'success');
+              // Navigate to login screen after successful deletion
+              router.replace('/(auth)/login');
+            } catch (error) {
+              console.error('Failed to delete account:', error);
+              showToast('Failed to delete account. Please try again.', 'error');
+            } finally {
+              setIsLoading(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (isLoading || !settings) {
@@ -217,6 +248,17 @@ const SettingsScreen = () => {
             <Ionicons name="log-out-outline" size={20} color="#e74c3c" />
           </TouchableOpacity>
         </View>
+
+        <View style={styles.section}>
+          <TouchableOpacity 
+            style={[styles.settingItem, styles.deleteAccountButton]} 
+            onPress={handleDeleteAccount}
+            disabled={isLoading}
+          >
+            <Text style={styles.deleteAccountText}>Delete Account</Text>
+            <Ionicons name="trash-outline" size={20} color="#e74c3c" />
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </View>
   );
@@ -312,6 +354,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
   },
   logoutText: {
+    color: '#e74c3c',
+    fontSize: 16,
+    fontWeight: '500',
+    marginRight: 8,
+  },
+  deleteAccountButton: {
+    justifyContent: 'center',
+    borderBottomWidth: 0,
+  },
+  deleteAccountText: {
     color: '#e74c3c',
     fontSize: 16,
     fontWeight: '500',

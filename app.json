@@ -12,7 +12,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.Pairfect",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "SKAdNetworkItems": []
       }
     },
     "android": {
@@ -42,7 +43,7 @@
           "image": "./assets/images/LandingLogo.png",
           "imageWidth": 100,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#000000",
           "dark": {
             "backgroundColor": "#000000"
           }

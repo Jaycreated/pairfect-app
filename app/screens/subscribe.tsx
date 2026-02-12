@@ -1,7 +1,7 @@
 // app/(tabs)/subscribe.tsx
 import { useSubscription } from '@/context/SubscriptionContext';
 import { useToast } from '@/context/ToastContext';
-import { connectToIAP, disconnectIAP, IOS_PRODUCT_IDS, purchaseItem } from '@/services/iapService';
+import { PRODUCT_IDS, purchaseItem } from '@/services/iapService';
 import { initializePayment } from '@/services/paymentService';
 import { Storage } from '@/utils/storage';
 import { Ionicons } from '@expo/vector-icons';
@@ -59,7 +59,8 @@ export default function SubscribeScreen() {
       
       // If iOS use IAP, Android -> redirect to website
       if (Platform.OS === 'ios') {
-        const productId = planId === 'daily' ? IOS_PRODUCT_IDS.daily : IOS_PRODUCT_IDS.monthly;
+        const platformIds = PRODUCT_IDS.ios;
+        const productId = planId === 'daily' ? platformIds.daily : platformIds.monthly;
         await purchaseItem(productId);
         // After purchaseListener verifies and backend verifies, refresh subscription
         await refreshSubscription();
@@ -119,9 +120,9 @@ export default function SubscribeScreen() {
   };
 
   React.useEffect(() => {
-    connectToIAP();
+    // IAP is initialized globally in app/_layout.tsx via useIAP hook
     return () => {
-      disconnectIAP();
+      // Cleanup if needed
     };
   }, []);
 

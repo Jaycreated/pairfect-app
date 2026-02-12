@@ -1,141 +1,257 @@
-import { Linking, Platform } from 'react-native';
-import { verifyIapReceipt, verifyPayment } from './subscriptionService';
+let RNIap: any = null;
+let iapAvailable = false;
 
-// Product IDs must be registered in App Store Connect
-export const IOS_PRODUCT_IDS = {
-  daily: 'com.pairfect.daily',
-  monthly: 'com.pairfect.monthly',
+// Try to import RNIap, but don't fail if it's not available
+try {
+  RNIap = require('react-native-iap');
+  iapAvailable = true;
+} catch (error) {
+  console.warn('react-native-iap not available - IAP features will be disabled:', error);
+  iapAvailable = false;
+}
+
+import { Platform } from 'react-native';
+import { verifyIapReceipt } from './subscriptionService';
+
+// Product IDs configuration
+export const PRODUCT_IDS = {
+  // iOS Product IDs (must match App Store Connect)
+  ios: {
+    daily: 'com.pairfect.daily',
+    monthly: 'com.pairfect.monthly',
+  },
+  // Android Product IDs (must match Google Play Console)
+  android: {
+    daily: 'com.pairfect.daily',
+    monthly: 'com.pairfect.monthly',
+  },
 };
 
-let iapModule: any = null;
+// Get platform-specific product IDs
+export const getPlatformProductIds = (): string[] => {
+  const ids = Platform.OS === 'ios' ? PRODUCT_IDS.ios : PRODUCT_IDS.android;
+  return Object.values(ids);
+};
 
+let purchaseListener: any = null;
+let purchaseErrorListener: any = null;
+
+/**
+ * Initialize IAP connection and set up purchase listener
+ */
 export const connectToIAP = async () => {
-  if (Platform.OS !== 'ios') return;
+  if (!iapAvailable) {
+    console.warn('IAP not available on this environment');
+    return;
+  }
+
   try {
-    const raw = await import('expo-in-app-purchases');
-    iapModule = raw && raw.default ? raw.default : raw;
+    // Initialize RNIap connection
+    await RNIap.initConnection();
+    console.log('IAP Connection established');
 
-    if (!iapModule || typeof iapModule.connectAsync !== 'function') {
-      console.warn('IAP module loaded but missing expected methods; skipping IAP setup');
-      return;
-    }
+    // Fetch available products
+    await getAvailableProducts();
 
-    await iapModule.connectAsync();
+    // Set up purchase update listener
+    setupPurchaseListener();
 
-    // get available items
-    if (typeof iapModule.getProductsAsync === 'function') {
-      await iapModule.getProductsAsync(Object.values(IOS_PRODUCT_IDS));
-    }
-
-    // register listener
-    const purchaseListener = async ({ responseCode, results, errorCode }: any) => {
-      if (responseCode === iapModule.IAPResponseCode.OK) {
-        if (!results || results.length === 0) return;
-
-        for (const purchase of results) {
-          if (!purchase) continue;
-          if (!purchase.acknowledged) {
-            try {
-              const receipt = purchase.transactionReceipt || purchase.originalJson || purchase.orderId || purchase.productId;
-
-              if (receipt) {
-                await verifyIapReceipt(receipt, purchase.productId);
-              } else {
-                await verifyPayment(purchase.orderId || purchase.productId);
-              }
-
-              await iapModule.finishTransactionAsync(purchase, false);
-            } catch (err) {
-              console.error('IAP verification error:', err);
-            }
-          }
-        }
-      } else if (responseCode === iapModule.IAPResponseCode.USER_CANCELED) {
-        console.log('User canceled IAP');
-      } else {
-        console.error('IAP error', responseCode, errorCode);
-      }
-    };
-
-    if (typeof iapModule.setPurchaseListener === 'function') {
-      iapModule.setPurchaseListener(purchaseListener);
-    } else if (typeof iapModule.addPurchaseListener === 'function') {
-      iapModule.addPurchaseListener(purchaseListener);
-    } else {
-      console.warn('IAP module has no purchase listener registration method');
-    }
+    // Handle purchases from previous app sessions
+    await handlePendingPurchases();
   } catch (error) {
     console.error('Error connecting to IAP:', error);
   }
 };
 
+/**
+ * Disconnect from IAP
+ */
 export const disconnectIAP = async () => {
-  try {
-    if (iapModule) {
-      try {
-        await iapModule.disconnectAsync();
-      } catch (err) {
-        console.warn('Error disconnecting IAP module:', err);
-      }
-      iapModule = null;
-    }
-  } catch (error) {
-    console.error('Error disconnecting IAP:', error);
-  }
-};
-
-export const purchaseItem = async (productId: string) => {
-  if (Platform.OS === 'android') {
-    // On Android, redirect to website
-    const url = 'https://pairfect.example.com/subscribe';
-    try {
-      await Linking.openURL(url);
-    } catch (err) {
-      console.error('Error opening URL:', err);
-      throw err;
-    }
+  if (!iapAvailable) {
     return;
   }
 
   try {
-    // dynamic import to avoid loading native module on web
-    const raw = iapModule || (await import('expo-in-app-purchases'));
-    const mod = raw && raw.default ? raw.default : raw;
-
-    // Try common purchase method names
-    const tryFns = [
-      'purchaseItemAsync',
-      'requestPurchaseAsync',
-      'requestPurchase',
-      'purchaseAsync',
-      'buyItemAsync',
-      'purchaseItem'
-    ];
-
-    let fn: any = null;
-    for (const name of tryFns) {
-      if (mod && typeof mod[name] === 'function') {
-        fn = mod[name];
-        break;
-      }
+    if (purchaseListener) {
+      purchaseListener.remove();
+      purchaseListener = null;
     }
-
-    if (!fn) {
-      console.warn('No purchase function found on IAP module — falling back to web checkout');
-      const url = 'https://pairfect.example.com/subscribe';
-      try {
-        await Linking.openURL(url);
-        return { fallback: 'web' } as any;
-      } catch (err) {
-        console.error('Failed to open fallback URL for purchase:', err);
-        throw new Error('No purchase function available and fallback failed');
-      }
+    if (purchaseErrorListener) {
+      purchaseErrorListener.remove();
+      purchaseErrorListener = null;
     }
-
-    const purchaseRequest = await fn.call(mod, productId);
-    return purchaseRequest;
+    await RNIap.endConnection();
+    console.log('IAP Connection disconnected');
   } catch (error) {
-    console.error('purchaseItem error:', error);
+    console.error('Error disconnecting from IAP:', error);
+  }
+};
+
+/**
+ * Get available products from App Store/Play Store
+ */
+export const getAvailableProducts = async (): Promise<any[]> => {
+  if (!iapAvailable) {
+    console.warn('IAP not available - returning empty products');
+    return [];
+  }
+
+  try {
+    const productIds = getPlatformProductIds();
+    const products = await RNIap.fetchProducts({
+      skus: productIds,
+    });
+    console.log('Available products:', products);
+    return (products as any) || [];
+  } catch (error) {
+    console.error('Error fetching products:', error);
+    return [];
+  }
+};
+
+/**
+ * Purchase a product
+ */
+export const purchaseItem = async (productId: string): Promise<any | null> => {
+  if (!iapAvailable) {
+    console.warn('IAP not available - purchase cannot be completed');
+    throw new Error('In-app purchases are not available on this device');
+  }
+
+  try {
+    console.log('Initiating purchase for product:', productId);
+
+    const purchase = await RNIap.requestPurchase({
+      skus: [productId],
+    } as any);
+
+    console.log('Purchase initiated:', purchase);
+    return (purchase as any) || null;
+  } catch (error: any) {
+    if (error?.code === 'E_USER_CANCELLED') {
+      console.log('User cancelled the purchase');
+    } else {
+      console.error('Purchase error:', error);
+    }
     throw error;
+  }
+};
+
+/**
+ * Set up listener for purchase updates
+ */
+const setupPurchaseListener = () => {
+  if (!iapAvailable || !RNIap) {
+    return;
+  }
+
+  try {
+    purchaseListener = RNIap.purchaseUpdatedListener(
+      (purchase: any) => {
+        handlePurchaseUpdate(purchase);
+      }
+    );
+
+    purchaseErrorListener = RNIap.purchaseErrorListener(
+      (error: any) => {
+        console.error('Purchase error received:', error);
+      }
+    );
+  } catch (error) {
+    console.error('Error setting up purchase listener:', error);
+  }
+};
+
+/**
+ * Handle purchase updates
+ */
+const handlePurchaseUpdate = async (purchase: any) => {
+  if (!iapAvailable) {
+    return;
+  }
+
+  try {
+    console.log('Purchase update received:', purchase);
+
+    // For iOS: transactionId exists
+    // For Android: orderId exists and needs acknowledgement
+    const isValidPurchase =
+      (purchase as any).transactionId ||
+      ((purchase as any).orderId && (purchase as any).purchaseState !== 'cancelled');
+
+    if (isValidPurchase) {
+      // Verify receipt with backend
+      await verifyPurchase(purchase);
+
+      // Finish the transaction
+      if (Platform.OS === 'android') {
+        try {
+          const token = (purchase as any).purchaseToken || (purchase as any).token;
+          if (token) {
+            await RNIap.acknowledgePurchaseAndroid(token);
+          }
+        } catch (err) {
+          console.warn('Error acknowledging Android purchase:', err);
+        }
+      } else {
+        try {
+          await RNIap.finishTransaction({ purchase, isConsumable: false });
+        } catch (err) {
+          console.warn('Error finishing iOS transaction:', err);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error handling purchase update:', error);
+  }
+};
+
+/**
+ * Verify purchase with backend
+ */
+const verifyPurchase = async (purchase: any) => {
+  if (!iapAvailable) {
+    return;
+  }
+
+  try {
+    console.log('Verifying purchase:', purchase.productId);
+
+    const receiptData = {
+      transactionId: purchase.transactionId,
+      receipt: (purchase as any).transactionReceipt || purchase.transactionId,
+      originalJson: (purchase as any).originalJson,
+      signature: (purchase as any).signature,
+      productId: purchase.productId,
+      purchaseToken: purchase.purchaseToken || (purchase as any).token,
+      isAndroid: Platform.OS === 'android',
+      isIOS: Platform.OS === 'ios',
+    };
+
+    // Call backend to verify receipt
+    await verifyIapReceipt(JSON.stringify(receiptData), purchase.productId);
+
+    console.log('Purchase verified successfully');
+  } catch (error) {
+    console.error('Error verifying purchase:', error);
+    throw error;
+  }
+};
+
+/**
+ * Handle purchases from previous app sessions
+ */
+const handlePendingPurchases = async () => {
+  if (!iapAvailable) {
+    return;
+  }
+
+  try {
+    console.log('Checking for pending purchases...');
+
+    // In a real scenario, you'd check your backend for pending purchases
+    // This is a placeholder for cleanup purposes
+  } catch (error) {
+    console.error('Error handling pending purchases:', error);
   }
 };

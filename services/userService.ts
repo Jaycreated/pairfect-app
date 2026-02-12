@@ -190,3 +190,33 @@ export const sendSwipeAction = async (targetUserId: string, action: 'like' | 'pa
     throw error;
   }
 };
+
+// Delete user account
+export const deleteAccount = async (): Promise<void> => {
+  const token = await getAuthToken();
+  
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+
+  try {
+    const response = await fetch(getApiUrl('/users/account'), {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to delete account');
+    }
+
+    // Clear local storage after successful deletion
+    await Storage.clear();
+  } catch (error) {
+    console.error('Error deleting account:', error);
+    throw error;
+  }
+};

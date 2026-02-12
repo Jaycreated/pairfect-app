@@ -526,8 +526,8 @@ const MessagesScreen = () => {
   if (!subscription || requiresSubscription) {
     // Default to the production subscribe URL if not provided in env
     const baseUrl = process.env.EXPO_PUBLIC_SUBSCRIBE_URL 
-      ? `${process.env.EXPO_PUBLIC_SUBSCRIBE_URL}/subscribe` 
-      : 'https://dating-g2mc.onrender.com/subscribe';
+      ? `${process.env.EXPO_PUBLIC_SUBSCRIBE_URL}/pricing` 
+      : 'https://dating-g2mc.onrender.com/pricing';
     
     // Create a deep link that will redirect back to the app after subscription
     const callbackUrl = 'pairfect://messages';

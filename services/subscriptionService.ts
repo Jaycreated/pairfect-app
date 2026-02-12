@@ -246,20 +246,30 @@ export const initiatePayment = async (orderId: string, planId: string): Promise<
   }
 };
 
-// Verify iOS in-app purchase receipt with backend
+// Verify iOS/Android in-app purchase receipt with backend
 export const verifyIapReceipt = async (receiptData: string, productId?: string): Promise<{ success: boolean; subscription?: UserSubscription; message?: string }> => {
   try {
     const headers = await createHeaders({
       'Content-Type': 'application/json',
     });
 
+    // Parse receipt data if it's a string (could be JSON)
+    let receiptPayload: any = receiptData;
+    try {
+      if (typeof receiptData === 'string' && receiptData.startsWith('{')) {
+        receiptPayload = JSON.parse(receiptData);
+      }
+    } catch (e) {
+      // If not JSON, treat as raw receipt string
+    }
+
     const response = await fetch(getApiUrl('api/payments/verify-iap'), {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        receipt: receiptData,
+        receipt: receiptPayload,
         productId,
-        platform: 'ios'
+        platform: Platform.OS
       })
     });
 

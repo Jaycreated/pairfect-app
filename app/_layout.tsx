@@ -2,9 +2,11 @@
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { NotificationProvider } from '@/context/NotificationContext';
 import { SubscriptionProvider } from '@/context/SubscriptionContext';
+import { MessageCountProvider } from '@/context/MessageCountContext';
 import { ToastProvider } from '@/context/ToastContext';
 import { WebSocketProvider } from '@/context/WebSocketContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useIAP } from '@/hooks/useIAP';
 import { Storage } from '@/utils/storage';
 import {
   Poppins_400Regular,
@@ -47,8 +49,8 @@ function FontLoader({ children }: { children: React.ReactNode }) {
 
   if (!fontsLoaded) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
+        <ActivityIndicator size="large" color="#651B55" />
       </View>
     );
   }
@@ -64,6 +66,9 @@ function AuthLayout() {
   const [isNavigationReady, setIsNavigationReady] = useState(false);
   const [isCheckingOnboarding, setIsCheckingOnboarding] = useState(true);
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean | null>(null);
+
+  // Initialize IAP on app start
+  useIAP();
 
   // Check if it's the first app launch
   useEffect(() => {
@@ -202,7 +207,9 @@ export default function RootLayout() {
           <WebSocketProvider>
             <NotificationProvider>
               <SubscriptionProvider>
-                <RootLayoutNav />
+                <MessageCountProvider>
+                  <RootLayoutNav />
+                </MessageCountProvider>
               </SubscriptionProvider>
             </NotificationProvider>
           </WebSocketProvider>

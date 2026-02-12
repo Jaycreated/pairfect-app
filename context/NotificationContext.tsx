@@ -1,3 +1,4 @@
+import { api } from '@/services/api';
 import { registerForPushNotificationsAsync } from '@/utils/notifications';
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
@@ -20,8 +21,8 @@ export function useNotifications() {
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
   const [notification, setNotification] = useState<Notifications.Notification | null>(null);
-  const notificationListener = useRef<Notifications.Subscription>();
-  const responseListener = useRef<Notifications.Subscription>();
+  const notificationListener = useRef<Notifications.Subscription | null>(null);
+  const responseListener = useRef<Notifications.Subscription | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -32,8 +33,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         if (token) {
           console.log('Push token:', token);
           setExpoPushToken(token);
-          // Here you would typically send the token to your backend
-          // await savePushTokenToBackend(token);
+          // Send the token to your backend
+          try {
+            await api.registerPushToken(token);
+            console.log('Push token registered with backend');
+          } catch (error) {
+            console.error('Failed to register push token:', error);
+          }
         }
       } catch (error) {
         console.error('Error getting push token:', error);

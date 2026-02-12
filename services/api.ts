@@ -89,7 +89,12 @@ async function fetchApi<T = any>(
       ) as Promise<Response>
     ]);
 
+    console.log('🌐 [API] HTTP Response status:', response.status);
+    console.log('🌐 [API] HTTP Response ok:', response.ok);
+    console.log('🌐 [API] HTTP Response headers:', Object.fromEntries(response.headers.entries()));
+
     const responseData = await response.json().catch(() => ({}));
+    console.log('🌐 [API] Parsed response data:', responseData);
 
     if (!response.ok) {
       return {
@@ -284,34 +289,73 @@ export const api = {
     fetchApi(API_CONFIG.ENDPOINTS.MATCHES.BASE),
 
   // Messages
-  getMessages: (conversationId: string | number) => 
-    fetchApi(`/messages/${conversationId}`),
+  getMessages: (conversationId: string | number) => {
+    const url = `/messages/${conversationId}`;
+    console.log('🔍 [API] Getting messages for conversation:', conversationId);
+    console.log('📡 [API] Full URL:', getApiUrl(url));
+    return fetchApi(url).then(response => {
+      console.log('📥 [API] Messages response:', response);
+      return response;
+    });
+  },
     
   sendMessage: (conversationId: string | number, messageData: { content: string; senderId: string | number; recipientId: string | number }) => {
-    return fetchApi(`/messages/${conversationId}`, 'POST', messageData);
+    const url = `/messages/${conversationId}`;
+    console.log('📤 [API] Sending message to conversation:', conversationId);
+    console.log('📡 [API] Full URL:', getApiUrl(url));
+    console.log('📝 [API] Message data:', messageData);
+    return fetchApi(url, 'POST', messageData).then(response => {
+      console.log('📥 [API] Send message response:', response);
+      return response;
+    });
   },
   
   getUnreadMessageCount() {
-    return this.get('/messages/unread-count');
+    const url = '/messages/unread-count';
+    console.log('🔢 [API] Getting unread message count');
+    console.log('📡 [API] Full URL:', getApiUrl(url));
+    return this.get(url).then(response => {
+      console.log('📥 [API] Unread count response:', response);
+      return response;
+    });
   },
 
   // Conversations
   getConversations() {
-    return this.get<{ conversations: any[] }>(API_CONFIG.ENDPOINTS.MESSAGES.CONVERSATIONS).then(response => {
+    const endpoint = API_CONFIG.ENDPOINTS.MESSAGES.CONVERSATIONS;
+    console.log('💬 [API] Getting conversations list');
+    console.log('📡 [API] Full URL:', getApiUrl(endpoint));
+    console.log('🔧 [API] Endpoint config:', API_CONFIG.ENDPOINTS.MESSAGES.CONVERSATIONS);
+    return this.get<{ conversations: any[] }>(endpoint).then(response => {
+      console.log('📥 [API] Raw conversations response:', JSON.stringify(response, null, 2));
+      console.log('📥 [API] Response data type:', typeof response.data);
+      console.log('📥 [API] Response data:', response.data);
       if (response.data) {
+        console.log('📋 [API] Conversations data:', response.data.conversations);
+        console.log('📋 [API] Conversations data type:', typeof response.data.conversations);
+        console.log('📋 [API] Is conversations array?', Array.isArray(response.data.conversations));
         // Return the nested conversations array directly
-        return {
+        const processedResponse = {
           ...response,
           data: response.data.conversations || []
         };
+        console.log('✅ [API] Processed conversations response:', JSON.stringify(processedResponse, null, 2));
+        return processedResponse;
       }
       return response;
     });
   },
   
   // Get single conversation details
-  getConversation: (conversationId: string | number) => 
-    fetchApi(`/conversations/${conversationId}`),
+  getConversation: (conversationId: string | number) => {
+    const url = `/conversations/${conversationId}`;
+    console.log('🔍 [API] Getting single conversation details:', conversationId);
+    console.log('📡 [API] Full URL:', getApiUrl(url));
+    return fetchApi(url).then(response => {
+      console.log('📥 [API] Single conversation response:', response);
+      return response;
+    });
+  },
 
   // Generic methods
   get: <T = any>(endpoint: string) => fetchApi<T>(endpoint, 'GET'),
@@ -341,6 +385,10 @@ export const api = {
   
   deleteNotification: (notificationId: number) => 
     fetchApi(`/notifications/${notificationId}`, 'DELETE'),
+
+  // Push notification token registration
+  registerPushToken: (token: string) => 
+    fetchApi('/notifications/register', 'POST', { token }),
 };
 
 // Auth interceptor to handle token refresh

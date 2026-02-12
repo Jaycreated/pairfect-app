@@ -1,8 +1,20 @@
 import { Header } from '@/components/Header';
 import { Ionicons } from '@expo/vector-icons';
-import { Tabs, useRouter } from 'expo-router';
+import { Tabs, useRouter, usePathname } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import React, { useEffect } from 'react';
+import { Platform } from 'react-native';
+
+const ConditionalHeader = ({ onNotificationPress }: { onNotificationPress: () => void }) => {
+  const pathname = usePathname();
+  const isInConversation = /\/messages\/\w+/.test(pathname);
+  
+  if (isInConversation) {
+    return null;
+  }
+  
+  return <Header onNotificationPress={onNotificationPress} />;
+};
 
 export default function TabLayout() {
   const router = useRouter();
@@ -31,14 +43,17 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        header: () => <Header onNotificationPress={handleNotificationPress} />,
+        header: () => <ConditionalHeader onNotificationPress={handleNotificationPress} />,
         tabBarActiveTintColor: '#FFFFFF',
         tabBarInactiveTintColor: '#FFFFFF',
+        // Keep the bar visually elevated but allow it to sit flush
+        // with the device safe area by removing extra bottom padding
+        // and explicitly setting safe area insets.
         tabBarStyle: {
           backgroundColor: '#651B55',
           borderTopWidth: 0,
           height: 92,
-          paddingBottom: 12,
+          paddingBottom: 0,
           paddingTop: 8,
           paddingRight: 32,
           paddingLeft: 32,
@@ -128,6 +143,12 @@ export default function TabLayout() {
         name="notifications"
         options={{
           href: null, // This hides it from the tab bar
+        }}
+      />
+      <Tabs.Screen
+        name="notifications-test"
+        options={{
+          href: null, // This hides it from the tab bar - only for testing
         }}
       />
     </Tabs>

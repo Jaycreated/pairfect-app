@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 import { Dimensions, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { width } = Dimensions.get('window');
-const CARD_HEIGHT = 240; // Fixed height of 240px
+const CARD_HEIGHT = 200; // Fixed height of 200px
 const CARD_WIDTH = (width - 40) / 2; // 16px padding on each side + 8px gap between cards
 
 type Match = {
@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
     borderRadius: 24,
     overflow: 'hidden',
-    height: CARD_HEIGHT, // Fixed height of 240px
+    height: CARD_HEIGHT, // Fixed height of 200px
     position: 'relative',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
