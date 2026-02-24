@@ -5,6 +5,7 @@ This guide covers the complete setup and implementation of in-app purchases for 
 ## Overview
 
 The IAP implementation uses:
+
 - **Library**: `react-native-iap` v14.7.0 (already in your dependencies)
 - **Supported Plans**: Daily Access (24 hours) and Monthly Access (30 days)
 - **Platforms**: iOS (App Store) and Android (Google Play Store)
@@ -12,6 +13,7 @@ The IAP implementation uses:
 ## Files Modified/Created
 
 ### Core Services
+
 - `services/iapService.ts` - Main IAP service with purchase handling
 - `services/subscriptionService.ts` - Backend verification of receipts
 - `hooks/useIAP.ts` - React hook for IAP initialization
@@ -100,6 +102,7 @@ The IAP implementation uses:
 Your backend needs to implement receipt verification at the endpoint: `api/payments/verify-iap`
 
 #### iOS Receipt Verification
+
 ```typescript
 // Backend implementation example
 POST /api/payments/verify-iap
@@ -137,6 +140,7 @@ Response:
 ```
 
 **iOS Verification Process:**
+
 1. Extract the receipt from `transactionReceipt` field
 2. Send to Apple's verification endpoint: `https://buy.itunes.apple.com/verifyReceipt` (production) or `https://sandbox.itunes.apple.com/verifyReceipt` (sandbox)
 3. Validate signature and expiration date
@@ -144,6 +148,7 @@ Response:
 5. Return subscription details to client
 
 #### Android Receipt Verification
+
 ```typescript
 // Backend implementation example
 Request Body:
@@ -162,6 +167,7 @@ Request Body:
 ```
 
 **Android Verification Process:**
+
 1. Use Google Play Billing Library to verify the purchase
 2. Call Google Play API with `purchaseToken`
 3. Validate the purchase state and expiration
@@ -169,15 +175,17 @@ Request Body:
 5. Return subscription details to client
 
 **Recommended Backend Libraries:**
+
 - iOS: `node-app-store-connect` or manual HTTP requests to Apple APIs
 - Android: `@google-cloud/recaptcha-enterprise` or Google Play Developer API
 
 ### Step 4: Implementation in App
 
 1. **Initialize IAP in Root Layout** (`app/_layout.tsx`)
+
    ```typescript
-   import { useIAP } from '@/hooks/useIAP';
-   
+   import { useIAP } from "@/hooks/useIAP";
+
    function RootLayout() {
      useIAP(); // Initialize IAP on app start
      // ... rest of layout
@@ -185,13 +193,14 @@ Request Body:
    ```
 
 2. **Purchase Flow in UI Component**
+
    ```typescript
    import { purchaseItem, getAvailableProducts } from '@/services/iapService';
    import { useSubscription } from '@/context/SubscriptionContext';
-   
+
    export function SubscriptionComponent() {
      const { refreshSubscription } = useSubscription();
-   
+
      const handlePurchase = async (productId: string) => {
        try {
          await purchaseItem(productId);
@@ -201,9 +210,9 @@ Request Body:
          console.error('Purchase failed:', error);
        }
      };
-   
+
      return (
-       <Button 
+       <Button
          onPress={() => handlePurchase('com.pairfect.monthly')}
        >
          Subscribe
@@ -213,16 +222,17 @@ Request Body:
    ```
 
 3. **Check Subscription Status**
+
    ```typescript
    import { useSubscription } from '@/context/SubscriptionContext';
-   
+
    export function ChatScreen() {
      const { subscription, isLoading } = useSubscription();
-   
+
      if (!subscription) {
        return <Text>Please subscribe to access chat</Text>;
      }
-   
+
      return <ChatUI />;
    }
    ```
@@ -230,6 +240,7 @@ Request Body:
 ### Step 5: Testing
 
 #### iOS Testing
+
 1. Create sandbox test account in App Store Connect
 2. Sign out of your personal Apple ID on test device
 3. Install your debug build from Xcode
@@ -237,12 +248,14 @@ Request Body:
 5. Confirm receipt verification works
 
 #### Android Testing
+
 1. Add test Google Account to License Testing
 2. Install your debug build from Android Studio
 3. Attempt purchase with test account
 4. Confirm receipt verification works
 
 **Test Purchases:**
+
 - Sandbox purchases should NOT charge the test account
 - Enable logging in `iapService.ts` to debug
 - Use console.log statements to track purchase flow
@@ -262,11 +275,13 @@ Request Body:
 ## Important Notes
 
 ### Product IDs
+
 - Must exactly match App Store Connect and Google Play Console
 - Format: `com.pairfect.[planType]`
 - iOS and Android can use the same product IDs
 
 ### Security Best Practices
+
 1. **Never store raw receipts on client** - always verify on backend
 2. **Validate expiration dates** - subscriptions expire and should be renewed
 3. **Use HTTPS** - all communication with backend must be encrypted
@@ -276,15 +291,18 @@ Request Body:
 ### Common Issues
 
 **"SKU not found" Error**
+
 - Product ID doesn't match App Store Connect/Google Play Console
 - Verify exact spelling and format
 
 **Purchases Not Appearing**
+
 - Test account not properly configured
 - Not signed into sandbox/test account on device
 - Product not "Ready to Submit" or "Active"
 
 **Receipt Verification Failing**
+
 - Backend endpoint not implemented correctly
 - Wrong Apple verification URL (sandbox vs production)
 - Invalid receipt format from client
@@ -292,6 +310,7 @@ Request Body:
 ## Subscription Context
 
 The `SubscriptionContext` automatically:
+
 1. Fetches active subscription on app load
 2. Handles deep links for payment callbacks
 3. Refreshes subscription after purchases

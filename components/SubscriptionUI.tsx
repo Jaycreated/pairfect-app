@@ -1,9 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
-import * as RNIap from 'react-native-iap';
-import { getAvailableProducts, purchaseItem } from '@/services/iapService';
-import { useSubscription } from '@/context/SubscriptionContext';
-import { useToast } from '@/context/ToastContext';
+import { useSubscription } from "@/context/SubscriptionContext";
+import { useToast } from "@/context/ToastContext";
+import { getAvailableProducts, purchaseItem } from "@/services/iapService";
+import React, { useEffect, useState } from "react";
+import {
+    ActivityIndicator,
+    ScrollView,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import * as RNIap from "react-native-iap";
 
 /**
  * Example subscription component showing how to:
@@ -29,8 +35,8 @@ export function SubscriptionPlansComponent() {
       const availableProducts = await getAvailableProducts();
       setProducts((availableProducts as any) || []);
     } catch (error) {
-      console.error('Error loading products:', error);
-      showToast('Failed to load subscription plans', 'error');
+      console.error("Error loading products:", error);
+      showToast("Failed to load subscription plans", "error");
     } finally {
       setIsLoading(false);
     }
@@ -42,12 +48,12 @@ export function SubscriptionPlansComponent() {
       await purchaseItem(productId);
       // The purchase will be verified automatically in iapService
       // Subscription status will update through the listener
-      showToast('Purchase successful!', 'success');
+      showToast("Purchase successful!", "success");
     } catch (error: any) {
-      if (error?.code !== 'E_USER_CANCELLED') {
+      if (error?.code !== "E_USER_CANCELLED") {
         showToast(
-          error?.message || 'Purchase failed. Please try again.',
-          'error'
+          error?.message || "Purchase failed. Please try again.",
+          "error",
         );
       }
     } finally {
@@ -57,18 +63,20 @@ export function SubscriptionPlansComponent() {
 
   if (isSubscriptionLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" />
       </View>
     );
   }
 
   // Show current subscription if active
-  if (subscription && subscription.status === 'active') {
+  if (subscription && subscription.status === "active") {
     const endDate = new Date(subscription.endDate);
     return (
-      <View style={{ padding: 16, backgroundColor: '#f0f9ff', borderRadius: 8 }}>
-        <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 8 }}>
+      <View
+        style={{ padding: 16, backgroundColor: "#f0f9ff", borderRadius: 8 }}
+      >
+        <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 8 }}>
           Active Subscription
         </Text>
         <Text style={{ fontSize: 14, marginBottom: 4 }}>
@@ -77,8 +85,9 @@ export function SubscriptionPlansComponent() {
         <Text style={{ fontSize: 14, marginBottom: 4 }}>
           Expires: {endDate.toLocaleDateString()}
         </Text>
-        <Text style={{ fontSize: 12, color: '#666', marginTop: 8 }}>
-          Your subscription is active. It will automatically renew on the expiration date.
+        <Text style={{ fontSize: 12, color: "#666", marginTop: 8 }}>
+          Your subscription is active. It will automatically renew on the
+          expiration date.
         </Text>
       </View>
     );
@@ -87,7 +96,7 @@ export function SubscriptionPlansComponent() {
   // Show available plans
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" />
       </View>
     );
@@ -95,14 +104,17 @@ export function SubscriptionPlansComponent() {
 
   return (
     <ScrollView style={{ flex: 1, paddingHorizontal: 16 }}>
-      <Text style={{ fontSize: 24, fontWeight: 'bold', marginVertical: 16 }}>
+      <Text style={{ fontSize: 24, fontWeight: "bold", marginVertical: 16 }}>
         Choose Your Plan
       </Text>
 
       {products.length === 0 ? (
-        <View style={{ padding: 16, backgroundColor: '#fef2f2', borderRadius: 8 }}>
-          <Text style={{ color: '#991b1b' }}>
-            Unable to load subscription plans. Please check your internet connection and try again.
+        <View
+          style={{ padding: 16, backgroundColor: "#fef2f2", borderRadius: 8 }}
+        >
+          <Text style={{ color: "#991b1b" }}>
+            Unable to load subscription plans. Please check your internet
+            connection and try again.
           </Text>
           <TouchableOpacity
             onPress={loadProducts}
@@ -110,11 +122,17 @@ export function SubscriptionPlansComponent() {
               marginTop: 12,
               paddingHorizontal: 16,
               paddingVertical: 8,
-              backgroundColor: '#dc2626',
+              backgroundColor: "#dc2626",
               borderRadius: 4,
             }}
           >
-            <Text style={{ color: 'white', fontWeight: 'bold', textAlign: 'center' }}>
+            <Text
+              style={{
+                color: "white",
+                fontWeight: "bold",
+                textAlign: "center",
+              }}
+            >
               Retry
             </Text>
           </TouchableOpacity>
@@ -125,29 +143,33 @@ export function SubscriptionPlansComponent() {
           const p = product as any;
           const productId = p.productId || p.productIdentifier;
           const price = p.localizedPrice || p.price;
-          const currency = p.currency || 'USD';
+          const currency = p.currency || "USD";
           const title = p.title || p.name || productId;
-          const description = p.description || '';
+          const description = p.description || "";
 
           return (
             <View
               key={productId}
               style={{
-                backgroundColor: 'white',
+                backgroundColor: "white",
                 borderRadius: 12,
                 padding: 16,
                 marginBottom: 16,
                 borderWidth: 1,
-                borderColor: '#e5e7eb',
+                borderColor: "#e5e7eb",
               }}
             >
-              <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 4 }}>
+              <Text
+                style={{ fontSize: 18, fontWeight: "bold", marginBottom: 4 }}
+              >
                 {title}
               </Text>
-              <Text style={{ fontSize: 14, color: '#666', marginBottom: 12 }}>
+              <Text style={{ fontSize: 14, color: "#666", marginBottom: 12 }}>
                 {description}
               </Text>
-              <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 12 }}>
+              <Text
+                style={{ fontSize: 20, fontWeight: "bold", marginBottom: 12 }}
+              >
                 {price} {currency}
               </Text>
 
@@ -155,7 +177,7 @@ export function SubscriptionPlansComponent() {
                 onPress={() => handlePurchase(productId)}
                 disabled={isPurchasing === productId}
                 style={{
-                  backgroundColor: '#0ea5e9',
+                  backgroundColor: "#0ea5e9",
                   paddingHorizontal: 16,
                   paddingVertical: 12,
                   borderRadius: 6,
@@ -165,7 +187,13 @@ export function SubscriptionPlansComponent() {
                 {isPurchasing === productId ? (
                   <ActivityIndicator color="white" />
                 ) : (
-                  <Text style={{ color: 'white', fontWeight: 'bold', textAlign: 'center' }}>
+                  <Text
+                    style={{
+                      color: "white",
+                      fontWeight: "bold",
+                      textAlign: "center",
+                    }}
+                  >
                     Subscribe Now
                   </Text>
                 )}
@@ -176,8 +204,10 @@ export function SubscriptionPlansComponent() {
       )}
 
       <View style={{ marginVertical: 16, paddingHorizontal: 8 }}>
-        <Text style={{ fontSize: 12, color: '#666', lineHeight: 18 }}>
-          By subscribing, you agree to automatic renewal. Your subscription will renew at the end of each billing cycle. Cancel anytime in your account settings.
+        <Text style={{ fontSize: 12, color: "#666", lineHeight: 18 }}>
+          By subscribing, you agree to automatic renewal. Your subscription will
+          renew at the end of each billing cycle. Cancel anytime in your account
+          settings.
         </Text>
       </View>
     </ScrollView>
@@ -189,7 +219,7 @@ export function SubscriptionPlansComponent() {
  */
 export function SubscribeButton({
   productId,
-  label = 'Subscribe',
+  label = "Subscribe",
   onSuccess,
   onError,
 }: {
@@ -205,12 +235,13 @@ export function SubscribeButton({
     try {
       setIsLoading(true);
       await purchaseItem(productId);
-      showToast('Purchase successful!', 'success');
+      showToast("Purchase successful!", "success");
       onSuccess?.();
     } catch (error: any) {
-      if (error?.code !== 'E_USER_CANCELLED') {
-        const errorMessage = error?.message || 'Purchase failed. Please try again.';
-        showToast(errorMessage, 'error');
+      if (error?.code !== "E_USER_CANCELLED") {
+        const errorMessage =
+          error?.message || "Purchase failed. Please try again.";
+        showToast(errorMessage, "error");
         onError?.(error);
       }
     } finally {
@@ -223,7 +254,7 @@ export function SubscribeButton({
       onPress={handlePress}
       disabled={isLoading}
       style={{
-        backgroundColor: '#0ea5e9',
+        backgroundColor: "#0ea5e9",
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderRadius: 6,
@@ -233,7 +264,9 @@ export function SubscribeButton({
       {isLoading ? (
         <ActivityIndicator color="white" />
       ) : (
-        <Text style={{ color: 'white', fontWeight: 'bold', textAlign: 'center' }}>
+        <Text
+          style={{ color: "white", fontWeight: "bold", textAlign: "center" }}
+        >
           {label}
         </Text>
       )}

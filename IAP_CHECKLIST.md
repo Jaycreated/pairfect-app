@@ -35,6 +35,7 @@ Use this checklist to ensure your IAP implementation is complete and ready for t
 ## iOS Setup
 
 ### App Store Connect Configuration
+
 - [ ] Create Apple Developer account
 - [ ] Create iOS app in App Store Connect
 - [ ] Create app-specific password for API access
@@ -52,6 +53,7 @@ Use this checklist to ensure your IAP implementation is complete and ready for t
 - [ ] Create sandbox test users (at least 2)
 
 ### Xcode Configuration
+
 - [ ] Set bundle identifier to `com.anonymous.Pairfect`
 - [ ] Update version number in Xcode
 - [ ] Add signing team
@@ -59,6 +61,7 @@ Use this checklist to ensure your IAP implementation is complete and ready for t
 - [ ] Build and test on simulator/device
 
 ### Testing
+
 - [ ] Test with sandbox account on simulator
 - [ ] Test with sandbox account on physical device
 - [ ] Verify receipt verification works
@@ -69,6 +72,7 @@ Use this checklist to ensure your IAP implementation is complete and ready for t
 ## Android Setup
 
 ### Google Play Console Configuration
+
 - [ ] Create Google Play Developer account
 - [ ] Create Android app in Google Play Console
 - [ ] Set package name to `com.anonymous.Pairfect`
@@ -88,12 +92,14 @@ Use this checklist to ensure your IAP implementation is complete and ready for t
 - [ ] Add test devices if needed
 
 ### Android Studio Configuration
+
 - [ ] Update `app.json` with package name
 - [ ] Ensure `react-native-iap` is properly installed
 - [ ] Test on Android emulator
 - [ ] Test on physical Android device with Play Services
 
 ### Testing
+
 - [ ] Test with test account on emulator
 - [ ] Test with test account on physical device
 - [ ] Verify receipt verification works
@@ -104,6 +110,7 @@ Use this checklist to ensure your IAP implementation is complete and ready for t
 ## Backend Setup
 
 ### API Endpoints
+
 - [ ] Create `/api/payments/verify-iap` endpoint
 - [ ] Implement iOS receipt verification
   - [ ] Call Apple verification endpoint
@@ -117,6 +124,7 @@ Use this checklist to ensure your IAP implementation is complete and ready for t
 - [ ] Return proper error responses
 
 ### Database Updates
+
 - [ ] Add `iap_receipt_id` field to subscriptions table
 - [ ] Add `iap_platform` field (ios/android)
 - [ ] Add `auto_renewal_status` field
@@ -124,6 +132,7 @@ Use this checklist to ensure your IAP implementation is complete and ready for t
 - [ ] Add `purchase_token` field (Android)
 
 ### Security Checklist
+
 - [ ] Use HTTPS for all API calls
 - [ ] Validate auth token on verification endpoint
 - [ ] Store app-specific API credentials securely
@@ -134,6 +143,7 @@ Use this checklist to ensure your IAP implementation is complete and ready for t
 ## Testing Plan
 
 ### iOS Testing
+
 - [ ] [ ] Create sandbox test account
 - [ ] [ ] Sign out of personal Apple ID on test device
 - [ ] [ ] Install debug build from Xcode
@@ -147,6 +157,7 @@ Use this checklist to ensure your IAP implementation is complete and ready for t
 - [ ] [ ] Test renewing expired subscription
 
 ### Android Testing
+
 - [ ] [ ] Create test Google account
 - [ ] [ ] Add to License Testing in Play Console
 - [ ] [ ] Install debug build from Android Studio
@@ -161,6 +172,7 @@ Use this checklist to ensure your IAP implementation is complete and ready for t
 - [ ] [ ] Test renewing expired subscription
 
 ### Cross-Platform Testing
+
 - [ ] [ ] Subscribe on iOS, verify on Android (won't work - different platforms)
 - [ ] [ ] Subscribe on Android, verify on iOS (won't work - different platforms)
 - [ ] [ ] Kill app during purchase and restart (should retry)
@@ -171,6 +183,7 @@ Use this checklist to ensure your IAP implementation is complete and ready for t
 ## Production Deployment
 
 ### Pre-Release Checklist
+
 - [ ] All tests pass
 - [ ] No console errors in logs
 - [ ] Receipt verification working on both platforms
@@ -181,6 +194,7 @@ Use this checklist to ensure your IAP implementation is complete and ready for t
 - [ ] Test in production certificate environment
 
 ### iOS Submission
+
 - [ ] [ ] Complete app review with IAP mention
 - [ ] [ ] Submit IAP products for review (usually automatic)
 - [ ] [ ] Test with production receipts
@@ -189,6 +203,7 @@ Use this checklist to ensure your IAP implementation is complete and ready for t
 - [ ] [ ] Release app to 1% of users first
 
 ### Android Release
+
 - [ ] [ ] Test in internal testing track
 - [ ] [ ] Monitor for crashes/errors
 - [ ] [ ] Release to closed beta (1-5% of users)
@@ -208,18 +223,21 @@ Use this checklist to ensure your IAP implementation is complete and ready for t
 ## Common Issues to Handle
 
 ### During Development
+
 - [ ] Product IDs don't match (check App Store Connect/Play Console)
 - [ ] Receipt verification fails (check backend implementation)
 - [ ] App crashes on purchase (check error handling)
 - [ ] Subscription doesn't show as active (check subscription context)
 
 ### During Testing
+
 - [ ] "SKU not found" error → Wrong product ID
 - [ ] "Invalid token" → Test account not configured
 - [ ] Receipt verification returning 404 → Wrong backend endpoint
 - [ ] Subscription not persisting → Check database/backend
 
 ### Production Issues
+
 - [ ] Users complaining about duplicate charges → Check renewal logic
 - [ ] Receipts failing verification → Check Apple/Google API keys
 - [ ] App crashing on older devices → Check minimum OS version
@@ -247,6 +265,7 @@ Use this checklist to ensure your IAP implementation is complete and ready for t
 ---
 
 **Notes:**
+
 - Product IDs: `com.pairfect.daily` and `com.pairfect.monthly`
 - Bundle ID: `com.anonymous.Pairfect`
 - Backend endpoint: `/api/payments/verify-iap`

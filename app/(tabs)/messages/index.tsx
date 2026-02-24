@@ -1,21 +1,31 @@
-import { PoppinsText } from '@/components/PoppinsText';
-import { useAuth } from '@/context/AuthContext';
-import { useSubscription } from '@/context/SubscriptionContext';
-import { useToast } from '@/context/ToastContext';
-import { api } from '@/services/api';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FreeMessageCounter } from "@/components/FreeMessageCounter";
+import { PoppinsText } from "@/components/PoppinsText";
+import { useAuth } from "@/context/AuthContext";
+import { useMessageCount } from "@/context/MessageCountContext";
+import { useSubscription } from "@/context/SubscriptionContext";
+import { useToast } from "@/context/ToastContext";
+import { api } from "@/services/api";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Image, Linking, RefreshControl,
+  Image,
+  Linking,
+  Platform,
+  RefreshControl,
   StyleSheet,
   TextInput,
   TouchableOpacity,
   View,
-  Platform,
-} from 'react-native';
+} from "react-native";
 
 // ============================================================================
 // TYPES
@@ -75,7 +85,7 @@ const formatMessageTime = (timestamp: string): string => {
 
   // Just now (less than 1 minute)
   if (diffInMinutes < 1) {
-    return 'Just now';
+    return "Just now";
   }
 
   // Minutes ago (1-59 minutes)
@@ -90,7 +100,7 @@ const formatMessageTime = (timestamp: string): string => {
 
   // Yesterday
   if (diffInDays === 1) {
-    return 'Yesterday';
+    return "Yesterday";
   }
 
   // Within a week (2-6 days ago)
@@ -99,14 +109,17 @@ const formatMessageTime = (timestamp: string): string => {
   }
 
   // Older than a week - show date
-  const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
+  const options: Intl.DateTimeFormatOptions = {
+    month: "short",
+    day: "numeric",
+  };
 
   // If different year, add year
   if (messageDate.getFullYear() !== now.getFullYear()) {
-    options.year = 'numeric';
+    options.year = "numeric";
   }
 
-  return messageDate.toLocaleDateString('en-US', options);
+  return messageDate.toLocaleDateString("en-US", options);
 };
 
 /**
@@ -114,18 +127,20 @@ const formatMessageTime = (timestamp: string): string => {
  */
 const transformApiConversation = (conv: ApiConversation): ConversationType => {
   // Use the first photo as avatar if available, otherwise fallback to avatar or placeholder
-  const avatar = Array.isArray(conv.photos) && conv.photos.length > 0
-    ? conv.photos[0]
-    : conv.avatar || 'https://via.placeholder.com/56';
+  const avatar =
+    Array.isArray(conv.photos) && conv.photos.length > 0
+      ? conv.photos[0]
+      : conv.avatar || "https://via.placeholder.com/56";
 
   return {
-    id: String(conv.id || conv._id || ''),
+    id: String(conv.id || conv._id || ""),
     user: {
-      id: String(conv.id || ''),
-      name: conv.name || 'Unknown User',
+      id: String(conv.id || ""),
+      name: conv.name || "Unknown User",
       avatar: avatar,
     },
-    lastMessage: conv.last_message || conv.lastMessage?.content || 'No messages yet',
+    lastMessage:
+      conv.last_message || conv.lastMessage?.content || "No messages yet",
     time: conv.last_message_at || conv.updatedAt || new Date().toISOString(),
     unread: Number(conv.unread_count || conv.unreadCount || 0),
   };
@@ -140,78 +155,94 @@ interface ConversationItemProps {
   onPress: (id: string) => void;
 }
 
-const ConversationItem = React.memo<ConversationItemProps>(({ item, onPress }) => {
-  const handlePress = useCallback(() => {
-    onPress(item.id);
-  }, [item.id, onPress]);
+const ConversationItem = React.memo<ConversationItemProps>(
+  ({ item, onPress }) => {
+    const handlePress = useCallback(() => {
+      onPress(item.id);
+    }, [item.id, onPress]);
 
-  return (
-    <TouchableOpacity
-      style={styles.conversationItem}
-      onPress={handlePress}
-      testID={`conversation-${item.id}`}
-      accessibilityLabel={`Conversation with ${item.user.name}`}
-      accessibilityHint="Double tap to open conversation"
-      accessibilityRole="button"
-    >
-      <Image
-        source={{ uri: item.user.avatar }}
-        style={styles.avatar}
-        accessibilityLabel={`${item.user.name}'s avatar`}
-      />
+    return (
+      <TouchableOpacity
+        style={styles.conversationItem}
+        onPress={handlePress}
+        testID={`conversation-${item.id}`}
+        accessibilityLabel={`Conversation with ${item.user.name}`}
+        accessibilityHint="Double tap to open conversation"
+        accessibilityRole="button"
+      >
+        <Image
+          source={{ uri: item.user.avatar }}
+          style={styles.avatar}
+          accessibilityLabel={`${item.user.name}'s avatar`}
+        />
 
-      <View style={styles.conversationContent}>
-        {/* Header: Name and Time */}
-        <View style={styles.conversationHeader}>
-          <PoppinsText style={styles.userName} numberOfLines={1}>
-            {item.user.name}
-          </PoppinsText>
-          <PoppinsText style={styles.time}>
-            {formatMessageTime(item.time)}
-          </PoppinsText>
+        <View style={styles.conversationContent}>
+          {/* Header: Name and Time */}
+          <View style={styles.conversationHeader}>
+            <PoppinsText style={styles.userName} numberOfLines={1}>
+              {item.user.name}
+            </PoppinsText>
+            <PoppinsText style={styles.time}>
+              {formatMessageTime(item.time)}
+            </PoppinsText>
+          </View>
+
+          {/* Last Message Preview */}
+          <View style={styles.messagePreview}>
+            <PoppinsText
+              style={[
+                styles.lastMessage,
+                item.unread > 0 && styles.unreadMessage,
+              ]}
+              numberOfLines={1}
+            >
+              {item.lastMessage}
+            </PoppinsText>
+
+            {item.unread > 0 && (
+              <View style={styles.unreadBadge}>
+                <PoppinsText style={styles.unreadCount}>
+                  {item.unread > 99 ? "99+" : item.unread}
+                </PoppinsText>
+              </View>
+            )}
+          </View>
         </View>
+      </TouchableOpacity>
+    );
+  },
+);
 
-        {/* Last Message Preview */}
-        <View style={styles.messagePreview}>
-          <PoppinsText
-            style={[
-              styles.lastMessage,
-              item.unread > 0 && styles.unreadMessage,
-            ]}
-            numberOfLines={1}
-          >
-            {item.lastMessage}
-          </PoppinsText>
-
-          {item.unread > 0 && (
-            <View style={styles.unreadBadge}>
-              <PoppinsText style={styles.unreadCount}>
-                {item.unread > 99 ? '99+' : item.unread}
-              </PoppinsText>
-            </View>
-          )}
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-});
-
-ConversationItem.displayName = 'ConversationItem';
+ConversationItem.displayName = "ConversationItem";
 
 // ============================================================================
 // MAIN MESSAGES SCREEN COMPONENT
 // ============================================================================
 
 const MessagesScreen = () => {
-  console.log('[MessagesScreen] Rendering component');
+  console.log("[MessagesScreen] Rendering component");
 
   // ========== Context Hooks ==========
-  const { subscription, isLoading: isSubscriptionLoading, refreshSubscription } = useSubscription();
+  const {
+    subscription,
+    isLoading: isSubscriptionLoading,
+    refreshSubscription,
+  } = useSubscription();
+  const { canSend, remainingFreeMessages, isLoading: messageCountLoading } = useMessageCount();
   const { user } = useAuth();
   const router = useRouter();
 
+  console.log("[MessagesScreen] Context state:", {
+    subscription: !!subscription,
+    isSubscriptionLoading,
+    canSend,
+    remainingFreeMessages,
+    messageCountLoading,
+    userId: user?.id
+  });
+
   // ========== State ==========
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [conversations, setConversations] = useState<ConversationType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -223,7 +254,7 @@ const MessagesScreen = () => {
   const isMountedRef = useRef(true);
   const searchInputRef = useRef<TextInput>(null);
 
-  console.log('[MessagesScreen] State:', {
+  console.log("[MessagesScreen] State:", {
     userLoggedIn: !!user,
     hasSubscription: !!subscription,
     conversationsCount: conversations.length,
@@ -248,7 +279,9 @@ const MessagesScreen = () => {
    * Fetch conversations when component mounts or user changes
    */
   useEffect(() => {
-    console.log('[MessagesScreen] useEffect triggered - fetching conversations');
+    console.log(
+      "[MessagesScreen] useEffect triggered - fetching conversations",
+    );
     fetchConversations(false);
   }, [user?.id]);
 
@@ -259,10 +292,10 @@ const MessagesScreen = () => {
    * @param isRefresh - Whether this is a pull-to-refresh action
    */
   const fetchConversations = async (isRefresh: boolean = false) => {
-    console.log('[fetchConversations] Starting fetch, isRefresh:', isRefresh);
+    console.log("[fetchConversations] Starting fetch, isRefresh:", isRefresh);
 
     if (!user?.id) {
-      console.warn('[fetchConversations] No user ID, skipping fetch');
+      console.warn("[fetchConversations] No user ID, skipping fetch");
       setIsLoading(false);
       return;
     }
@@ -277,38 +310,46 @@ const MessagesScreen = () => {
 
       setError(null);
 
-      console.log('[fetchConversations] Making API request to get conversations');
+      console.log(
+        "[fetchConversations] Making API request to get conversations",
+      );
       const response = await api.getConversations();
 
-      console.log('[fetchConversations] API response received:', {
+      console.log("[fetchConversations] API response received:", {
         data: response.data,
         error: response.error,
       });
 
       // If server indicates subscription required, handle gracefully
       if (response.error) {
-        const msg = (response.error.message || '').toString().toLowerCase();
+        const msg = (response.error.message || "").toString().toLowerCase();
         const status = response.error.status as number | undefined;
-        const code = (response.error.code || '').toString();
+        const code = (response.error.code || "").toString();
 
         // Detect subscription-required responses from various providers/backends
         const isSubscriptionRequired =
           status === 402 ||
           status === 403 ||
-          code === 'SUBSCRIPTION_REQUIRED' ||
-          msg.includes('subscription') ||
-          msg.includes('payment required') ||
-          msg.includes('active subscription') ||
-          msg.includes('upgrade') ||
-          msg.includes('premium');
+          code === "SUBSCRIPTION_REQUIRED" ||
+          msg.includes("subscription") ||
+          msg.includes("payment required") ||
+          msg.includes("active subscription") ||
+          msg.includes("upgrade") ||
+          msg.includes("premium");
 
         if (isSubscriptionRequired) {
-          console.warn('[fetchConversations] Server requires active subscription:', response.error);
+          console.warn(
+            "[fetchConversations] Server requires active subscription:",
+            response.error,
+          );
           // Try to refresh local subscription state from server
           try {
             await refreshSubscription();
           } catch (e) {
-            console.error('Failed to refresh subscription after server response', e);
+            console.error(
+              "Failed to refresh subscription after server response",
+              e,
+            );
           }
 
           // Set flag to show subscription UI
@@ -318,73 +359,100 @@ const MessagesScreen = () => {
         }
 
         // For other API errors, throw to be handled by catch below
-        throw new Error(response.error.message || 'Failed to fetch conversations');
+        throw new Error(
+          response.error.message || "Failed to fetch conversations",
+        );
       }
 
       // Type assertion for the response data
       const conversationsData = response.data as ApiConversation[];
 
       // Log the transformed data for debugging
-      console.log('[fetchConversations] Transformed conversations data:',
-        JSON.stringify(conversationsData, null, 2)
+      console.log(
+        "[fetchConversations] Transformed conversations data:",
+        JSON.stringify(conversationsData, null, 2),
       );
 
       if (!isMountedRef.current) {
-        console.log('[fetchConversations] Component unmounted, aborting state update');
+        console.log(
+          "[fetchConversations] Component unmounted, aborting state update",
+        );
         return;
       }
       if (response.error) {
-        const errorMessage = typeof response.error === 'object' && response.error !== null
-          ? (response.error as { message?: string }).message
-          : 'Failed to fetch conversations';
+        const errorMessage =
+          typeof response.error === "object" && response.error !== null
+            ? (response.error as { message?: string }).message
+            : "Failed to fetch conversations";
         throw new Error(errorMessage);
       }
       if (conversationsData && Array.isArray(conversationsData)) {
-        console.log('[fetchConversations] Processing', conversationsData.length, 'conversations');
+        console.log(
+          "[fetchConversations] Processing",
+          conversationsData.length,
+          "conversations",
+        );
 
         if (conversationsData.length === 0) {
-          console.log('[fetchConversations] No conversations found');
+          console.log("[fetchConversations] No conversations found");
           setConversations([]);
           return;
         }
 
-        const formattedConversations = conversationsData.map(transformApiConversation);
+        const formattedConversations = conversationsData.map(
+          transformApiConversation,
+        );
 
         // Sort by most recent first
-        formattedConversations.sort((a, b) =>
-          new Date(b.time).getTime() - new Date(a.time).getTime()
+        formattedConversations.sort(
+          (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime(),
         );
 
         setConversations(formattedConversations);
-        console.log('[fetchConversations] Conversations updated successfully');
+        console.log("[fetchConversations] Conversations updated successfully");
       } else {
-        console.warn('[fetchConversations] Invalid response data format');
+        console.warn("[fetchConversations] Invalid response data format");
         setConversations([]);
       }
     } catch (err) {
-      console.error('[fetchConversations] Error occurred:', err instanceof Error ? err.message : err);
+      console.error(
+        "[fetchConversations] Error occurred:",
+        err instanceof Error ? err.message : err,
+      );
 
       if (!isMountedRef.current) {
-        console.log('[fetchConversations] Component unmounted, skipping error handling');
+        console.log(
+          "[fetchConversations] Component unmounted, skipping error handling",
+        );
         return;
       }
 
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
 
       // If the error indicates subscription is required, set flag and avoid noisy stack
-      if (errorMessage.toLowerCase().includes('subscription') || errorMessage.toLowerCase().includes('payment required')) {
+      if (
+        errorMessage.toLowerCase().includes("subscription") ||
+        errorMessage.toLowerCase().includes("payment required")
+      ) {
         setRequiresSubscription(true);
         setError(null);
       } else {
-        setError('Failed to load conversations. Please check your connection and try again.');
+        setError(
+          "Failed to load conversations. Please check your connection and try again.",
+        );
         // Show toast on refresh errors (user-initiated action)
         if (isRefresh) {
-          showToast('Could not refresh conversations. Please try again.', 'error');
+          showToast(
+            "Could not refresh conversations. Please try again.",
+            "error",
+          );
         }
       }
     } finally {
       if (isMountedRef.current) {
-        console.log('[fetchConversations] Fetch complete, updating loading states');
+        console.log(
+          "[fetchConversations] Fetch complete, updating loading states",
+        );
         setIsLoading(false);
         setIsRefreshing(false);
       }
@@ -397,27 +465,33 @@ const MessagesScreen = () => {
    * Handles search input changes
    */
   const handleSearch = useCallback((query: string) => {
-    console.log('[handleSearch] Search query:', query);
+    console.log("[handleSearch] Search query:", query);
     setSearchQuery(query);
   }, []);
 
   /**
    * Handles conversation item press - navigates to chat
    */
-  const handleConversationPress = useCallback((conversationId: string) => {
-    console.log('[handleConversationPress] Opening conversation:', conversationId);
-    // Navigate to the chat screen with the conversation ID
-    router.push({
-      pathname: '/(tabs)/messages/[id]',
-      params: { id: conversationId }
-    });
-  }, [router]);
+  const handleConversationPress = useCallback(
+    (conversationId: string) => {
+      console.log(
+        "[handleConversationPress] Opening conversation:",
+        conversationId,
+      );
+      // Navigate to the chat screen with the conversation ID
+      router.push({
+        pathname: "/(tabs)/messages/[id]",
+        params: { id: conversationId },
+      });
+    },
+    [router],
+  );
 
   /**
    * Handles pull-to-refresh
    */
   const handleRefresh = useCallback(() => {
-    console.log('[handleRefresh] User initiated refresh');
+    console.log("[handleRefresh] User initiated refresh");
     fetchConversations(true);
   }, [user?.id]);
 
@@ -425,7 +499,7 @@ const MessagesScreen = () => {
    * Handles retry button press
    */
   const handleRetry = useCallback(() => {
-    console.log('[handleRetry] User clicked retry');
+    console.log("[handleRetry] User clicked retry");
     fetchConversations(false);
   }, [user?.id]);
 
@@ -441,9 +515,9 @@ const MessagesScreen = () => {
     }
 
     const query = searchQuery.toLowerCase().trim();
-    console.log('[filteredConversations] Filtering with query:', query);
+    console.log("[filteredConversations] Filtering with query:", query);
 
-    return conversations.filter(conv => {
+    return conversations.filter((conv) => {
       const nameMatch = conv.user.name.toLowerCase().includes(query);
       const messageMatch = conv.lastMessage.toLowerCase().includes(query);
       return nameMatch || messageMatch;
@@ -455,9 +529,12 @@ const MessagesScreen = () => {
   /**
    * Renders individual conversation item
    */
-  const renderConversation = useCallback(({ item }: { item: ConversationType }) => {
-    return <ConversationItem item={item} onPress={handleConversationPress} />;
-  }, [handleConversationPress]);
+  const renderConversation = useCallback(
+    ({ item }: { item: ConversationType }) => {
+      return <ConversationItem item={item} onPress={handleConversationPress} />;
+    },
+    [handleConversationPress],
+  );
 
   /**
    * Renders empty state when no conversations exist
@@ -473,7 +550,7 @@ const MessagesScreen = () => {
         <PoppinsText style={styles.emptyStateText}>
           {searchQuery
             ? `No conversations found for "${searchQuery}"`
-            : 'No conversations yet.\nStart chatting to see your messages here!'}
+            : "No conversations yet.\nStart chatting to see your messages here!"}
         </PoppinsText>
       </View>
     );
@@ -486,14 +563,43 @@ const MessagesScreen = () => {
 
   // ========== Loading States ==========
 
+  console.log("[MessagesScreen] Checking display conditions:", {
+    // Loading states
+    isSubscriptionLoading,
+    messageCountLoading,
+    isLoading,
+    isRefreshing,
+    
+    // Access states
+    subscription: !!subscription,
+    requiresSubscription,
+    canSend,
+    remainingFreeMessages,
+    
+    // Combined conditions
+    shouldShowLoading: isSubscriptionLoading || messageCountLoading || (isLoading && !isRefreshing),
+    shouldShowSubscriptionPrompt: !canSend && remainingFreeMessages <= 0,
+    shouldShowFreeMessageLimit: !canSend && remainingFreeMessages <= 0,
+    shouldShowConversations: subscription && canSend || (!subscription && canSend)
+  });
+
   /**
    * Show loading spinner while checking subscription or loading initial data
    */
-  if (isSubscriptionLoading || (isLoading && !isRefreshing)) {
+  if (isSubscriptionLoading || messageCountLoading || (isLoading && !isRefreshing)) {
+    console.log("[MessagesScreen] DECISION: Showing loading state - conditions:", {
+      isSubscriptionLoading,
+      messageCountLoading,
+      isLoading,
+      isRefreshing,
+      combined: isSubscriptionLoading || messageCountLoading || (isLoading && !isRefreshing)
+    });
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#651B55" />
-        <PoppinsText style={styles.loadingText}>Loading conversations...</PoppinsText>
+        <PoppinsText style={styles.loadingText}>
+          Loading conversations...
+        </PoppinsText>
       </View>
     );
   }
@@ -523,45 +629,64 @@ const MessagesScreen = () => {
    * message with a button that opens the external subscription website.
    * Falls back to the in-app subscribe screen if no external URL is configured.
    */
-  if (!subscription || requiresSubscription) {
-    // Default to the production subscribe URL if not provided in env
-    const baseUrl = process.env.EXPO_PUBLIC_SUBSCRIBE_URL 
-      ? `${process.env.EXPO_PUBLIC_SUBSCRIBE_URL}/pricing` 
-      : 'https://dating-g2mc.onrender.com/pricing';
+  if (!canSend && remainingFreeMessages <= 0) {
+    console.log("[MessagesScreen] DECISION: Showing subscription prompt - conditions:", {
+      subscription: !!subscription,
+      requiresSubscription,
+      condition: !canSend && remainingFreeMessages <= 0,
+      canSend,
+      remainingFreeMessages
+    });
     
+    console.log("[MessagesScreen] No free messages left - showing subscription prompt", {
+      subscription: !!subscription,
+      requiresSubscription,
+      canSend,
+      remainingFreeMessages
+    });
+    
+    // Default to the production subscribe URL if not provided in env
+    const baseUrl = process.env.EXPO_PUBLIC_SUBSCRIBE_URL
+      ? `${process.env.EXPO_PUBLIC_SUBSCRIBE_URL}/pricing`
+      : "https://dating-g2mc.onrender.com/pricing";
+
     // Create a deep link that will redirect back to the app after subscription
-    const callbackUrl = 'pairfect://messages';
+    const callbackUrl = "pairfect://messages";
     const externalSubscribeUrl = `${baseUrl}?redirect_uri=${encodeURIComponent(callbackUrl)}`;
 
     const verifySubscription = async () => {
       try {
-        const response = await fetch('https://dating-g2mc.onrender.com/api/subscription/status', {
-          headers: {
-            'Authorization': `Bearer ${user?.token || ''}`
-          }
-        });
-        
+        const response = await fetch(
+          "https://dating-g2mc.onrender.com/api/subscription/status",
+          {
+            headers: {
+              Authorization: `Bearer ${user?.token || ""}`,
+            },
+          },
+        );
+
         if (!response.ok) {
-          throw new Error('Failed to verify subscription');
+          throw new Error("Failed to verify subscription");
         }
-        
+
         const data = await response.json();
         if (data.isActive) {
           await refreshSubscription();
         } else {
-          throw new Error('Subscription not active');
+          throw new Error("Subscription not active");
         }
       } catch (error) {
-        console.error('Subscription verification failed:', error);
+        console.error("Subscription verification failed:", error);
         throw error;
       }
     };
 
     const handleOpenSubscribe = async () => {
+      console.log("[MessagesScreen] User clicked subscribe button");
       try {
         // On iOS we prefer the in-app subscribe screen (IAP).
-        if (Platform.OS === 'ios') {
-          router.push('/screens/subscribe' as any);
+        if (Platform.OS === "ios") {
+          router.push("/screens/subscribe" as any);
           return;
         }
 
@@ -571,16 +696,19 @@ const MessagesScreen = () => {
         const externalSubscribeUrl = `${baseUrl}?redirect_uri=${encodeURIComponent(callbackUrl)}`;
 
         // Set up deep link listener
-        const subscription = Linking.addEventListener('url', async (event) => {
-          console.log('App opened with URL:', event.url);
+        const subscription = Linking.addEventListener("url", async (event) => {
+          console.log("App opened with URL:", event.url);
           subscription.remove();
 
           // Verify the subscription with your backend
           try {
             await verifySubscription();
           } catch (error) {
-            console.error('Subscription verification failed:', error);
-            showToast('Failed to verify subscription. Please try again.', 'error');
+            console.error("Subscription verification failed:", error);
+            showToast(
+              "Failed to verify subscription. Please try again.",
+              "error",
+            );
           }
         });
 
@@ -589,12 +717,12 @@ const MessagesScreen = () => {
         if (supported) {
           await Linking.openURL(externalSubscribeUrl);
         } else {
-          throw new Error('Cannot open subscription URL');
+          throw new Error("Cannot open subscription URL");
         }
       } catch (err) {
-        console.error('Failed to open subscribe URL:', err);
+        console.error("Failed to open subscribe URL:", err);
         // Fallback to in-app subscribe screen if external URL fails
-        router.push('/screens/subscribe' as any);
+        router.push("/screens/subscribe" as any);
       }
     };
 
@@ -605,8 +733,8 @@ const MessagesScreen = () => {
           No Active Subscription
         </PoppinsText>
         <PoppinsText style={styles.subscriptionText}>
-          You need an active subscription to view and send messages. Subscribe to
-          unlock chat features.
+          You need an active subscription to view and send messages. Subscribe
+          to unlock chat features.
         </PoppinsText>
         <TouchableOpacity
           onPress={handleOpenSubscribe}
@@ -622,6 +750,130 @@ const MessagesScreen = () => {
     );
   }
 
+  /**
+   * If user has subscription access but no free messages left, show appropriate message
+   */
+  if (!canSend && remainingFreeMessages <= 0) {
+    console.log("[MessagesScreen] DECISION: Showing free message limit prompt - conditions:", {
+      canSend,
+      remainingFreeMessages,
+      condition: !canSend && remainingFreeMessages <= 0,
+      subscription: !!subscription
+    });
+    
+    console.log("[MessagesScreen] No free messages left - showing free message limit prompt", {
+      canSend,
+      remainingFreeMessages,
+      subscription: !!subscription
+    });
+    
+    const handleOpenSubscribe = async () => {
+      console.log("[MessagesScreen] User clicked subscribe from free message limit screen");
+      try {
+        // On iOS we prefer the in-app subscribe screen (IAP).
+        if (Platform.OS === "ios") {
+          router.push("/screens/subscribe" as any);
+          return;
+        }
+
+        // Default to the production subscribe URL if not provided in env
+        const baseUrl = process.env.EXPO_PUBLIC_SUBSCRIBE_URL
+          ? `${process.env.EXPO_PUBLIC_SUBSCRIBE_URL}/pricing`
+          : "https://dating-g2mc.onrender.com/pricing";
+
+        // Add a timestamp to make each redirect unique
+        const timestamp = Date.now();
+        const callbackUrl = `pairfect://messages?ts=${timestamp}`;
+        const externalSubscribeUrl = `${baseUrl}?redirect_uri=${encodeURIComponent(callbackUrl)}`;
+
+        // Set up deep link listener
+        const subscription = Linking.addEventListener("url", async (event) => {
+          console.log("App opened with URL:", event.url);
+          subscription.remove();
+
+          // Verify the subscription with your backend
+          try {
+            const response = await fetch(
+              "https://dating-g2mc.onrender.com/api/subscription/status",
+              {
+                headers: {
+                  Authorization: `Bearer ${user?.token || ""}`,
+                },
+              },
+            );
+
+            if (!response.ok) {
+              throw new Error("Failed to verify subscription");
+            }
+
+            const data = await response.json();
+            if (data.isActive) {
+              await refreshSubscription();
+            } else {
+              throw new Error("Subscription not active");
+            }
+          } catch (error) {
+            console.error("Subscription verification failed:", error);
+            showToast(
+              "Failed to verify subscription. Please try again.",
+              "error",
+            );
+          }
+        });
+
+        // Open the subscription URL in the browser
+        const supported = await Linking.canOpenURL(externalSubscribeUrl);
+        if (supported) {
+          await Linking.openURL(externalSubscribeUrl);
+        } else {
+          throw new Error("Cannot open subscription URL");
+        }
+      } catch (err) {
+        console.error("Failed to open subscribe URL:", err);
+        // Fallback to in-app subscribe screen if external URL fails
+        router.push("/screens/subscribe" as any);
+      }
+    };
+
+    return (
+      <View style={styles.subscriptionContainer}>
+        <Ionicons name="chatbubble-outline" size={80} color="#651B55" />
+        <PoppinsText style={styles.subscriptionTitle}>
+          No Free Messages Left
+        </PoppinsText>
+        <PoppinsText style={styles.subscriptionText}>
+          You've used all your free messages. Subscribe to continue chatting!
+        </PoppinsText>
+        <TouchableOpacity
+          onPress={handleOpenSubscribe}
+          style={styles.subscribeButton}
+          accessibilityLabel="Subscribe now"
+          accessibilityRole="button"
+        >
+          <PoppinsText style={styles.subscribeButtonText}>
+            Subscribe
+          </PoppinsText>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // User has access (either subscription or free messages) - show conversations
+  console.log("[MessagesScreen] DECISION: Showing conversations - conditions:", {
+    subscription: !!subscription,
+    canSend,
+    remainingFreeMessages,
+    condition: subscription && canSend || (!subscription && canSend),
+    conversationCount: conversations.length
+  });
+  
+  console.log("[MessagesScreen] User has access - showing conversations", {
+    subscription: !!subscription,
+    canSend,
+    remainingFreeMessages,
+    conversationCount: conversations.length
+  });
+
   // ========== Main Render ==========
 
   return (
@@ -633,7 +885,12 @@ const MessagesScreen = () => {
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+        <Ionicons
+          name="search"
+          size={20}
+          color="#999"
+          style={styles.searchIcon}
+        />
         <TextInput
           ref={searchInputRef}
           style={styles.searchInput}
@@ -648,7 +905,7 @@ const MessagesScreen = () => {
         />
         {searchQuery.length > 0 && (
           <TouchableOpacity
-            onPress={() => setSearchQuery('')}
+            onPress={() => setSearchQuery("")}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityLabel="Clear search"
             accessibilityRole="button"
@@ -657,6 +914,9 @@ const MessagesScreen = () => {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Free Message Counter */}
+      <FreeMessageCounter />
 
       {/* Conversations List */}
       <FlatList
@@ -673,7 +933,7 @@ const MessagesScreen = () => {
             refreshing={isRefreshing}
             onRefresh={handleRefresh}
             tintColor="#651B55"
-            colors={['#651B55']}
+            colors={["#651B55"]}
           />
         }
         initialNumToRender={10}
@@ -693,27 +953,27 @@ const MessagesScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-    fontFamily: 'Poppins-Regular',
+    backgroundColor: "#fff",
+    fontFamily: "Poppins-Regular",
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     padding: 16,
     paddingTop: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: "#f0f0f0",
   },
   headerTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
   },
   searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f5f5f5",
     borderRadius: 10,
     margin: 16,
     paddingHorizontal: 12,
@@ -725,90 +985,90 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     height: 44,
-    color: '#333',
+    color: "#333",
     fontSize: 16,
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#fff",
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#666',
+    color: "#666",
   },
   errorContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   errorText: {
     fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
+    color: "#666",
+    textAlign: "center",
     marginTop: 16,
     marginBottom: 24,
   },
   retryButton: {
-    backgroundColor: '#651B55',
+    backgroundColor: "#651B55",
     paddingHorizontal: 32,
     paddingVertical: 12,
     borderRadius: 8,
   },
   retryButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   subscriptionContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   subscriptionTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
     marginTop: 16,
     marginBottom: 8,
-    fontFamily: 'Poppins-Bold',
+    fontFamily: "Poppins-Bold",
   },
   subscriptionText: {
     fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
+    color: "#666",
+    textAlign: "center",
     marginBottom: 24,
-    fontFamily: 'Poppins-Regular',
+    fontFamily: "Poppins-Regular",
   },
   subscribeButton: {
-    backgroundColor: '#651B55',
+    backgroundColor: "#651B55",
     paddingHorizontal: 32,
     paddingVertical: 12,
     borderRadius: 12,
   },
   subscribeButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Poppins-SemiBold',
+    fontWeight: "600",
+    fontFamily: "Poppins-SemiBold",
   },
   emptyState: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
     paddingTop: 60,
   },
   emptyStateText: {
     fontSize: 16,
-    color: '#999',
-    textAlign: 'center',
+    color: "#999",
+    textAlign: "center",
     marginTop: 16,
     lineHeight: 24,
   },
@@ -819,68 +1079,68 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   conversationItem: {
-    flexDirection: 'row',
+    flexDirection: "row",
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    backgroundColor: '#fff',
+    borderBottomColor: "#f0f0f0",
+    backgroundColor: "#fff",
   },
   avatar: {
     width: 56,
     height: 56,
     borderRadius: 28,
     marginRight: 12,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: "#f0f0f0",
   },
   conversationContent: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   conversationHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 4,
-    alignItems: 'center',
+    alignItems: "center",
   },
   userName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
     flex: 1,
     marginRight: 8,
   },
   time: {
     fontSize: 12,
-    color: '#999',
+    color: "#999",
   },
   messagePreview: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   lastMessage: {
     flex: 1,
     fontSize: 14,
-    color: '#666',
+    color: "#666",
   },
   unreadMessage: {
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
   },
   unreadBadge: {
-    backgroundColor: '#651B55',
+    backgroundColor: "#651B55",
     borderRadius: 10,
     minWidth: 20,
     height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginLeft: 8,
     paddingHorizontal: 6,
   },
   unreadCount: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });
 

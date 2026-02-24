@@ -1,18 +1,21 @@
-import { Header } from '@/components/Header';
-import { Ionicons } from '@expo/vector-icons';
-import { Tabs, useRouter, usePathname } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
-import React, { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { Header } from "@/components/Header";
+import { Ionicons } from "@expo/vector-icons";
+import { Tabs, usePathname, useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
+import React, { useEffect } from "react";
 
-const ConditionalHeader = ({ onNotificationPress }: { onNotificationPress: () => void }) => {
+const ConditionalHeader = ({
+  onNotificationPress,
+}: {
+  onNotificationPress: () => void;
+}) => {
   const pathname = usePathname();
   const isInConversation = /\/messages\/\w+/.test(pathname);
-  
+
   if (isInConversation) {
     return null;
   }
-  
+
   return <Header onNotificationPress={onNotificationPress} />;
 };
 
@@ -23,13 +26,15 @@ export default function TabLayout() {
   useEffect(() => {
     const checkOnboarding = async () => {
       try {
-        const hasCompleted = await SecureStore.getItemAsync('onboarding_completed');
-        if (hasCompleted !== 'true') {
+        const hasCompleted = await SecureStore.getItemAsync(
+          "onboarding_completed",
+        );
+        if (hasCompleted !== "true") {
           // If not completed, ensure we're on the onboarding tab
-          router.setParams({ screen: 'onboarding' });
+          router.setParams({ screen: "onboarding" });
         }
       } catch (error) {
-        console.error('Error checking onboarding:', error);
+        console.error("Error checking onboarding:", error);
       }
     };
 
@@ -37,20 +42,22 @@ export default function TabLayout() {
   }, []);
 
   const handleNotificationPress = () => {
-    router.push('/(tabs)/notifications');
+    router.push("/(tabs)/notifications");
   };
 
   return (
     <Tabs
       screenOptions={{
-        header: () => <ConditionalHeader onNotificationPress={handleNotificationPress} />,
-        tabBarActiveTintColor: '#FFFFFF',
-        tabBarInactiveTintColor: '#FFFFFF',
+        header: () => (
+          <ConditionalHeader onNotificationPress={handleNotificationPress} />
+        ),
+        tabBarActiveTintColor: "#FFFFFF",
+        tabBarInactiveTintColor: "#FFFFFF",
         // Keep the bar visually elevated but allow it to sit flush
         // with the device safe area by removing extra bottom padding
         // and explicitly setting safe area insets.
         tabBarStyle: {
-          backgroundColor: '#651B55',
+          backgroundColor: "#651B55",
           borderTopWidth: 0,
           height: 92,
           paddingBottom: 0,
@@ -59,11 +66,11 @@ export default function TabLayout() {
           paddingLeft: 32,
           borderTopLeftRadius: 24,
           borderTopRightRadius: 24,
-          position: 'absolute',
+          position: "absolute",
           left: 0,
           right: 0,
           bottom: 0,
-          shadowColor: '#000',
+          shadowColor: "#000",
           shadowOffset: {
             width: 0,
             height: -5,
@@ -75,7 +82,7 @@ export default function TabLayout() {
         tabBarLabelStyle: {
           fontSize: 12,
           marginBottom: 4,
-          fontFamily: 'Poppins_500Medium',
+          fontFamily: "Poppins_500Medium",
           includeFontPadding: false,
         },
       }}
@@ -86,16 +93,16 @@ export default function TabLayout() {
           href: null, // This hides it from the tab bar
         }}
       />
-     
+
       <Tabs.Screen
         name="swipe"
         options={{
-          title: 'Discover',
+          title: "Discover",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? 'home' : 'home-outline'} 
-              size={24} 
-              color={color} 
+            <Ionicons
+              name={focused ? "home" : "home-outline"}
+              size={24}
+              color={color}
             />
           ),
         }}
@@ -103,12 +110,12 @@ export default function TabLayout() {
       <Tabs.Screen
         name="matches"
         options={{
-          title: 'Matches',
+          title: "Matches",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? 'heart' : 'heart-outline'} 
-              size={24} 
-              color={color} 
+            <Ionicons
+              name={focused ? "heart" : "heart-outline"}
+              size={24}
+              color={color}
             />
           ),
         }}
@@ -116,12 +123,12 @@ export default function TabLayout() {
       <Tabs.Screen
         name="messages"
         options={{
-          title: 'Chats',
+          title: "Chats",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? 'chatbubbles' : 'chatbubbles-outline'} 
-              size={24} 
-              color={color} 
+            <Ionicons
+              name={focused ? "chatbubbles" : "chatbubbles-outline"}
+              size={24}
+              color={color}
             />
           ),
         }}
@@ -129,12 +136,12 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: "Profile",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? 'person' : 'person-outline'} 
-              size={24} 
-              color={color} 
+            <Ionicons
+              name={focused ? "person" : "person-outline"}
+              size={24}
+              color={color}
             />
           ),
         }}

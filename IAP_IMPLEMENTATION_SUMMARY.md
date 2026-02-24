@@ -5,6 +5,7 @@ Your Pairfect app now has a complete in-app purchase (IAP) system for both iOS a
 ## What's Been Done ✅
 
 ### 1. Core IAP Service (`services/iapService.ts`)
+
 - ✅ Full integration with `react-native-iap` library
 - ✅ Support for both iOS and Android
 - ✅ Automatic product discovery and loading
@@ -14,21 +15,25 @@ Your Pairfect app now has a complete in-app purchase (IAP) system for both iOS a
 - ✅ Proper error handling and logging
 
 ### 2. Subscription Service Enhanced (`services/subscriptionService.ts`)
+
 - ✅ Updated `verifyIapReceipt()` to support both platforms
 - ✅ Handles JSON and raw receipt formats
 - ✅ Backend communication for receipt verification
 
 ### 3. React Hook for Initialization (`hooks/useIAP.ts`)
+
 - ✅ `useIAP()` hook for easy setup
 - ✅ Automatic initialization on app start
 - ✅ Proper cleanup on app close
 - ✅ Prevents duplicate initialization
 
 ### 4. App Integration (`app/_layout.tsx`)
+
 - ✅ Added IAP hook initialization in root layout
 - ✅ Seamless integration with existing providers
 
 ### 5. UI Components (`components/SubscriptionUI.tsx`)
+
 - ✅ `SubscriptionPlansComponent` - Display all available plans
 - ✅ `SubscribeButton` - Reusable purchase button
 - ✅ Current subscription status display
@@ -36,10 +41,12 @@ Your Pairfect app now has a complete in-app purchase (IAP) system for both iOS a
 - ✅ Loading states
 
 ### 6. Configuration (`app.json`)
+
 - ✅ Added SKAdNetworkItems for iOS tracking
 - ✅ Proper iOS configuration
 
 ### 7. Documentation
+
 - ✅ `IAP_SETUP_GUIDE.md` - Complete setup instructions
 - ✅ `IAP_CHECKLIST.md` - Verification checklist
 - ✅ `BACKEND_IAP_IMPLEMENTATION.md` - Backend implementation guide
@@ -48,10 +55,10 @@ Your Pairfect app now has a complete in-app purchase (IAP) system for both iOS a
 
 Your app uses two subscription products:
 
-| Plan | Product ID | Duration | Price |
-|------|-----------|----------|-------|
-| Daily Access | `com.pairfect.daily` | 24 hours | ~$0.99 |
-| Monthly Access | `com.pairfect.monthly` | 30 days | ~$4.99 |
+| Plan           | Product ID             | Duration | Price  |
+| -------------- | ---------------------- | -------- | ------ |
+| Daily Access   | `com.pairfect.daily`   | 24 hours | ~$0.99 |
+| Monthly Access | `com.pairfect.monthly` | 30 days  | ~$4.99 |
 
 ## Key Features
 
@@ -66,9 +73,10 @@ Your app uses two subscription products:
 ## Usage Examples
 
 ### Basic Usage
+
 ```typescript
 // In your app layout (already done in app/_layout.tsx)
-import { useIAP } from '@/hooks/useIAP';
+import { useIAP } from "@/hooks/useIAP";
 
 function MyApp() {
   useIAP(); // Initialize IAP on app start
@@ -77,6 +85,7 @@ function MyApp() {
 ```
 
 ### Display Subscription Plans
+
 ```typescript
 import { SubscriptionPlansComponent } from '@/components/SubscriptionUI';
 
@@ -86,12 +95,13 @@ export function SubscribeScreen() {
 ```
 
 ### Subscribe Button
+
 ```typescript
 import { SubscribeButton } from '@/components/SubscriptionUI';
 
 export function MyComponent() {
   return (
-    <SubscribeButton 
+    <SubscribeButton
       productId="com.pairfect.monthly"
       label="Subscribe Monthly"
       onSuccess={() => console.log('Success!')}
@@ -101,6 +111,7 @@ export function MyComponent() {
 ```
 
 ### Check Subscription
+
 ```typescript
 import { useSubscription } from '@/context/SubscriptionContext';
 
@@ -122,34 +133,39 @@ export function ChatScreen() {
 ## Next Steps
 
 ### 1. **Create App Store Connect Account** (iOS)
-   - Set up app in App Store Connect
-   - Create subscription products with matching IDs
-   - Set prices and availability
-   - Create test accounts
+
+- Set up app in App Store Connect
+- Create subscription products with matching IDs
+- Set prices and availability
+- Create test accounts
 
 ### 2. **Create Google Play Console Account** (Android)
-   - Set up app in Google Play Console
-   - Create subscription products with matching IDs
-   - Set prices and availability
-   - Add test accounts
+
+- Set up app in Google Play Console
+- Create subscription products with matching IDs
+- Set prices and availability
+- Add test accounts
 
 ### 3. **Implement Backend Endpoint**
-   - Create `/api/payments/verify-iap` endpoint
-   - Implement iOS receipt verification
-   - Implement Android receipt verification
-   - See `BACKEND_IAP_IMPLEMENTATION.md` for details
+
+- Create `/api/payments/verify-iap` endpoint
+- Implement iOS receipt verification
+- Implement Android receipt verification
+- See `BACKEND_IAP_IMPLEMENTATION.md` for details
 
 ### 4. **Test on Devices**
-   - Test on iOS simulator/device with sandbox account
-   - Test on Android emulator/device with test account
-   - Verify subscription activation
-   - Test renewal and cancellation
+
+- Test on iOS simulator/device with sandbox account
+- Test on Android emulator/device with test account
+- Verify subscription activation
+- Test renewal and cancellation
 
 ### 5. **Production Setup**
-   - Deploy backend verification
-   - Submit app for review (includes IAP)
-   - Configure production receipts
-   - Monitor IAP metrics
+
+- Deploy backend verification
+- Submit app for review (includes IAP)
+- Configure production receipts
+- Monitor IAP metrics
 
 ## Architecture Overview
 
@@ -222,6 +238,7 @@ A: Use sandbox accounts (iOS) or test accounts (Android) - they make free test p
 ## Files Modified/Created
 
 ### Core Files
+
 - `services/iapService.ts` - ✅ Complete rewrite
 - `services/subscriptionService.ts` - ✅ Enhanced
 - `hooks/useIAP.ts` - ✅ New
@@ -229,9 +246,11 @@ A: Use sandbox accounts (iOS) or test accounts (Android) - they make free test p
 - `app/_layout.tsx` - ✅ Updated
 
 ### Configuration
+
 - `app.json` - ✅ Updated
 
 ### Documentation
+
 - `IAP_SETUP_GUIDE.md` - ✅ New (Complete setup guide)
 - `IAP_CHECKLIST.md` - ✅ New (Testing checklist)
 - `BACKEND_IAP_IMPLEMENTATION.md` - ✅ New (Backend guide)
@@ -248,6 +267,7 @@ A: Use sandbox accounts (iOS) or test accounts (Android) - they make free test p
 ## Ready to Go!
 
 Your app is now fully configured for in-app purchases. Follow the guides to:
+
 1. Set up your App Store and Google Play accounts
 2. Create the subscription products
 3. Implement backend verification

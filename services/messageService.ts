@@ -1,6 +1,6 @@
-import { getApiUrl } from '@/config/api';
-import * as SecureStore from 'expo-secure-store';
-import { getAuthToken } from './userService';
+import { API_CONFIG } from "@/config/api";
+import { api } from "@/services/api";
+import * as SecureStore from "expo-secure-store";
 
 export interface MessageCount {
   totalSent: number;
@@ -16,62 +16,27 @@ export interface SendMessageResponse {
   remainingFreeMessages?: number;
 }
 
-const FREE_MESSAGES_LIMIT = 3;
-const MESSAGE_COUNT_KEY = 'message_count';
+const DEFAULT_FREE_MESSAGES_LIMIT = 3;
+const MESSAGE_COUNT_KEY = "message_count";
+
+// ---------------------------------------------------------------------------
+// Local storage helpers
+// ---------------------------------------------------------------------------
 
 /**
- * Get the current message count for the user
+ * Clear cached message count from local storage
  */
-export const getMessageCount = async (): Promise<MessageCount> => {
+export const clearLocalMessageCount = async (): Promise<void> => {
   try {
-    const token = await getAuthToken();
-    
-    if (!token) {
-      throw new Error('No authentication token found');
-    }
-
-    const url = getApiUrl('/messages/count');
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      let errorData: any = {};
-      try {
-        errorData = await response.json();
-      } catch (e) {
-        try {
-          errorData = { message: await response.text() };
-        } catch (e2) {
-          errorData = {};
-        }
-      }
-
-      console.error(`getMessageCount failed for ${url}:`, response.status, response.statusText, errorData);
-      throw new Error(errorData.message || `Failed to get message count (status ${response.status})`);
-    }
-
-    const data = await response.json();
-    return {
-      totalSent: data.totalSent || 0,
-      freeMessagesUsed: data.freeMessagesUsed || 0,
-      freeMessagesLimit: data.freeMessagesLimit || FREE_MESSAGES_LIMIT,
-      hasPaidAccess: data.hasPaidAccess || false,
-    };
+    await SecureStore.deleteItemAsync(MESSAGE_COUNT_KEY);
+    console.log("Cleared cached message count");
   } catch (error) {
-    console.error('Error getting message count:', error);
-    
-    // Fallback to local storage if API fails
-    return getLocalMessageCount();
+    console.error("Error clearing local message count:", error);
   }
 };
 
 /**
- * Get message count from local storage (fallback)
+ * Get message count from local SecureStore (fallback when API is unavailable).
  */
 export const getLocalMessageCount = async (): Promise<MessageCount> => {
   try {
@@ -81,51 +46,121 @@ export const getLocalMessageCount = async (): Promise<MessageCount> => {
       return {
         totalSent: data.totalSent || 0,
         freeMessagesUsed: data.freeMessagesUsed || 0,
-        freeMessagesLimit: FREE_MESSAGES_LIMIT,
+        freeMessagesLimit: data.freeMessagesLimit || DEFAULT_FREE_MESSAGES_LIMIT,
         hasPaidAccess: data.hasPaidAccess || false,
       };
     }
   } catch (error) {
-    console.error('Error getting local message count:', error);
+    console.error("Error getting local message count:", error);
   }
 
   return {
     totalSent: 0,
     freeMessagesUsed: 0,
-    freeMessagesLimit: FREE_MESSAGES_LIMIT,
+    freeMessagesLimit: DEFAULT_FREE_MESSAGES_LIMIT,
     hasPaidAccess: false,
   };
 };
 
 /**
- * Save message count to local storage
+ * Persist message count to local SecureStore.
  */
-export const saveLocalMessageCount = async (count: MessageCount): Promise<void> => {
+export const saveLocalMessageCount = async (
+  count: MessageCount,
+): Promise<void> => {
   try {
     await SecureStore.setItemAsync(MESSAGE_COUNT_KEY, JSON.stringify(count));
   } catch (error) {
-    console.error('Error saving local message count:', error);
+    console.error("Error saving local message count:", error);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Server-backed helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch the current message count from the server, falling back to local
+ * storage if the request fails.
+ */
+export const getMessageCount = async (): Promise<MessageCount> => {
+  try {
+    // Use the correct endpoint that exists in the backend
+    const endpoint = API_CONFIG.ENDPOINTS.MESSAGES.COUNT;
+    const response = await api.get<{
+      success?: boolean;
+      data?: {
+        hasAccess: boolean;
+        planType: string;
+        freeMessagesRemaining: number;
+        freeMessagesLimit: number;
+        nextResetInHours: string;
+      };
+      // Alternative response format
+      freeMessages?: {
+        limit: number;
+        used: number;
+        remaining: number;
+      };
+    }>(endpoint);
+
+    if (response.error) {
+      console.error(`getMessageCount failed for ${endpoint}:`, response.error);
+      throw new Error(response.error.message || "Failed to get message count");
+    }
+
+    const data = response.data?.data || response.data || {
+      hasAccess: false,
+      planType: 'free',
+      freeMessagesRemaining: 0,
+      freeMessagesLimit: DEFAULT_FREE_MESSAGES_LIMIT,
+      nextResetInHours: '24'
+    };
+
+    console.log('API Response Data:', data);
+    
+    // Handle both response formats from backend
+    const freeMessagesData = (data as any).freeMessages || {};
+    const accessData = (data as any).data || data;
+
+    const messageCount = {
+      totalSent: 0, // Backend doesn't provide this, use default
+      freeMessagesUsed: freeMessagesData.used !== undefined ? freeMessagesData.used : (accessData.freeMessagesLimit || DEFAULT_FREE_MESSAGES_LIMIT) - (accessData.freeMessagesRemaining || 0),
+      freeMessagesLimit: freeMessagesData.limit || accessData.freeMessagesLimit || DEFAULT_FREE_MESSAGES_LIMIT,
+      hasPaidAccess: (accessData.planType || freeMessagesData.planType || 'free') !== 'free',
+    };
+
+    console.log('freeMessagesData:', freeMessagesData);
+    console.log('accessData:', accessData);
+    console.log('Calculated messageCount:', messageCount);
+
+    // Save the correct data to local cache
+    await saveLocalMessageCount(messageCount);
+    
+    return messageCount;
+  } catch (error) {
+    console.error("Error getting message count — falling back to local:", error);
+    return getLocalMessageCount();
   }
 };
 
 /**
- * Check if user can send a message
+ * Determine whether the current user is allowed to send a message.
  */
-export const canSendMessage = async (): Promise<{ canSend: boolean; remainingFree: number; requiresSubscription: boolean }> => {
+export const canSendMessage = async (): Promise<{
+  canSend: boolean;
+  remainingFree: number;
+  requiresSubscription: boolean;
+}> => {
   try {
     const messageCount = await getMessageCount();
-    
-    // If user has paid access, they can always send messages
+
     if (messageCount.hasPaidAccess) {
-      return {
-        canSend: true,
-        remainingFree: 0,
-        requiresSubscription: false,
-      };
+      return { canSend: true, remainingFree: 0, requiresSubscription: false };
     }
 
-    // Check if user has free messages remaining
-    const remainingFree = messageCount.freeMessagesLimit - messageCount.freeMessagesUsed;
+    const remainingFree =
+      messageCount.freeMessagesLimit - messageCount.freeMessagesUsed;
     const canSend = remainingFree > 0;
 
     return {
@@ -134,149 +169,150 @@ export const canSendMessage = async (): Promise<{ canSend: boolean; remainingFre
       requiresSubscription: !canSend,
     };
   } catch (error) {
-    console.error('Error checking if user can send message:', error);
-    // Default to allowing the message if we can't check
-    return {
-      canSend: true,
-      remainingFree: 1,
-      requiresSubscription: false,
-    };
+    console.error("Error checking if user can send message:", error);
+    // When we genuinely cannot determine the state, surface the uncertainty
+    // rather than silently granting access with a misleading remainingFree count.
+    console.warn(
+      "canSendMessage: unable to verify quota — defaulting to blocked to avoid over-consumption.",
+    );
+    return { canSend: false, remainingFree: 0, requiresSubscription: false };
   }
 };
 
 /**
- * Send a message with free message limit checking
+ * Send a message, enforcing the free-message limit and updating local state
+ * from the server response where possible.
  */
 export const sendMessageWithLimit = async (
-  recipientId: string,
-  content: string
+  conversationId: string,
+  content: string,
 ): Promise<SendMessageResponse> => {
   try {
-    const token = await getAuthToken();
-    
-    if (!token) {
-      throw new Error('No authentication token found');
-    }
+    const { canSend, remainingFree, requiresSubscription } =
+      await canSendMessage();
 
-    // Check if user can send a message
-    const { canSend, remainingFree, requiresSubscription } = await canSendMessage();
-    
     if (!canSend) {
       return {
         success: false,
-        message: `You've used your ${FREE_MESSAGES_LIMIT} free messages. Subscribe to continue chatting!`,
+        message: `You've used all your free messages. Subscribe to continue chatting!`,
         requiresSubscription: true,
         remainingFreeMessages: 0,
       };
     }
 
-    // Send the message
-    const url = getApiUrl('/messages');
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        recipientId,
-        content,
-      }),
-    });
+    // Use conversation-based send to match the API used elsewhere (`api.getMessages`)
+    const endpoint = API_CONFIG.ENDPOINTS.MESSAGES.CONVERSATION(conversationId);
+    const response = await api.post<{
+      success?: boolean;
+      message?: string;
+      freeMessagesUsed?: number;
+      freeMessagesLimit?: number;
+      hasPaidAccess?: boolean;
+    }>(endpoint, { content });
 
-    if (!response.ok) {
-      let errorData: any = {};
-      try {
-        errorData = await response.json();
-      } catch (e) {
-        try {
-          errorData = { message: await response.text() };
-        } catch (e2) {
-          errorData = {};
-        }
-      }
+    if (response.error) {
+      console.error(
+        `sendMessageWithLimit failed for ${endpoint}:`,
+        response.error,
+      );
 
-      console.error(`sendMessageWithLimit failed for ${url}:`, response.status, response.statusText, errorData);
-
-      // Check if it's a subscription error
-      if (errorData.code === 'SUBSCRIPTION_REQUIRED' || response.status === 402) {
+      if (
+        response.error.code === "SUBSCRIPTION_REQUIRED" ||
+        response.error.status === 402
+      ) {
         return {
           success: false,
-          message: errorData.message || 'Subscription required to send messages',
+          message:
+            response.error.message || "Subscription required to send messages",
           requiresSubscription: true,
           remainingFreeMessages: 0,
         };
       }
 
-      throw new Error(errorData.message || `Failed to send message (status ${response.status})`);
+      throw new Error(response.error.message || "Failed to send message");
     }
 
-    const data = await response.json();
-    
-    // Update local message count if successful
+    const data = response.data || {};
+
     if (data.success) {
+      // Prefer server-authoritative counts; fall back to local increment.
       const currentCount = await getLocalMessageCount();
-      const updatedCount = {
+      const updatedCount: MessageCount = {
         ...currentCount,
         totalSent: currentCount.totalSent + 1,
-        freeMessagesUsed: currentCount.freeMessagesUsed + 1,
+        // Use server value if returned, otherwise increment locally.
+        freeMessagesUsed:
+          data.freeMessagesUsed ?? currentCount.freeMessagesUsed + 1,
+        freeMessagesLimit:
+          data.freeMessagesLimit ?? currentCount.freeMessagesLimit,
+        hasPaidAccess: data.hasPaidAccess ?? currentCount.hasPaidAccess,
       };
       await saveLocalMessageCount(updatedCount);
+
+      const updatedRemaining = Math.max(
+        0,
+        updatedCount.freeMessagesLimit - updatedCount.freeMessagesUsed,
+      );
+
+      return {
+        success: true,
+        message: "Message sent successfully",
+        remainingFreeMessages: updatedCount.hasPaidAccess
+          ? undefined
+          : updatedRemaining,
+      };
     }
 
-    return {
-      success: true,
-      message: 'Message sent successfully',
-      remainingFreeMessages: Math.max(0, remainingFree - 1),
-    };
-  } catch (error) {
-    console.error('Error sending message:', error);
+    // Server responded without an error but success was falsy — treat as failure.
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Failed to send message',
+      message: data.message || "Message could not be delivered",
+    };
+  } catch (error) {
+    console.error("Error sending message:", error);
+    return {
+      success: false,
+      message:
+        error instanceof Error ? error.message : "Failed to send message",
     };
   }
 };
 
 /**
- * Reset message count (typically called after subscription)
+ * Reset the message count after a subscription purchase.
+ * Uses the shared `api` wrapper (fixes the missing `getApiUrl` bug).
  */
-export const resetMessageCount = async (hasAccess: boolean = true): Promise<void> => {
+export const resetMessageCount = async (
+  hasAccess: boolean = true,
+): Promise<void> => {
   try {
-    const token = await getAuthToken();
-    
-    if (token) {
-      // Try to reset on server
-      await fetch(getApiUrl('/messages/count/reset'), {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+    // Fix: use the api wrapper instead of the undefined `getApiUrl` helper.
+    const endpoint = `${API_CONFIG.ENDPOINTS.MESSAGES.BASE}/count/reset`;
+    const response = await api.post(endpoint, { hasPaidAccess: hasAccess });
+
+    if (response.error) {
+      console.error("Error resetting message count on server:", response.error);
     }
   } catch (error) {
-    console.error('Error resetting message count on server:', error);
+    console.error("Error resetting message count on server:", error);
   }
-  
-  // Always reset locally
+
+  // Always reset locally regardless of server outcome.
   const currentCount = await getLocalMessageCount();
-  const resetCount = {
+  await saveLocalMessageCount({
     ...currentCount,
     freeMessagesUsed: 0,
     hasPaidAccess: hasAccess,
-  };
-  await saveLocalMessageCount(resetCount);
+  });
 };
 
 /**
- * Update paid access status
+ * Update the paid-access flag in local storage (e.g. after a webhook confirms
+ * a subscription without a full count reset).
  */
-export const updatePaidAccessStatus = async (hasAccess: boolean): Promise<void> => {
+export const updatePaidAccessStatus = async (
+  hasAccess: boolean,
+): Promise<void> => {
   const currentCount = await getLocalMessageCount();
-  const updatedCount = {
-    ...currentCount,
-    hasPaidAccess: hasAccess,
-  };
-  await saveLocalMessageCount(updatedCount);
+  await saveLocalMessageCount({ ...currentCount, hasPaidAccess: hasAccess });
 };

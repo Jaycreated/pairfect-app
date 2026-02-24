@@ -406,7 +406,7 @@ const styles = StyleSheet.create({
   },
   messagesContainer: {
     flex: 1,
-    backgroundColor: "#666",
+    backgroundColor: "#000000",
   },
   loadingContainer: {
     flex: 1,

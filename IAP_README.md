@@ -5,6 +5,7 @@
 This is your complete in-app purchase (IAP) implementation for the Pairfect app. All files are in the root directory of your project.
 
 ### Quick Start (Read These First)
+
 1. **[QUICK_START_IAP.md](QUICK_START_IAP.md)** - 5 minute overview
    - TL;DR version
    - Code snippets
@@ -18,6 +19,7 @@ This is your complete in-app purchase (IAP) implementation for the Pairfect app.
    - Key features
 
 ### Detailed Guides (Setup & Configuration)
+
 3. **[IAP_SETUP_GUIDE.md](IAP_SETUP_GUIDE.md)** - Complete setup instructions
    - iOS App Store Connect setup
    - Android Google Play setup
@@ -35,6 +37,7 @@ This is your complete in-app purchase (IAP) implementation for the Pairfect app.
    - Security best practices
 
 ### Testing & Validation (Before Launch)
+
 5. **[IAP_CHECKLIST.md](IAP_CHECKLIST.md)** - Complete testing checklist
    - Code implementation checklist ✓
    - iOS setup checklist
@@ -47,6 +50,7 @@ This is your complete in-app purchase (IAP) implementation for the Pairfect app.
 ## 🏗️ Implementation Files
 
 ### Core Services
+
 - **services/iapService.ts** - Main IAP service with:
   - Product fetching
   - Purchase handling
@@ -58,21 +62,25 @@ This is your complete in-app purchase (IAP) implementation for the Pairfect app.
   - Backend communication
 
 ### UI Components
+
 - **components/SubscriptionUI.tsx** - Ready-to-use components:
   - `SubscriptionPlansComponent` - Display plans
   - `SubscribeButton` - Purchase button
 
 ### React Hooks & Context
+
 - **hooks/useIAP.ts** - Automatic IAP initialization
 - **context/SubscriptionContext.tsx** - Subscription state management
-- **app/_layout.tsx** - App root with IAP initialization
+- **app/\_layout.tsx** - App root with IAP initialization
 
 ### Configuration
+
 - **app.json** - Updated with IAP configuration
 
 ## 📋 Quick Reference
 
 ### Product IDs
+
 ```
 iOS & Android:
 - com.pairfect.daily (24 hours, ~$0.99)
@@ -80,24 +88,26 @@ iOS & Android:
 ```
 
 ### Key Functions
+
 ```typescript
 // Initialize (automatic in app layout)
-useIAP()
+useIAP();
 
 // Get products
-getAvailableProducts()
+getAvailableProducts();
 
 // Purchase
-purchaseItem(productId)
+purchaseItem(productId);
 
 // Check subscription
-useSubscription()
+useSubscription();
 
 // Protect screens
-withSubscription(Component)
+withSubscription(Component);
 ```
 
 ### Backend Endpoint
+
 ```
 POST /api/payments/verify-iap
 Authorization: Bearer {token}
@@ -106,6 +116,7 @@ Authorization: Bearer {token}
 ## 🚀 Getting Started
 
 ### For Immediate Next Steps:
+
 1. Read **QUICK_START_IAP.md** (5 min)
 2. Read **IAP_SETUP_GUIDE.md** (20 min)
 3. Create App Store and Google Play accounts
@@ -115,6 +126,7 @@ Authorization: Bearer {token}
 7. Use **IAP_CHECKLIST.md** for testing
 
 ### For Understanding the Architecture:
+
 1. Read **IAP_IMPLEMENTATION_SUMMARY.md**
 2. Review **services/iapService.ts**
 3. Review **components/SubscriptionUI.tsx**
@@ -155,13 +167,13 @@ Pairfect/
 
 ## 📚 Document Navigation
 
-| Document | Purpose | Read Time | When to Read |
-|----------|---------|-----------|--------------|
-| QUICK_START_IAP.md | Quick reference | 5 min | First - get overview |
-| IAP_IMPLEMENTATION_COMPLETE.md | What's done | 5 min | Second - see features |
-| IAP_SETUP_GUIDE.md | Setup instructions | 30 min | Third - before setup |
-| BACKEND_IAP_IMPLEMENTATION.md | Backend code | 20 min | Fourth - implement server |
-| IAP_CHECKLIST.md | Testing guide | 15 min | Fifth - before launch |
+| Document                       | Purpose            | Read Time | When to Read              |
+| ------------------------------ | ------------------ | --------- | ------------------------- |
+| QUICK_START_IAP.md             | Quick reference    | 5 min     | First - get overview      |
+| IAP_IMPLEMENTATION_COMPLETE.md | What's done        | 5 min     | Second - see features     |
+| IAP_SETUP_GUIDE.md             | Setup instructions | 30 min    | Third - before setup      |
+| BACKEND_IAP_IMPLEMENTATION.md  | Backend code       | 20 min    | Fourth - implement server |
+| IAP_CHECKLIST.md               | Testing guide      | 15 min    | Fifth - before launch     |
 
 ## 💡 Common Questions
 

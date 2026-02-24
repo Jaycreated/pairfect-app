@@ -39,12 +39,14 @@ npx react-native config
 ### Step 3: Rebuild for Your Platform
 
 **For iOS:**
+
 ```bash
 npx expo prebuild --clean
 npx expo run:ios
 ```
 
 **For Android:**
+
 ```bash
 npx expo prebuild --clean
 npx expo run:android
@@ -55,6 +57,7 @@ npx expo run:android
 Your project has react-native 0.81.5 ✅ (requires 0.75.0+)
 
 Check in your package.json:
+
 ```json
 {
   "dependencies": {
@@ -67,6 +70,7 @@ Check in your package.json:
 ### Step 5: Enable New Architecture (Optional but Recommended)
 
 In `app.json`:
+
 ```jsonc
 {
   "expo": {
@@ -100,6 +104,7 @@ expo run:android
 ## What Changed
 
 Your IAP service now:
+
 - ✅ Gracefully handles missing native modules
 - ✅ Won't crash the app if IAP isn't available
 - ✅ Logs warnings instead of errors

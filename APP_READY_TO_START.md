@@ -5,6 +5,7 @@
 The NitroModules error was preventing your app from starting. I've made the IAP system **gracefully degrade** when native modules aren't available:
 
 ### Changes Made:
+
 - ✅ IAP service now catches import errors safely
 - ✅ All IAP functions check if library is available before running
 - ✅ App continues to work without IAP during development
@@ -16,12 +17,14 @@ The NitroModules error was preventing your app from starting. I've made the IAP 
 **Your app should now start successfully** ✅
 
 ### Try this:
+
 ```bash
 cd /Users/mac/Pairfect
 npx expo start
 ```
 
 Or on a specific platform:
+
 ```bash
 npx expo run:ios    # for iOS
 npx expo run:android # for Android
@@ -47,6 +50,7 @@ npx expo run:ios     # or run:android
 ```
 
 This will:
+
 - Properly link native modules
 - Enable react-native-iap functionality
 - Allow real purchases on App Store & Google Play
@@ -70,6 +74,7 @@ This will:
 ## Documentation
 
 See these files for reference:
+
 - `IAP_README.md` - Overview
 - `IAP_SETUP_GUIDE.md` - Setup instructions
 - `NITRO_MODULES_FIX.md` - Complete rebuild guide

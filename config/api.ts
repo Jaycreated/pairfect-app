@@ -45,6 +45,7 @@ export const API_CONFIG = {
       CONVERSATION: (matchId: string) => `messages/${matchId}`,
       CONVERSATIONS: 'conversations',
       SEND: 'messages/send',
+      COUNT: 'payments/chat/access', // Use the correct endpoint that exists in backend
     },
     PAYMENTS: {
       CHAT_ACCESS: 'payments/chat/access',

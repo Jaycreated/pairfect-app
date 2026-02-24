@@ -1,9 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef } from "react";
 
 /**
  * Hook to initialize and manage IAP connection
  * Should be called once in the root layout of your app
- * 
+ *
  * Note: IAP initialization is optional and gracefully degrades if not available
  */
 export const useIAP = () => {
@@ -20,11 +20,12 @@ export const useIAP = () => {
     const initializeIAP = async () => {
       try {
         // Lazy import to avoid breaking the app if native modules aren't available
-        const { connectToIAP, getAvailableProducts, disconnectIAP } = await import('@/services/iapService');
-        
-        console.log('Initializing IAP...');
+        const { connectToIAP, getAvailableProducts, disconnectIAP } =
+          await import("@/services/iapService");
+
+        console.log("Initializing IAP...");
         await connectToIAP();
-        
+
         // Fetch available products
         const products = await getAvailableProducts();
         console.log(`Successfully loaded ${products.length} products`);
@@ -34,11 +35,14 @@ export const useIAP = () => {
           try {
             await disconnectIAP();
           } catch (error) {
-            console.warn('Error during IAP cleanup:', error);
+            console.warn("Error during IAP cleanup:", error);
           }
         };
       } catch (error) {
-        console.warn('IAP not available - app will continue without in-app purchases:', error);
+        console.warn(
+          "IAP not available - app will continue without in-app purchases:",
+          error,
+        );
         // App continues to work without IAP
         return undefined;
       }
