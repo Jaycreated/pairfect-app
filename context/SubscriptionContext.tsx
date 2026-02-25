@@ -2,8 +2,6 @@ import { useToast } from "@/context/ToastContext";
 import {
     clearPaymentAttempt,
     getActiveSubscription,
-    getPendingPayments,
-    verifyChatPayment,
 } from "@/services/subscriptionService";
 import { UserSubscription } from "@/types/subscription";
 import { useRouter, type Href } from "expo-router";

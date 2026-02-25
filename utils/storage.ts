@@ -27,6 +27,26 @@ export const Storage = {
     await SecureStore.deleteItemAsync(key);
   },
 
+  async clear() {
+    if (Platform.OS === "web") {
+      localStorage.clear();
+      return;
+    }
+    // SecureStore doesn't have a clear method, so we need to clear known keys
+    const knownKeys = [
+      'auth_token',
+      'message_count',
+      'user_preferences',
+      'onboarding_completed',
+      'hasLaunched',
+      'needsProfileSetup',
+      'user',
+      'userPhotos',
+      'pending_payments',
+    ];
+    await Promise.all(knownKeys.map(key => SecureStore.deleteItemAsync(key)));
+  },
+
   // Alias for backward compatibility
   async setValueWithKeyAsync(key: string, value: string) {
     return this.setItem(key, value);

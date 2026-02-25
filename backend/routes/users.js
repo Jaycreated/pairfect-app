@@ -101,4 +101,30 @@ router.post("/reset-free-messages/:userId", auth, async (req, res) => {
   }
 });
 
+/**
+ * DELETE /api/users/account
+ * Delete user account
+ */
+router.delete("/account", auth, async (req, res) => {
+  try {
+    const user = req.user;
+    console.log(`[DELETE ACCOUNT] Attempting to delete account for user: ${user._id} (${user.email})`);
+
+    // Delete the user from database
+    await User.findByIdAndDelete(user._id);
+    console.log(`[DELETE ACCOUNT] Successfully deleted user: ${user._id}`);
+
+    res.json({
+      success: true,
+      message: "Account deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete account error:", error);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: "Failed to delete account",
+    });
+  }
+});
+
 module.exports = router;

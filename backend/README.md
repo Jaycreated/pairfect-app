@@ -1,5 +1,47 @@
 # Pairfect Backend API
 
+## ⚠️ IMPORTANT NOTICE
+
+**This folder contains REFERENCE SOURCE CODE only.**
+
+The mobile app connects to the **hosted backend** at:
+```
+https://pairfect.com.ng/api/
+```
+
+## 📁 Purpose of This Folder
+
+This folder is kept for:
+- **Reference & Documentation** - API endpoints and business logic
+- **Development & Testing** - Local testing before deployment  
+- **Team Collaboration** - Code reviews and knowledge sharing
+- **Backup & Recovery** - Version control and emergency reference
+
+## 🌐 Actual Backend Setup
+
+```
+Mobile App (React Native)  ←→  Hosted Backend (pairfect.com.ng)
+                              ↓
+                    API calls to live server
+```
+
+## 🚀 Deployment Process
+
+To deploy changes from this reference code:
+1. Make changes to local files
+2. Test thoroughly in development
+3. Deploy through proper CI/CD pipeline
+4. Update mobile app if API contract changes
+
+## ⚠️ Critical Notes
+
+- **DO NOT** run this backend locally for mobile app development
+- **MOBILE APP** always connects to https://pairfect.com.ng
+- **DEPLOY** changes to hosted environment, not local
+- **USE** this only for reference and development
+
+---
+
 Backend API for the Pairfect dating application.
 
 ## Features

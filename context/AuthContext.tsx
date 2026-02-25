@@ -1,4 +1,5 @@
 import { api } from '@/services/api';
+import { clearLocalMessageCount } from '@/services/messageService';
 import { SignInCredentials, SignUpData, User } from '@/types/auth';
 import { Storage } from '@/utils/storage';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
@@ -145,6 +146,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Create user object with token
       const userWithToken = { ...userData, token };
       
+      // Clear cached message count for new user
+      await clearLocalMessageCount();
+      
       setUser(userWithToken);
       setProfile(userWithToken);
       
@@ -220,6 +224,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Clear all auth state
       await Storage.deleteItem('auth_token');
+      await clearLocalMessageCount(); // Clear cached message count on logout
       setUser(null);
       setProfile(null);
       setError(null);

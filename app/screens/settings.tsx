@@ -111,15 +111,21 @@ const SettingsScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
+              console.log('[UI DELETE ACCOUNT] User confirmed account deletion');
               setIsLoading(true);
+              
+              console.log('[UI DELETE ACCOUNT] Calling deleteAccount API...');
               await deleteAccount();
+              
+              console.log('[UI DELETE ACCOUNT] Account deletion successful, navigating to login');
               showToast('Account deleted successfully', 'success');
               // Navigate to login screen after successful deletion
               router.replace('/(auth)/login');
             } catch (error) {
-              console.error('Failed to delete account:', error);
+              console.error('[UI DELETE ACCOUNT] Account deletion failed:', error);
               showToast('Failed to delete account. Please try again.', 'error');
             } finally {
+              console.log('[UI DELETE ACCOUNT] Account deletion process completed');
               setIsLoading(false);
             }
           },

@@ -1,20 +1,21 @@
+import { useRouter, type Href } from 'expo-router';
 import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
+    createContext,
+    useContext,
+    useEffect,
+    useState,
+    type ReactNode,
 } from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import { useRouter, type Href } from 'expo-router';
 
+import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import {
-  canSendMessage,
-  getMessageCount,
-  sendMessageWithLimit,
-  updatePaidAccessStatus,
-  type MessageCount,
+    canSendMessage,
+    getMessageCount,
+    sendMessageWithLimit,
+    updatePaidAccessStatus,
+    type MessageCount,
 } from '@/services/messageService';
 
 type MessageCountContextType = {
@@ -49,6 +50,7 @@ export const MessageCountProvider: React.FC<{ children: ReactNode }> = ({
   const [messageCount, setMessageCount] = useState<MessageCount | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const { user } = useAuth();
   const { showToast } = useToast();
   const router = useRouter();
 
@@ -130,7 +132,7 @@ export const MessageCountProvider: React.FC<{ children: ReactNode }> = ({
 
   useEffect(() => {
     refreshMessageCount();
-  }, []);
+  }, [user?.id]); // Refresh when user changes
 
   const canSend =
     !!messageCount &&
