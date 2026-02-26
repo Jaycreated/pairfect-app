@@ -348,6 +348,13 @@ const ChatScreen = () => {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
       >
+        {/* Header with Back Button */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#651B55" />
+          </TouchableOpacity>
+        </View>
+
         {/* Messages List */}
         <FlatList
           ref={flatListRef}
@@ -403,6 +410,17 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     position: "relative",
      paddingBottom: Platform.OS === "ios" ? 40 : 40,
+     paddingTop: 0,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
   messagesContainer: {
     flex: 1,

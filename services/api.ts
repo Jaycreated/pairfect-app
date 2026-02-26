@@ -255,15 +255,16 @@ export const api = {
     
   likeUser: async (userId: string) => {
     try {
-      const response = await fetchApi<{ success: boolean; match?: boolean; message?: string }>(
+      const response = await fetchApi<{ success: boolean; match?: any; matched?: boolean; message?: string }>(
         API_CONFIG.ENDPOINTS.MATCHES.LIKE(userId),
         'POST'
       );
       
-      // Only include match in the response if it exists in the API response
-      const responseData = response.data?.match !== undefined 
-        ? { match: response.data.match }
-        : {};
+      // Include both match object and matched flag from the API response
+      const responseData = {
+        ...(response.data?.match !== undefined && { match: response.data.match }),
+        ...(response.data?.matched !== undefined && { matched: response.data.matched }),
+      };
         
       return { data: responseData, error: response.error };
     } catch (error) {

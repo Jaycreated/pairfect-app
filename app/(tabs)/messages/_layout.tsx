@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useRouter } from "expo-router";
 import React from "react";
-import { Text, TouchableOpacity, View } from "react-native";
+import { TouchableOpacity, View } from "react-native";
 
 export default function MessagesLayout() {
   const router = useRouter();
@@ -38,7 +38,7 @@ export default function MessagesLayout() {
             >
               <TouchableOpacity
                 onPress={() => router.back()}
-                style={{ position: "absolute", left: 12, top: 8 }}
+                style={{ position: "absolute", left: 12, top: 2 }}
               >
                 <Ionicons name="chevron-back" size={24} color="#000" />
               </TouchableOpacity>

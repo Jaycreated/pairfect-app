@@ -131,7 +131,14 @@ export const MessageCountProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   useEffect(() => {
-    refreshMessageCount();
+    // Only refresh message count if there's an authenticated user
+    if (user?.id) {
+      refreshMessageCount();
+    } else {
+      // Clear message count when user is null (logged out)
+      setMessageCount(null);
+      setIsLoading(false);
+    }
   }, [user?.id]); // Refresh when user changes
 
   const canSend =
