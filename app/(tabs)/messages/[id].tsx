@@ -350,7 +350,7 @@ const ChatScreen = () => {
       >
         {/* Header with Back Button */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity onPress={() => router.push('/messages')}>
             <Ionicons name="arrow-back" size={24} color="#651B55" />
           </TouchableOpacity>
         </View>
@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
   },
   messagesContainer: {
     flex: 1,
-    backgroundColor: "#000000",
+    backgroundColor: "#B2B2B2",
   },
   loadingContainer: {
     flex: 1,

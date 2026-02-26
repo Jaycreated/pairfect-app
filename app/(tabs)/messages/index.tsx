@@ -6,6 +6,7 @@ import { useSubscription } from "@/context/SubscriptionContext";
 import { useToast } from "@/context/ToastContext";
 import { api } from "@/services/api";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import React, {
   useCallback,
@@ -231,6 +232,7 @@ const MessagesScreen = () => {
   const { canSend, remainingFreeMessages, isLoading: messageCountLoading } = useMessageCount();
   const { user } = useAuth();
   const router = useRouter();
+  const navigation = useNavigation();
 
   console.log("[MessagesScreen] Context state:", {
     subscription: !!subscription,
@@ -263,6 +265,37 @@ const MessagesScreen = () => {
   });
 
   // ========== Effects ==========
+
+  /**
+   * Ensure tab bar is visible when on messages list screen
+   */
+  useEffect(() => {
+    navigation.getParent()?.setOptions({
+      tabBarStyle: {
+        backgroundColor: "#651B55",
+        borderTopWidth: 0,
+        height: 92,
+        paddingBottom: 0,
+        paddingTop: 8,
+        paddingRight: 32,
+        paddingLeft: 32,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        position: "absolute",
+        left: 0,
+        right: 0,
+        bottom: 0,
+        shadowColor: "#000",
+        shadowOffset: {
+          width: 0,
+          height: -5,
+        },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 8,
+      },
+    });
+  }, [navigation]);
 
   /**
    * Cleanup on unmount to prevent memory leaks
