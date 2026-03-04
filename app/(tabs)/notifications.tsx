@@ -60,6 +60,13 @@ type NotificationType = {
   createdAt?: string;
 };
 
+// Default profile icon component for users without photos
+const DefaultProfileIcon = ({ size = 50 }: { size?: number }) => (
+  <View style={[styles.defaultAvatar, { width: size, height: size, borderRadius: size / 2 }]}>
+    <Ionicons name="person" size={size * 0.6} color="#fff" />
+  </View>
+);
+
 const NotificationsScreen = () => {
   const { subscription } = useSubscription();
   const [notifications, setNotifications] = useState<NotificationType[]>([]);
@@ -82,7 +89,7 @@ const NotificationsScreen = () => {
           user: {
             id: n.from_user_id?.toString() || 'unknown',
             name: n.from_user_name || 'Unknown User',
-            avatar: n.from_user_photo?.[0] || 'https://i.pravatar.cc/150?img=32'
+            avatar: n.from_user_photo?.[0] || null,
           },
           read: n.is_read,
           time: formatTimeAgo(n.created_at || new Date().toISOString()),
@@ -209,11 +216,14 @@ const NotificationsScreen = () => {
       onPress={() => handleNotificationPress(item)}
     >
     <View style={styles.avatarContainer}>
+      {item.user?.avatar ? (
         <Image 
-          source={{ uri: item.user?.avatar || item.from_user_photo?.[0] || 'https://i.pravatar.cc/150?img=32' }} 
+          source={{ uri: item.user.avatar }} 
           style={styles.avatar} 
-          defaultSource={{ uri: 'https://i.pravatar.cc/150?img=32' }}
         />
+      ) : (
+        <DefaultProfileIcon size={50} />
+      )}
         <View style={[
           styles.notificationIcon,
           { backgroundColor: getNotificationColor(item.type) }
@@ -353,6 +363,11 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
+  },
+  defaultAvatar: {
+    backgroundColor: '#651B55',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   notificationIcon: {
     position: 'absolute',

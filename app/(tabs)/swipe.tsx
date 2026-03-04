@@ -10,8 +10,12 @@ const { width, height } = Dimensions.get('window');
 const SWIPE_THRESHOLD = width * 0.4;
 const SWIPE_OUT_DURATION = 250;
 
-// Placeholder image for users without photos
-const PLACEHOLDER_IMAGE = 'https://via.placeholder.com/400x600/651B55/FFFFFF?text=No+Photo';
+// Default profile icon component for users without photos
+const DefaultProfileIcon = ({ size = 50 }: { size?: number }) => (
+  <View style={[styles.defaultAvatar, { width: size, height: size, borderRadius: size / 2 }]}>
+    <Ionicons name="person" size={size * 0.6} color="#fff" />
+  </View>
+);
 
 type User = {
   id: string;
@@ -68,12 +72,8 @@ const fetchPotentialMatches = async () => {
     const matches = await api.getPotentialMatches();
     console.log('Received matches:', matches);
     
-    // Map users and add placeholder image if needed (don't filter out users without images)
-    const validUsers = matches.map((user: User) => ({
-      ...user,
-      // Use placeholder if no images exist
-      images: user.images && user.images.length > 0 ? user.images : [PLACEHOLDER_IMAGE]
-    }));
+    // Keep users as they come - don't filter out or modify images
+    const validUsers = matches;
     
     console.log('Valid users after mapping:', validUsers.length);
     
@@ -279,11 +279,9 @@ const fetchPotentialMatches = async () => {
       },
     ];
 
-    // Use placeholder if no image
-    const imageUri = user.images && user.images.length > 0 
-      ? user.images[0] 
-      : PLACEHOLDER_IMAGE;
-
+    // Check if user has images and render accordingly
+    const hasImage = user.images && user.images.length > 0 && user.images[0];
+    
     return (
       <View style={styles.cardContainer}>
         <TouchableOpacity 
@@ -297,11 +295,16 @@ const fetchPotentialMatches = async () => {
             style={cardStyle}
             {...panResponderHandlers}
           >
-            <Image 
-              source={{ uri: imageUri }} 
-              style={styles.cardImage}
-              defaultSource={{ uri: PLACEHOLDER_IMAGE }}
-            />
+            {hasImage ? (
+              <Image 
+                source={{ uri: user.images[0] }} 
+                style={styles.cardImage}
+              />
+            ) : (
+              <View style={[styles.cardImage, styles.defaultProfileImageContainer]}>
+                <DefaultProfileIcon size={120} />
+              </View>
+            )}
             <View style={styles.cardOverlay}>
               <Animated.View 
                 style={[styles.likeBadgeContainer, { opacity: likeOpacity }]}
@@ -389,9 +392,8 @@ const fetchPotentialMatches = async () => {
   const renderMatchModal = () => {
     if (!matchedUser) return null;
 
-    const matchImageUri = matchedUser.images && matchedUser.images.length > 0 
-      ? matchedUser.images[0] 
-      : PLACEHOLDER_IMAGE;
+    // Check if matched user has images
+    const hasMatchImage = matchedUser.images && matchedUser.images.length > 0 && matchedUser.images[0];
 
     return (
       <Modal
@@ -402,17 +404,17 @@ const fetchPotentialMatches = async () => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.matchModalContainer}>
-            {/* Confetti-like decoration */}
-            <View style={styles.matchHeader}>
-              <Ionicons name="heart" size={40} color="#FF1B6D" />
-            </View>
-
             {/* Matched User Image */}
-            <Image
-              source={{ uri: matchImageUri }}
-              style={styles.matchModalImage}
-              defaultSource={{ uri: PLACEHOLDER_IMAGE }}
-            />
+            {hasMatchImage ? (
+              <Image
+                source={{ uri: matchedUser.images[0] }}
+                style={styles.matchModalImage}
+              />
+            ) : (
+              <View style={[styles.matchModalImage, styles.defaultProfileImageContainer]}>
+                <DefaultProfileIcon size={100} />
+              </View>
+            )}
 
             {/* Match Text */}
             <View style={styles.matchContent}>
@@ -766,25 +768,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     borderRadius: 24,
     padding: 0,
-    width: '100%',
-    maxWidth: 340,
-    overflow: 'hidden',
+    width: '90%',
+    maxWidth: 400,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 8,
+  },
+  matchModalImage: {
+    width: '100%',
+    height: 300,
+    resizeMode: 'cover',
   },
   matchHeader: {
     backgroundColor: '#FF1B6D',
     height: 60,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  matchModalImage: {
-    width: '100%',
-    height: 300,
-    resizeMode: 'cover',
   },
   matchContent: {
     alignItems: 'center',
@@ -837,6 +838,16 @@ const styles = StyleSheet.create({
   matchContinueButtonText: {
     color: '#FF1B6D',
     fontSize: 16,
+  },
+  defaultAvatar: {
+    backgroundColor: '#651B55',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  defaultProfileImageContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F0F0F0',
   },
 });
 

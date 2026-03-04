@@ -2,12 +2,13 @@
   "expo": {
     "name": "Pairfect",
     "slug": "Pairfect",
-    "version": "1.0.0",
+    "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "pairfect",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "privacyPolicy": "https://pairfect.com.ng/privacy",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.Pairfect",
@@ -26,6 +27,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.Pairfect",
+      "versionCode": 4,
       "permissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.READ_MEDIA_IMAGES"
@@ -55,6 +57,12 @@
           "icon": "./assets/images/icon.png",
           "color": "#ffffff",
           "sounds": []
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosOnly": true
         }
       ],
       "expo-secure-store",

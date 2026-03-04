@@ -7,11 +7,19 @@ import {
   ActivityIndicator,
   Dimensions,
   Image,
+  Modal,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
+
+// Default profile icon component for users without photos
+const DefaultProfileIcon = ({ size = 50 }: { size?: number }) => (
+  <View style={[styles.defaultAvatar, { width: size, height: size, borderRadius: size / 2 }]}>
+    <Ionicons name="person" size={size * 0.6} color="#fff" />
+  </View>
+);
 
 // Types for the user profile
 interface ApiResponse<T> {
@@ -47,6 +55,116 @@ export default function PublicProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const [matchModalVisible, setMatchModalVisible] = useState(false);
+
+  // Handle like button press
+  const handleLike = async () => {
+    if (!user?.id) return;
+    
+    try {
+      console.log('Liking user:', user.id);
+      const response = await api.likeUser(user.id);
+      
+      if (response.error) {
+        console.error('Error liking user:', response.error);
+        // Optionally show error message to user
+        return;
+      }
+      
+      console.log('User liked successfully:', response.data);
+      
+      // Check if it's a mutual match
+      if (response.data && (response.data as any).matched === true) {
+        console.log('Mutual match found with:', user.name);
+        setMatchModalVisible(true);
+      } else {
+        console.log('Like registered, but no mutual match yet with:', user.name);
+      }
+      
+    } catch (error) {
+      console.error('Error in handleLike:', error);
+    }
+  };
+
+  // Handle message button press
+  const handleMessage = () => {
+    if (!user?.id) return;
+    
+    console.log('Navigating to chat with user:', user.id);
+    router.push(`/messages/${user.id}` as any);
+  };
+
+  // Handle message from match modal
+  const handleMessageMatch = () => {
+    if (user) {
+      setMatchModalVisible(false);
+      router.push(`/messages/${user.id}` as any);
+    }
+  };
+
+  // Render match modal
+  const renderMatchModal = () => {
+    if (!user) return null;
+
+    // Check if user has photos
+    const hasMatchImage = user.photos && user.photos.length > 0 && user.photos[0];
+
+    return (
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={matchModalVisible}
+        onRequestClose={() => setMatchModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.matchModalContainer}>
+            {/* Matched User Image */}
+            {hasMatchImage ? (
+              <Image
+                source={{ uri: user.photos[0] }}
+                style={styles.matchModalImage}
+              />
+            ) : (
+              <View style={[styles.matchModalImage, styles.defaultProfileImageContainer]}>
+                <DefaultProfileIcon size={100} />
+              </View>
+            )}
+
+            {/* Match Text */}
+            <View style={styles.matchContent}>
+              <PoppinsText style={styles.matchTitle}>
+                It's a Match!
+              </PoppinsText>
+              <PoppinsText style={styles.matchSubtitle}>
+                You and {user.name} have liked each other!
+              </PoppinsText>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={styles.matchButtonContainer}>
+              <TouchableOpacity
+                style={styles.matchMessageButton}
+                onPress={handleMessageMatch}
+              >
+                <PoppinsText style={styles.matchMessageButtonText}>
+                  Message
+                </PoppinsText>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.matchContinueButton}
+                onPress={() => setMatchModalVisible(false)}
+              >
+                <PoppinsText style={styles.matchContinueButtonText}>
+                  View Profile
+                </PoppinsText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -85,7 +203,7 @@ export default function PublicProfileScreen() {
             ? userData.photos 
             : userData.avatar 
               ? [userData.avatar]
-              : ['https://i.pravatar.cc/300?img=32'],
+              : [],
           location: userData.location || userData.city,
           gender: userData.gender,
           orientation: userData.orientation,
@@ -147,16 +265,22 @@ export default function PublicProfileScreen() {
       <ScrollView style={styles.scrollView}>
         {/* Main Profile Photo */}
         <View style={styles.photoContainer}>
-          <Image 
-            source={{ uri: user.photos?.[currentPhotoIndex] || 'https://via.placeholder.com/300' }} 
-            style={styles.mainPhoto}
-            resizeMode="cover"
-          />
+          {user.photos && user.photos.length > 0 && user.photos[0] ? (
+            <Image 
+              source={{ uri: user.photos[currentPhotoIndex] }} 
+              style={styles.mainPhoto}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={[styles.mainPhoto, styles.defaultProfileImageContainer]}>
+              <DefaultProfileIcon size={150} />
+            </View>
+          )}
           
           {/* Photo indicators */}
-          {user.photos?.length > 1 && (
+          {user.photos && user.photos.length > 1 && (
             <View style={styles.photoIndicators}>
-              {user.photos.map((_: any, index: number) => (
+              {user.photos.map((_: string, index: number) => (
                 <View 
                   key={index} 
                   style={[
@@ -206,7 +330,7 @@ export default function PublicProfileScreen() {
           )}
           
           {/* Additional Photos */}
-          {user.photos && user.photos.length > 1 && (
+          {user.photos && user.photos.length > 0 && (
             <View style={styles.section}>
               <PoppinsText style={styles.sectionTitle}>Photos</PoppinsText>
               <ScrollView 
@@ -238,14 +362,22 @@ export default function PublicProfileScreen() {
       
       {/* Action Buttons */}
       <View style={styles.actionButtons}>
-        <TouchableOpacity style={[styles.actionButton, styles.likeButton]}>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.likeButton]}
+          onPress={handleLike}
+        >
           <Ionicons name="heart" size={28} color="#fff" />
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionButton, styles.messageButton]}>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.messageButton]}
+          onPress={handleMessage}
+        >
           <Ionicons name="chatbubble-ellipses" size={24} color="#fff" />
           <PoppinsText style={styles.messageButtonText}>Message</PoppinsText>
         </TouchableOpacity>
       </View>
+      
+      {renderMatchModal()}
     </View>
   );
 }
@@ -431,5 +563,91 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#651B55',
     marginLeft: 8,
+  },
+  // Match Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  matchModalContainer: {
+    backgroundColor: '#FFF',
+    borderRadius: 24,
+    padding: 0,
+    width: '90%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  matchModalImage: {
+    width: '100%',
+    height: 300,
+    resizeMode: 'cover',
+  },
+  matchContent: {
+    alignItems: 'center',
+    padding: 24,
+    paddingBottom: 16,
+  },
+  matchTitle: {
+    fontSize: 28,
+    color: '#FF1B6D',
+    marginBottom: 8,
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+  matchSubtitle: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  matchButtonContainer: {
+    flexDirection: 'row',
+    padding: 16,
+    gap: 12,
+  },
+  matchMessageButton: {
+    flex: 1,
+    backgroundColor: '#651B55',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  matchMessageButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  matchContinueButton: {
+    flex: 1,
+    backgroundColor: '#f0f0f0',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  matchContinueButtonText: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  defaultAvatar: {
+    backgroundColor: '#651B55',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  defaultProfileImageContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F0F0F0',
   },
 });

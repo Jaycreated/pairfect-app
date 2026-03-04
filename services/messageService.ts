@@ -84,9 +84,11 @@ export const saveLocalMessageCount = async (
  * storage if the request fails.
  */
 export const getMessageCount = async (): Promise<MessageCount> => {
+  console.log('=== getMessageCount START ===');
   try {
     // Use the correct endpoint that exists in the backend
     const endpoint = API_CONFIG.ENDPOINTS.MESSAGES.COUNT;
+    console.log('Fetching message count from endpoint:', endpoint);
     const response = await api.get<{
       success?: boolean;
       data?: {
@@ -103,6 +105,7 @@ export const getMessageCount = async (): Promise<MessageCount> => {
         remaining: number;
       };
     }>(endpoint);
+    console.log('getMessageCount API response:', response);
 
     if (response.error) {
       console.error(`getMessageCount failed for ${endpoint}:`, response.error);
@@ -123,6 +126,9 @@ export const getMessageCount = async (): Promise<MessageCount> => {
     const freeMessagesData = (data as any).freeMessages || {};
     const accessData = (data as any).data || data;
 
+    console.log('freeMessagesData:', freeMessagesData);
+    console.log('accessData:', accessData);
+    
     const messageCount = {
       totalSent: 0, // Backend doesn't provide this, use default
       freeMessagesUsed: freeMessagesData.used !== undefined ? freeMessagesData.used : (accessData.freeMessagesLimit || DEFAULT_FREE_MESSAGES_LIMIT) - (accessData.freeMessagesRemaining || 0),
@@ -130,17 +136,19 @@ export const getMessageCount = async (): Promise<MessageCount> => {
       hasPaidAccess: (accessData.planType || freeMessagesData.planType || 'free') !== 'free',
     };
 
-    console.log('freeMessagesData:', freeMessagesData);
-    console.log('accessData:', accessData);
     console.log('Calculated messageCount:', messageCount);
 
     // Save the correct data to local cache
     await saveLocalMessageCount(messageCount);
+    console.log('Message count saved to local cache');
     
+    console.log('=== getMessageCount END ===');
     return messageCount;
   } catch (error) {
     console.error("Error getting message count — falling back to local:", error);
-    return getLocalMessageCount();
+    const localCount = await getLocalMessageCount();
+    console.log('Fallback to local count:', localCount);
+    return localCount;
   }
 };
 
@@ -187,11 +195,17 @@ export const sendMessageWithLimit = async (
   conversationId: string,
   content: string,
 ): Promise<SendMessageResponse> => {
+  console.log('=== sendMessageWithLimit START ===');
+  console.log('conversationId:', conversationId);
+  console.log('content:', content);
+  
   try {
     const { canSend, remainingFree, requiresSubscription } =
       await canSendMessage();
+    console.log('canSendMessage check result:', { canSend, remainingFree, requiresSubscription });
 
     if (!canSend) {
+      console.log('User cannot send message - returning failure');
       return {
         success: false,
         message: `You've used all your free messages. Subscribe to continue chatting!`,
@@ -200,8 +214,10 @@ export const sendMessageWithLimit = async (
       };
     }
 
+    console.log('User can send message, calling API...');
     // Use conversation-based send to match the API used elsewhere (`api.getMessages`)
     const endpoint = API_CONFIG.ENDPOINTS.MESSAGES.CONVERSATION(conversationId);
+    console.log('API endpoint:', endpoint);
     const response = await api.post<{
       success?: boolean;
       message?: string;
@@ -209,6 +225,7 @@ export const sendMessageWithLimit = async (
       freeMessagesLimit?: number;
       hasPaidAccess?: boolean;
     }>(endpoint, { content });
+    console.log('API response:', response);
 
     if (response.error) {
       console.error(
@@ -233,10 +250,19 @@ export const sendMessageWithLimit = async (
     }
 
     const data = response.data || {};
+    console.log('Response data after successful send:', data);
 
-    if (data.success) {
+    // Check if the request was successful based on absence of error or presence of success field
+    // The API returns HTTP 201 for successful message sending
+    const isSuccess = !response.error || data.success === true;
+    console.log('Request successful check:', { isSuccess, hasError: !!response.error, dataSuccess: data.success });
+
+    if (isSuccess) {
+      console.log('Message send successful, updating local count...');
       // Prefer server-authoritative counts; fall back to local increment.
       const currentCount = await getLocalMessageCount();
+      console.log('Current local count before update:', currentCount);
+      
       const updatedCount: MessageCount = {
         ...currentCount,
         totalSent: currentCount.totalSent + 1,
@@ -247,20 +273,27 @@ export const sendMessageWithLimit = async (
           data.freeMessagesLimit ?? currentCount.freeMessagesLimit,
         hasPaidAccess: data.hasPaidAccess ?? currentCount.hasPaidAccess,
       };
+      console.log('Updated count to be saved:', updatedCount);
+      
       await saveLocalMessageCount(updatedCount);
+      console.log('Local count saved');
 
       const updatedRemaining = Math.max(
         0,
         updatedCount.freeMessagesLimit - updatedCount.freeMessagesUsed,
       );
+      console.log('Calculated remaining messages:', updatedRemaining);
 
-      return {
+      const result = {
         success: true,
         message: "Message sent successfully",
         remainingFreeMessages: updatedCount.hasPaidAccess
           ? undefined
           : updatedRemaining,
       };
+      console.log('sendMessageWithLimit returning:', result);
+      console.log('=== sendMessageWithLimit END ===');
+      return result;
     }
 
     // Server responded without an error but success was falsy — treat as failure.

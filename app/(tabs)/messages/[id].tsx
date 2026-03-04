@@ -121,8 +121,9 @@ const ChatScreen = () => {
           const formattedMessages = response.data.messages.map((msg: any) => ({
             id: String(msg.id || `msg-${Date.now()}`),
             text: msg.content || msg.text || "",
-            senderId: String(msg.senderId || ""),
-            timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
+            senderId: String(msg.senderId || msg.sender_id || ""),
+            receiverId: String(msg.receiverId || msg.receiver_id || ""),
+            timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(msg.created_at || new Date()),
           }));
 
           setMessages(formattedMessages);
@@ -177,29 +178,31 @@ const ChatScreen = () => {
 
   // Handle sending a new message
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !canSendMessage) return;
+    if (!newMessage.trim() || !canSendMessage) {
+      return;
+    }
 
     const tempId = `temp-${Date.now()}`;
     const messageToSend = {
       id: tempId,
       text: newMessage,
-      senderId: user.id,
+      senderId: String(user.id),
       timestamp: new Date(),
     };
 
-    // Optimistically add the message
+    // Optimistically add message
     setMessages((prev) => [...prev, messageToSend]);
     const messageContent = newMessage;
     setNewMessage("");
 
     try {
-      // Use the message service with free message limit checking
+      // Use message service with free message limit checking
       const result = await sendMessage(id, messageContent);
 
       if (!result.success) {
-        // Remove the optimistic message
+        // Remove optimistic message
         setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
-        setNewMessage(messageContent); // Restore the message
+        setNewMessage(messageContent); // Restore message
 
         if (
           result.message?.includes("subscription") ||
@@ -210,30 +213,31 @@ const ChatScreen = () => {
         return;
       }
 
-      // Refresh messages to get the actual message from server
+      // Refresh messages to get actual message from server
       const messagesResponse = await api.getMessages(id);
       if (messagesResponse?.data?.messages) {
         setMessages(
           messagesResponse.data.messages.map((msg: any) => ({
             id: String(msg.id),
             text: msg.content || "",
-            senderId: String(msg.senderId || ""),
-            timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
+            senderId: String(msg.senderId || msg.sender_id || ""),
+            receiverId: String(msg.receiverId || msg.receiver_id || ""),
+            timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(msg.created_at || new Date()),
           })),
         );
       }
     } catch (error) {
       console.error("Error sending message:", error);
-      // Remove the optimistic message on error
+      // Remove optimistic message on error
       setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
-      setNewMessage(messageContent); // Restore the message
+      setNewMessage(messageContent); // Restore message
       showToast("Failed to send message. Please try again.", "error");
     }
   };
 
   // Render a single message
   const renderMessage = ({ item }: { item: any }) => {
-    const isCurrentUser = item.senderId === user?.id;
+    const isCurrentUser = String(item.senderId) === String(user?.id);
 
     return (
       <View
@@ -248,7 +252,10 @@ const ChatScreen = () => {
             isCurrentUser ? styles.currentUserMessage : styles.otherUserMessage,
           ]}
         >
-          <Text style={styles.messageText}>{item.text}</Text>
+          <Text style={[
+            styles.messageText,
+            isCurrentUser ? styles.currentUserMessageText : null
+          ]}>{item.text}</Text>
           <Text style={styles.timestamp}>
             {new Date(item.timestamp).toLocaleTimeString([], {
               hour: "2-digit",
@@ -322,7 +329,7 @@ const ChatScreen = () => {
               style={[styles.sendButton, styles.sendButtonDisabled]}
               disabled={true}
             >
-              <Text style={styles.sendButtonText}>Send</Text>
+              <Text style={[styles.sendButtonText, styles.sendButtonTextDisabled]}>Send</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -396,7 +403,13 @@ const ChatScreen = () => {
             onPress={handleSendMessage}
             disabled={!newMessage.trim() || !canSendMessage}
           >
-            <Text style={styles.sendButtonText}>Send</Text>
+            <Text style={[
+              styles.sendButtonText,
+              (!newMessage.trim() || !canSendMessage) &&
+                styles.sendButtonTextDisabled
+            ]}>
+              Send
+            </Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -531,9 +544,9 @@ const styles = StyleSheet.create({
   },
   timestamp: {
     fontSize: 10,
-    color: "rgba(0,0,0,0.5)",
     marginTop: 4,
     textAlign: "right",
+    color: "#fff",
   },
   inputContainer: {
     flexDirection: "row",
@@ -577,6 +590,9 @@ const styles = StyleSheet.create({
   sendButtonText: {
     color: "#fff",
     fontWeight: "600",
+  },
+  sendButtonTextDisabled: {
+    color: "#999",
   },
 });
 

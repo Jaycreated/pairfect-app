@@ -36,12 +36,6 @@ export default function MessagesLayout() {
                 paddingLeft: 40,
               }}
             >
-              <TouchableOpacity
-                onPress={() => router.back()}
-                style={{ position: "absolute", left: 12, top: 2 }}
-              >
-                <Ionicons name="chevron-back" size={24} color="#000" />
-              </TouchableOpacity>
             </View>
           ),
         }}

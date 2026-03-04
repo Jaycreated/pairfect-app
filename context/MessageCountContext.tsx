@@ -1,21 +1,21 @@
 import { useRouter, type Href } from 'expo-router';
 import React, {
-    createContext,
-    useContext,
-    useEffect,
-    useState,
-    type ReactNode,
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
 } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import {
-    canSendMessage,
-    getMessageCount,
-    sendMessageWithLimit,
-    updatePaidAccessStatus,
-    type MessageCount,
+  canSendMessage,
+  getMessageCount,
+  sendMessageWithLimit,
+  updatePaidAccessStatus,
+  type MessageCount,
 } from '@/services/messageService';
 
 type MessageCountContextType = {
@@ -55,15 +55,19 @@ export const MessageCountProvider: React.FC<{ children: ReactNode }> = ({
   const router = useRouter();
 
   const refreshMessageCount = async () => {
+    console.log('=== refreshMessageCount START ===');
     try {
       setIsLoading(true);
       const count = await getMessageCount();
+      console.log('getMessageCount returned:', count);
       setMessageCount(count);
+      console.log('messageCount state updated');
     } catch (error) {
       console.error('Error refreshing message count:', error);
       showToast('Failed to load message limits', 'error');
     } finally {
       setIsLoading(false);
+      console.log('=== refreshMessageCount END ===');
     }
   };
 
@@ -78,10 +82,16 @@ export const MessageCountProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   const sendMessage = async (recipientId: string, content: string) => {
+    console.log('=== MessageCountContext.sendMessage START ===');
+    console.log('recipientId:', recipientId);
+    console.log('content:', content);
+    
     try {
       const result = await sendMessageWithLimit(recipientId, content);
+      console.log('sendMessageWithLimit result:', result);
 
       if (!result.success) {
+        console.log('sendMessageWithLimit failed');
         if (result.requiresSubscription) {
           showToast(result.message || 'Subscription required', 'error');
           router.push('/(tabs)/subscribe' as Href);
@@ -91,10 +101,13 @@ export const MessageCountProvider: React.FC<{ children: ReactNode }> = ({
         return result;
       }
 
+      console.log('Message sent successfully, refreshing message count...');
       // update count after successful send
       await refreshMessageCount();
+      console.log('Message count refreshed');
 
       if (typeof result.remainingFreeMessages === 'number') {
+        console.log('remainingFreeMessages from result:', result.remainingFreeMessages);
         if (result.remainingFreeMessages > 0) {
           showToast(
             `Message sent! ${result.remainingFreeMessages} free messages remaining.`,
@@ -107,9 +120,11 @@ export const MessageCountProvider: React.FC<{ children: ReactNode }> = ({
           );
         }
       } else {
+        console.log('No remainingFreeMessages in result, showing generic success');
         showToast('Message sent successfully!', 'success');
       }
 
+      console.log('=== MessageCountContext.sendMessage END ===');
       return result;
     } catch (error) {
       console.error('Error sending message:', error);
