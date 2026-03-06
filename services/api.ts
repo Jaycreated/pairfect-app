@@ -159,6 +159,12 @@ export const api = {
 
   logout: () => fetchApi(API_CONFIG.ENDPOINTS.AUTH.LOGOUT, 'POST'),
 
+  forgotPassword: (email: string) => 
+    fetchApi(API_CONFIG.ENDPOINTS.AUTH.FORGOT_PASSWORD, 'POST', { email }),
+
+  resetPassword: (token: string, newPassword: string) => 
+    fetchApi(API_CONFIG.ENDPOINTS.AUTH.RESET_PASSWORD, 'POST', { token, newPassword }),
+
   // User
   // User Profile
   getProfile: () => fetchApi<{
