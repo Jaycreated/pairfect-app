@@ -218,16 +218,32 @@ const verifyPurchase = async (purchase: any) => {
   try {
     console.log("Verifying purchase:", purchase.productId);
 
-    const receiptData = {
-      transactionId: purchase.transactionId,
-      receipt: (purchase as any).transactionReceipt || purchase.transactionId,
-      originalJson: (purchase as any).originalJson,
-      signature: (purchase as any).signature,
-      productId: purchase.productId,
-      purchaseToken: purchase.purchaseToken || (purchase as any).token,
-      isAndroid: Platform.OS === "android",
-      isIOS: Platform.OS === "ios",
-    };
+    // Prepare receipt data with base64 encoding for security
+    let receiptData: any = {};
+
+    if (Platform.OS === "ios") {
+      // For iOS, the transactionReceipt is already base64 encoded
+      receiptData = {
+        transactionId: purchase.transactionId,
+        receipt: (purchase as any).transactionReceipt || purchase.transactionId,
+        productId: purchase.productId,
+        isIOS: true,
+        isAndroid: false,
+      };
+    } else {
+      // For Android, base64 encode the originalJson for security
+      const originalJson = (purchase as any).originalJson;
+      const base64Receipt = btoa(unescape(encodeURIComponent(originalJson)));
+
+      receiptData = {
+        originalJson: base64Receipt, // Base64 encoded
+        signature: (purchase as any).signature,
+        purchaseToken: purchase.purchaseToken || (purchase as any).token,
+        productId: purchase.productId,
+        isIOS: false,
+        isAndroid: true,
+      };
+    }
 
     // Call backend to verify receipt
     await verifyIapReceipt(JSON.stringify(receiptData), purchase.productId);

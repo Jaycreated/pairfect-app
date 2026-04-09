@@ -159,12 +159,6 @@ export const api = {
 
   logout: () => fetchApi(API_CONFIG.ENDPOINTS.AUTH.LOGOUT, 'POST'),
 
-  forgotPassword: (email: string) => 
-    fetchApi(API_CONFIG.ENDPOINTS.AUTH.FORGOT_PASSWORD, 'POST', { email }),
-
-  resetPassword: (token: string, newPassword: string) => 
-    fetchApi(API_CONFIG.ENDPOINTS.AUTH.RESET_PASSWORD, 'POST', { token, newPassword }),
-
   // User
   // User Profile
   getProfile: () => fetchApi<{
@@ -395,7 +389,7 @@ export const api = {
 
   // Push notification token registration
   registerPushToken: (token: string) => 
-    fetchApi('/notifications/register', 'POST', { token }),
+    fetchApi('/notifications/register', 'POST', { pushToken: token }),
 };
 
 // Auth interceptor to handle token refresh

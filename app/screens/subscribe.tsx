@@ -2,15 +2,11 @@
 import { useSubscription } from "@/context/SubscriptionContext";
 import { useToast } from "@/context/ToastContext";
 import { PRODUCT_IDS, purchaseItem } from "@/services/iapService";
-import { initializePayment } from "@/services/paymentService";
-import { Storage } from "@/utils/storage";
 import { Ionicons } from "@expo/vector-icons";
-import Constants from "expo-constants";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
     ActivityIndicator,
-    Linking,
     Platform,
     ScrollView,
     StyleSheet,
@@ -50,77 +46,19 @@ export default function SubscribeScreen() {
   const handleSubscribe = async (planId: string) => {
     if (isProcessing) return;
 
-    // Define the deep link handler function
-    const handleDeepLink = (event: { url: string }) => {
-      console.log("Received deep link:", event.url);
-      // When we get a deep link, refresh the subscription status
-      refreshSubscription().then(() => {
-        // Navigate to messages tab after subscription is refreshed
-        router.replace("/(tabs)/messages");
-      });
-    };
-
-    let subscription: { remove: () => void } | null = null;
-
     try {
       setIsProcessing(true);
       setSelectedPlan(planId);
 
-      // If iOS use IAP, Android -> redirect to website
-      if (Platform.OS === "ios") {
-        const platformIds = PRODUCT_IDS.ios;
-        const productId =
-          planId === "daily" ? platformIds.daily : platformIds.monthly;
-        await purchaseItem(productId);
-        // After purchaseListener verifies and backend verifies, refresh subscription
-        await refreshSubscription();
-        router.replace("/(tabs)/messages");
-        return;
-      }
+      // Use native IAP for both iOS and Android
+      const platformIds =
+        Platform.OS === "ios" ? PRODUCT_IDS.ios : PRODUCT_IDS.android;
+      const productId =
+        planId === "daily" ? platformIds.daily : platformIds.monthly;
 
-      // Android/Web: Use chat payment initialization (Paystack) + HTTPS callback that deep-links back to app
-      const token = await Storage.getItem("auth_token");
-      if (!token) {
-        showToast("Please log in to subscribe", "error");
-        return;
-      }
-
-      const plan = plans.find((p) => p.id === planId);
-      if (!plan) {
-        throw new Error("Invalid plan");
-      }
-
-      const webCallbackBaseUrl =
-        Constants.expoConfig?.extra?.webCallbackBaseUrl ||
-        process.env.EXPO_PUBLIC_WEB_CALLBACK_BASE_URL;
-
-      if (!webCallbackBaseUrl) {
-        throw new Error("Missing web callback base URL configuration");
-      }
-
-      const deepLinkRedirect = "pairfect://payment-success";
-      const callbackUrl = `${String(webCallbackBaseUrl).replace(/\/$/, "")}/payment/callback?redirect=${encodeURIComponent(deepLinkRedirect)}`;
-
-      // Add the event listener (fallback; the app also has a global listener in SubscriptionContext)
-      subscription = Linking.addEventListener("url", handleDeepLink);
-
-      const payment = await initializePayment(
-        plan.price,
-        planId,
-        token,
-        callbackUrl,
-      );
-
-      if (!payment?.payment_url) {
-        throw new Error("Missing payment URL");
-      }
-
-      const canOpen = await Linking.canOpenURL(payment.payment_url);
-      if (!canOpen) {
-        throw new Error("Cannot open payment URL");
-      }
-
-      await Linking.openURL(payment.payment_url);
+      await purchaseItem(productId);
+      await refreshSubscription();
+      router.replace("/(tabs)/messages");
     } catch (error) {
       console.error("Payment error:", error);
       const errorMessage =
@@ -129,10 +67,6 @@ export default function SubscribeScreen() {
           : "Failed to process payment. Please try again.";
       showToast(errorMessage, "error");
     } finally {
-      // Clean up the subscription if it was created
-      if (subscription) {
-        subscription.remove();
-      }
       setSelectedPlan(null);
       setIsProcessing(false);
     }

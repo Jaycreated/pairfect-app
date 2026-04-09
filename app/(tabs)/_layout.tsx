@@ -1,8 +1,7 @@
 import { Header } from "@/components/Header";
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs, usePathname, useRouter } from "expo-router";
-import * as SecureStore from "expo-secure-store";
-import React, { useEffect } from "react";
+import React from "react";
 
 const ConditionalHeader = ({
   onNotificationPress,
@@ -21,25 +20,6 @@ const ConditionalHeader = ({
 
 export default function TabLayout() {
   const router = useRouter();
-
-  // Check if onboarding is completed when the tab layout loads
-  useEffect(() => {
-    const checkOnboarding = async () => {
-      try {
-        const hasCompleted = await SecureStore.getItemAsync(
-          "onboarding_completed",
-        );
-        if (hasCompleted !== "true") {
-          // If not completed, ensure we're on the onboarding tab
-          router.setParams({ screen: "onboarding" });
-        }
-      } catch (error) {
-        console.error("Error checking onboarding:", error);
-      }
-    };
-
-    checkOnboarding();
-  }, []);
 
   const handleNotificationPress = () => {
     router.push("/(tabs)/notifications");

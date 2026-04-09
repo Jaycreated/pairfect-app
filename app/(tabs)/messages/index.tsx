@@ -19,7 +19,6 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
-  Linking,
   Platform,
   RefreshControl,
   StyleSheet,
@@ -229,7 +228,11 @@ const MessagesScreen = () => {
     isLoading: isSubscriptionLoading,
     refreshSubscription,
   } = useSubscription();
-  const { canSend, remainingFreeMessages, isLoading: messageCountLoading } = useMessageCount();
+  const {
+    canSend,
+    remainingFreeMessages,
+    isLoading: messageCountLoading,
+  } = useMessageCount();
   const { user } = useAuth();
   const router = useRouter();
   const navigation = useNavigation();
@@ -240,7 +243,7 @@ const MessagesScreen = () => {
     canSend,
     remainingFreeMessages,
     messageCountLoading,
-    userId: user?.id
+    userId: user?.id,
   });
 
   // ========== State ==========
@@ -602,31 +605,45 @@ const MessagesScreen = () => {
     messageCountLoading,
     isLoading,
     isRefreshing,
-    
+
     // Access states
     subscription: !!subscription,
     requiresSubscription,
     canSend,
     remainingFreeMessages,
-    
+
     // Combined conditions
-    shouldShowLoading: isSubscriptionLoading || messageCountLoading || (isLoading && !isRefreshing),
+    shouldShowLoading:
+      isSubscriptionLoading ||
+      messageCountLoading ||
+      (isLoading && !isRefreshing),
     shouldShowSubscriptionPrompt: !canSend && remainingFreeMessages <= 0,
     shouldShowFreeMessageLimit: !canSend && remainingFreeMessages <= 0,
-    shouldShowConversations: subscription && canSend || (!subscription && canSend)
+    shouldShowConversations:
+      (subscription && canSend) || (!subscription && canSend),
   });
 
   /**
    * Show loading spinner while checking subscription or loading initial data
    */
-  if (isSubscriptionLoading || messageCountLoading || (isLoading && !isRefreshing)) {
-    console.log("[MessagesScreen] DECISION: Showing loading state - conditions:", {
-      isSubscriptionLoading,
-      messageCountLoading,
-      isLoading,
-      isRefreshing,
-      combined: isSubscriptionLoading || messageCountLoading || (isLoading && !isRefreshing)
-    });
+  if (
+    isSubscriptionLoading ||
+    messageCountLoading ||
+    (isLoading && !isRefreshing)
+  ) {
+    console.log(
+      "[MessagesScreen] DECISION: Showing loading state - conditions:",
+      {
+        isSubscriptionLoading,
+        messageCountLoading,
+        isLoading,
+        isRefreshing,
+        combined:
+          isSubscriptionLoading ||
+          messageCountLoading ||
+          (isLoading && !isRefreshing),
+      },
+    );
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#651B55" />
@@ -659,104 +676,33 @@ const MessagesScreen = () => {
 
   /**
    * If the user does not have an active subscription, show a prominent
-   * message with a button that opens the external subscription website.
-   * Falls back to the in-app subscribe screen if no external URL is configured.
+   * message with a button that opens the in-app subscription screen.
    */
   if (!canSend && remainingFreeMessages <= 0) {
-    console.log("[MessagesScreen] DECISION: Showing subscription prompt - conditions:", {
-      subscription: !!subscription,
-      requiresSubscription,
-      condition: !canSend && remainingFreeMessages <= 0,
-      canSend,
-      remainingFreeMessages
-    });
-    
-    console.log("[MessagesScreen] No free messages left - showing subscription prompt", {
-      subscription: !!subscription,
-      requiresSubscription,
-      canSend,
-      remainingFreeMessages
-    });
-    
-    // Default to the production subscribe URL if not provided in env
-    const baseUrl = process.env.EXPO_PUBLIC_SUBSCRIBE_URL
-      ? `${process.env.EXPO_PUBLIC_SUBSCRIBE_URL}/pricing`
-      : "https://dating-g2mc.onrender.com/pricing";
+    console.log(
+      "[MessagesScreen] DECISION: Showing subscription prompt - conditions:",
+      {
+        subscription: !!subscription,
+        requiresSubscription,
+        condition: !canSend && remainingFreeMessages <= 0,
+        canSend,
+        remainingFreeMessages,
+      },
+    );
 
-    // Create a deep link that will redirect back to the app after subscription
-    const callbackUrl = "pairfect://messages";
-    const externalSubscribeUrl = `${baseUrl}?redirect_uri=${encodeURIComponent(callbackUrl)}`;
-
-    const verifySubscription = async () => {
-      try {
-        const response = await fetch(
-          "https://dating-g2mc.onrender.com/api/subscription/status",
-          {
-            headers: {
-              Authorization: `Bearer ${user?.token || ""}`,
-            },
-          },
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to verify subscription");
-        }
-
-        const data = await response.json();
-        if (data.isActive) {
-          await refreshSubscription();
-        } else {
-          throw new Error("Subscription not active");
-        }
-      } catch (error) {
-        console.error("Subscription verification failed:", error);
-        throw error;
-      }
-    };
+    console.log(
+      "[MessagesScreen] No free messages left - showing subscription prompt",
+      {
+        subscription: !!subscription,
+        requiresSubscription,
+        canSend,
+        remainingFreeMessages,
+      },
+    );
 
     const handleOpenSubscribe = async () => {
       console.log("[MessagesScreen] User clicked subscribe button");
-      try {
-        // On iOS we prefer the in-app subscribe screen (IAP).
-        if (Platform.OS === "ios") {
-          router.push("/screens/subscribe" as any);
-          return;
-        }
-
-        // Add a timestamp to make each redirect unique
-        const timestamp = Date.now();
-        const callbackUrl = `pairfect://messages?ts=${timestamp}`;
-        const externalSubscribeUrl = `${baseUrl}?redirect_uri=${encodeURIComponent(callbackUrl)}`;
-
-        // Set up deep link listener
-        const subscription = Linking.addEventListener("url", async (event) => {
-          console.log("App opened with URL:", event.url);
-          subscription.remove();
-
-          // Verify the subscription with your backend
-          try {
-            await verifySubscription();
-          } catch (error) {
-            console.error("Subscription verification failed:", error);
-            showToast(
-              "Failed to verify subscription. Please try again.",
-              "error",
-            );
-          }
-        });
-
-        // Open the subscription URL in the browser
-        const supported = await Linking.canOpenURL(externalSubscribeUrl);
-        if (supported) {
-          await Linking.openURL(externalSubscribeUrl);
-        } else {
-          throw new Error("Cannot open subscription URL");
-        }
-      } catch (err) {
-        console.error("Failed to open subscribe URL:", err);
-        // Fallback to in-app subscribe screen if external URL fails
-        router.push("/screens/subscribe" as any);
-      }
+      router.push("/screens/subscribe" as any);
     };
 
     return (
@@ -786,86 +732,31 @@ const MessagesScreen = () => {
   /**
    * If user has subscription access but no free messages left, show appropriate message
    */
-  if (!canSend && remainingFreeMessages <= 0) {
-    console.log("[MessagesScreen] DECISION: Showing free message limit prompt - conditions:", {
-      canSend,
-      remainingFreeMessages,
-      condition: !canSend && remainingFreeMessages <= 0,
-      subscription: !!subscription
-    });
-    
-    console.log("[MessagesScreen] No free messages left - showing free message limit prompt", {
-      canSend,
-      remainingFreeMessages,
-      subscription: !!subscription
-    });
-    
+  if (subscription && !canSend) {
+    console.log(
+      "[MessagesScreen] DECISION: Showing free message limit prompt - conditions:",
+      {
+        canSend,
+        remainingFreeMessages,
+        condition: subscription && !canSend,
+        subscription: !!subscription,
+      },
+    );
+
+    console.log(
+      "[MessagesScreen] No free messages left - showing free message limit prompt",
+      {
+        canSend,
+        remainingFreeMessages,
+        subscription: !!subscription,
+      },
+    );
+
     const handleOpenSubscribe = async () => {
-      console.log("[MessagesScreen] User clicked subscribe from free message limit screen");
-      try {
-        // On iOS we prefer the in-app subscribe screen (IAP).
-        if (Platform.OS === "ios") {
-          router.push("/screens/subscribe" as any);
-          return;
-        }
-
-        // Default to the production subscribe URL if not provided in env
-        const baseUrl = process.env.EXPO_PUBLIC_SUBSCRIBE_URL
-          ? `${process.env.EXPO_PUBLIC_SUBSCRIBE_URL}/pricing`
-          : "https://dating-g2mc.onrender.com/pricing";
-
-        // Add a timestamp to make each redirect unique
-        const timestamp = Date.now();
-        const callbackUrl = `pairfect://messages?ts=${timestamp}`;
-        const externalSubscribeUrl = `${baseUrl}?redirect_uri=${encodeURIComponent(callbackUrl)}`;
-
-        // Set up deep link listener
-        const subscription = Linking.addEventListener("url", async (event) => {
-          console.log("App opened with URL:", event.url);
-          subscription.remove();
-
-          // Verify the subscription with your backend
-          try {
-            const response = await fetch(
-              "https://dating-g2mc.onrender.com/api/subscription/status",
-              {
-                headers: {
-                  Authorization: `Bearer ${user?.token || ""}`,
-                },
-              },
-            );
-
-            if (!response.ok) {
-              throw new Error("Failed to verify subscription");
-            }
-
-            const data = await response.json();
-            if (data.isActive) {
-              await refreshSubscription();
-            } else {
-              throw new Error("Subscription not active");
-            }
-          } catch (error) {
-            console.error("Subscription verification failed:", error);
-            showToast(
-              "Failed to verify subscription. Please try again.",
-              "error",
-            );
-          }
-        });
-
-        // Open the subscription URL in the browser
-        const supported = await Linking.canOpenURL(externalSubscribeUrl);
-        if (supported) {
-          await Linking.openURL(externalSubscribeUrl);
-        } else {
-          throw new Error("Cannot open subscription URL");
-        }
-      } catch (err) {
-        console.error("Failed to open subscribe URL:", err);
-        // Fallback to in-app subscribe screen if external URL fails
-        router.push("/screens/subscribe" as any);
-      }
+      console.log(
+        "[MessagesScreen] User clicked subscribe from free message limit screen",
+      );
+      router.push("/screens/subscribe" as any);
     };
 
     return (
@@ -890,22 +781,6 @@ const MessagesScreen = () => {
       </View>
     );
   }
-
-  // User has access (either subscription or free messages) - show conversations
-  console.log("[MessagesScreen] DECISION: Showing conversations - conditions:", {
-    subscription: !!subscription,
-    canSend,
-    remainingFreeMessages,
-    condition: subscription && canSend || (!subscription && canSend),
-    conversationCount: conversations.length
-  });
-  
-  console.log("[MessagesScreen] User has access - showing conversations", {
-    subscription: !!subscription,
-    canSend,
-    remainingFreeMessages,
-    conversationCount: conversations.length
-  });
 
   // ========== Main Render ==========
 

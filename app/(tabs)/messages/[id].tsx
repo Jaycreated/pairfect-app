@@ -12,7 +12,6 @@ import {
   ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
-  Linking,
   Platform,
   SafeAreaView,
   StyleSheet,
@@ -144,33 +143,7 @@ const ChatScreen = () => {
 
   // Handle subscription button press
   const handleSubscribe = async () => {
-    try {
-      // Default to the production subscribe URL if not provided in env
-      const baseUrl = process.env.EXPO_PUBLIC_SUBSCRIBE_URL
-        ? `${process.env.EXPO_PUBLIC_SUBSCRIBE_URL}/pricing`
-        : "https://dating-g2mc.onrender.com/pricing";
-
-      // On iOS, use in-app subscription flow
-      if (Platform.OS === "ios") {
-        router.push("/screens/subscribe" as any);
-        return;
-      }
-
-      // On Android, open external browser with deep link back
-      const timestamp = Date.now();
-      const callbackUrl = `pairfect://messages/${id}?ts=${timestamp}`;
-      const externalSubscribeUrl = `${baseUrl}?redirect_uri=${encodeURIComponent(callbackUrl)}`;
-
-      const supported = await Linking.canOpenURL(externalSubscribeUrl);
-      if (supported) {
-        await Linking.openURL(externalSubscribeUrl);
-      } else {
-        throw new Error("Cannot open subscription URL");
-      }
-    } catch (error) {
-      console.error("Failed to open subscribe URL:", error);
-      showToast("Failed to open subscription page. Please try again.", "error");
-    }
+    router.push("/screens/subscribe" as any);
   };
 
   // Check if user can send messages

@@ -3,6 +3,7 @@ import { registerForPushNotificationsAsync } from '@/utils/notifications';
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { useAuth } from '@/context/AuthContext';
 
 type NotificationContextType = {
   expoPushToken: string | null;
@@ -24,22 +25,33 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const notificationListener = useRef<Notifications.Subscription | null>(null);
   const responseListener = useRef<Notifications.Subscription | null>(null);
   const router = useRouter();
+  const { user } = useAuth();
 
   useEffect(() => {
-    // Register for push notifications
+    let isMounted = true;
+
     const registerForPushNotifications = async () => {
+      if (!user?.token) {
+        setExpoPushToken(null);
+        return;
+      }
+
       try {
         const token = await registerForPushNotificationsAsync();
-        if (token) {
-          console.log('Push token:', token);
-          setExpoPushToken(token);
-          // Send the token to your backend
-          try {
-            await api.registerPushToken(token);
-            console.log('Push token registered with backend');
-          } catch (error) {
-            console.error('Failed to register push token:', error);
-          }
+        if (!token) {
+          console.warn('Push registration completed without a token.');
+          return;
+        }
+
+        if (!isMounted) return;
+        console.log('Push token:', token);
+        setExpoPushToken(token);
+
+        try {
+          await api.registerPushToken(token);
+          console.log('Push token registered with backend');
+        } catch (error) {
+          console.error('Failed to register push token:', error);
         }
       } catch (error) {
         console.error('Error getting push token:', error);
@@ -48,25 +60,21 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
     registerForPushNotifications();
 
-    // This listener is called when a notification is received while the app is in the foreground
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
       setNotification(notification);
-      // You can add custom handling for foreground notifications here
       console.log('Notification received:', notification);
     });
 
-    // This listener is called when a user taps on a notification
     responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
       const data = response.notification.request.content.data as { url?: string };
       if (data?.url) {
-        // Use the correct type for navigation
         const url = data.url.startsWith('/') ? data.url : `/${data.url}`;
         router.push(url as any);
       }
     });
 
     return () => {
-      // Clean up listeners
+      isMounted = false;
       if (notificationListener.current) {
         notificationListener.current.remove();
       }
@@ -74,7 +82,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         responseListener.current.remove();
       }
     };
-  }, []);
+  }, [user?.token, router]);
 
   return (
     <NotificationContext.Provider value={{ expoPushToken, notification }}>
