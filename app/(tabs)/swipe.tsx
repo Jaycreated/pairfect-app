@@ -4,14 +4,18 @@ import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Dimensions, Image, PanResponder, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, Dimensions, Image, Modal, PanResponder, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 const SWIPE_THRESHOLD = width * 0.4;
 const SWIPE_OUT_DURATION = 250;
 
-// Placeholder image for users without photos
-const PLACEHOLDER_IMAGE = 'https://via.placeholder.com/400x600/651B55/FFFFFF?text=No+Photo';
+// Default profile icon component for users without photos
+const DefaultProfileIcon = ({ size = 50 }: { size?: number }) => (
+  <View style={[styles.defaultAvatar, { width: size, height: size, borderRadius: size / 2 }]}>
+    <Ionicons name="person" size={size * 0.6} color="#fff" />
+  </View>
+);
 
 type User = {
   id: string;
@@ -31,6 +35,8 @@ const SwipeScreen = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isProcessingSwipe, setIsProcessingSwipe] = useState(false);
+  const [matchModalVisible, setMatchModalVisible] = useState(false);
+  const [matchedUser, setMatchedUser] = useState<User | null>(null);
   const { showToast } = useToast();
   
   // Use ref to track users array for immediate access in callbacks
@@ -66,12 +72,8 @@ const fetchPotentialMatches = async () => {
     const matches = await api.getPotentialMatches();
     console.log('Received matches:', matches);
     
-    // Map users and add placeholder image if needed (don't filter out users without images)
-    const validUsers = matches.map((user: User) => ({
-      ...user,
-      // Use placeholder if no images exist
-      images: user.images && user.images.length > 0 ? user.images : [PLACEHOLDER_IMAGE]
-    }));
+    // Keep users as they come - don't filter out or modify images
+    const validUsers = matches;
     
     console.log('Valid users after mapping:', validUsers.length);
     
@@ -201,17 +203,14 @@ const fetchPotentialMatches = async () => {
       console.log(`${isLike ? 'Liked' : 'Passed'}:`, currentUser.name, 'Match data:', response.data);
       
       // Check if it's a mutual match
-      // The API returns an object with match details, and may include is_mutual property
-      if (isLike && response.data && response.data.match) {
-        const matchData = response.data.match;
-        // Check if it's a mutual match (could be a boolean or object with is_mutual property)
-        const isMutualMatch = typeof matchData === 'boolean' 
-          ? matchData 
-          : (matchData as any).is_mutual === true;
+      // The API returns both 'matched': boolean and match object
+      if (isLike && response.data) {
+        const isMutualMatch = (response.data as any).matched === true;
         
         if (isMutualMatch) {
           console.log('Mutual match found with:', currentUser.name);
-          showToast(`It's a match! You and ${currentUser.name} have liked each other!`, 'success', 5000);
+          setMatchedUser(currentUser);
+          setMatchModalVisible(true);
         } else {
           console.log('Like registered, but no mutual match yet with:', currentUser.name);
         }
@@ -280,11 +279,9 @@ const fetchPotentialMatches = async () => {
       },
     ];
 
-    // Use placeholder if no image
-    const imageUri = user.images && user.images.length > 0 
-      ? user.images[0] 
-      : PLACEHOLDER_IMAGE;
-
+    // Check if user has images and render accordingly
+    const hasImage = user.images && user.images.length > 0 && user.images[0];
+    
     return (
       <View style={styles.cardContainer}>
         <TouchableOpacity 
@@ -298,11 +295,16 @@ const fetchPotentialMatches = async () => {
             style={cardStyle}
             {...panResponderHandlers}
           >
-            <Image 
-              source={{ uri: imageUri }} 
-              style={styles.cardImage}
-              defaultSource={{ uri: PLACEHOLDER_IMAGE }}
-            />
+            {hasImage ? (
+              <Image 
+                source={{ uri: user.images[0] }} 
+                style={styles.cardImage}
+              />
+            ) : (
+              <View style={[styles.cardImage, styles.defaultProfileImageContainer]}>
+                <DefaultProfileIcon size={120} />
+              </View>
+            )}
             <View style={styles.cardOverlay}>
               <Animated.View 
                 style={[styles.likeBadgeContainer, { opacity: likeOpacity }]}
@@ -379,6 +381,78 @@ const fetchPotentialMatches = async () => {
     swipeCard(-1);
   }, [swipeCard]);
 
+  const handleMessageMatch = useCallback(() => {
+    if (matchedUser) {
+      setMatchModalVisible(false);
+      // Navigate to the messages screen with the matched user
+      router.push(`/messages/${matchedUser.id}`);
+    }
+  }, [matchedUser, router]);
+
+  const renderMatchModal = () => {
+    if (!matchedUser) return null;
+
+    // Check if matched user has images
+    const hasMatchImage = matchedUser.images && matchedUser.images.length > 0 && matchedUser.images[0];
+
+    return (
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={matchModalVisible}
+        onRequestClose={() => setMatchModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.matchModalContainer}>
+            {/* Matched User Image */}
+            {hasMatchImage ? (
+              <Image
+                source={{ uri: matchedUser.images[0] }}
+                style={styles.matchModalImage}
+              />
+            ) : (
+              <View style={[styles.matchModalImage, styles.defaultProfileImageContainer]}>
+                <DefaultProfileIcon size={100} />
+              </View>
+            )}
+
+            {/* Match Text */}
+            <View style={styles.matchContent}>
+              <PoppinsText weight="bold" style={styles.matchTitle}>
+                It's a Match!
+              </PoppinsText>
+              <PoppinsText style={styles.matchSubtitle}>
+                You and {matchedUser.name} have liked each other!
+              </PoppinsText>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={styles.matchButtonContainer}>
+              <TouchableOpacity
+                style={styles.matchMessageButton}
+                onPress={handleMessageMatch}
+              >
+                <Ionicons name="chatbubble-outline" size={20} color="#FFF" style={{ marginRight: 8 }} />
+                <PoppinsText weight="bold" style={styles.matchMessageButtonText}>
+                  Send Message
+                </PoppinsText>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.matchContinueButton}
+                onPress={() => setMatchModalVisible(false)}
+              >
+                <PoppinsText weight="bold" style={styles.matchContinueButtonText}>
+                  Keep Swiping
+                </PoppinsText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
   if (loading) {
     return (
       <View style={[styles.container, styles.centerContent]}>
@@ -446,6 +520,8 @@ const fetchPotentialMatches = async () => {
           )}
         </View>
       </ScrollView>
+
+      {renderMatchModal()}
     </View>
   );
 };
@@ -679,6 +755,99 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#FFCFF4',
     backgroundColor: '#FFCFF4',
+  },
+  // Match Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  matchModalContainer: {
+    backgroundColor: '#FFF',
+    borderRadius: 24,
+    padding: 0,
+    width: '90%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  matchModalImage: {
+    width: '100%',
+    height: 300,
+    resizeMode: 'cover',
+  },
+  matchHeader: {
+    backgroundColor: '#FF1B6D',
+    height: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  matchContent: {
+    alignItems: 'center',
+    padding: 24,
+    paddingBottom: 16,
+  },
+  matchTitle: {
+    fontSize: 28,
+    color: '#FF1B6D',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  matchSubtitle: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  matchButtonContainer: {
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+    gap: 12,
+  },
+  matchMessageButton: {
+    backgroundColor: '#FF1B6D',
+    borderRadius: 12,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#FF1B6D',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  matchMessageButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+  },
+  matchContinueButton: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    paddingVertical: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FF1B6D',
+  },
+  matchContinueButtonText: {
+    color: '#FF1B6D',
+    fontSize: 16,
+  },
+  defaultAvatar: {
+    backgroundColor: '#651B55',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  defaultProfileImageContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F0F0F0',
   },
 });
 

@@ -29,6 +29,8 @@ export const API_CONFIG = {
       ME: 'auth/me',
       CHANGE_PASSWORD: 'auth/change-password',
       LOGOUT: 'auth/logout',
+      FORGOT_PASSWORD: 'auth/forgot',
+      RESET_PASSWORD: 'auth/reset',
     },
     USERS: {
       PROFILE: 'users/profile',
@@ -44,6 +46,12 @@ export const API_CONFIG = {
       BASE: 'messages',
       CONVERSATION: (matchId: string) => `messages/${matchId}`,
       CONVERSATIONS: 'conversations',
+      SEND: 'messages/send',
+      COUNT: 'payments/chat/access', // Use the correct endpoint that exists in backend
+    },
+    PAYMENTS: {
+      CHAT_ACCESS: 'payments/chat/access',
+      CHAT_RESET: 'payments/chat/reset',
     }
   },
 

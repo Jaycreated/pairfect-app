@@ -1,42 +1,58 @@
 import { PoppinsText } from '@/components/PoppinsText';
-import { useToast } from '@/context/ToastContext';
 import { api } from '@/services/api';
-import { useRouter } from 'expo-router';
+import { useToast } from '@/context/ToastContext';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
-export default function ForgotPasswordScreen() {
-  const [email, setEmail] = useState('');
+export default function ResetPasswordScreen() {
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { showToast } = useToast();
+  const { token } = useLocalSearchParams<{ token: string }>();
 
   const handleResetPassword = async () => {
-    if (!email) {
-      showToast('Please enter your email', 'error');
+    // Validation
+    if (!newPassword) {
+      showToast('Please enter a new password', 'error');
       return;
     }
 
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      showToast('Please enter a valid email address', 'error');
+    if (!confirmPassword) {
+      showToast('Please confirm your new password', 'error');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      showToast('Password must be at least 6 characters long', 'error');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      showToast('Passwords do not match', 'error');
+      return;
+    }
+
+    if (!token) {
+      showToast('Invalid reset token. Please request a new password reset.', 'error');
       return;
     }
 
     try {
       setIsLoading(true);
-      const response = await api.forgotPassword(email);
+      const response = await api.resetPassword(token, newPassword);
       
       if (response.error) {
-        throw new Error(response.error.message || 'Failed to send reset link');
+        throw new Error(response.error.message || 'Failed to reset password');
       }
       
-      showToast('Password reset link sent to your email', 'success');
-      router.back();
+      showToast('Password reset successfully! Please login with your new password.', 'success');
+      router.replace('/(auth)/login');
     } catch (error) {
       console.error('Password reset error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to send reset link. Please try again.';
+      const errorMessage = error instanceof Error ? error.message : 'Failed to reset password. Please try again.';
       showToast(errorMessage, 'error');
     } finally {
       setIsLoading(false);
@@ -51,18 +67,30 @@ export default function ForgotPasswordScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
       >
         <View style={styles.formContainer}>
-          <PoppinsText style={styles.title}>Forgot Password</PoppinsText>
+          <PoppinsText style={styles.title}>Reset Password</PoppinsText>
           <PoppinsText style={styles.subtitle}>
-            Enter your email and we'll send you a link to reset your password.
+            Enter your new password below.
           </PoppinsText>
           
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
-              placeholder="Email"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
+              placeholder="New Password"
+              value={newPassword}
+              onChangeText={setNewPassword}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder="Confirm New Password"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
               autoCapitalize="none"
               autoCorrect={false}
             />
@@ -74,11 +102,11 @@ export default function ForgotPasswordScreen() {
             disabled={isLoading}
           >
             <PoppinsText style={styles.buttonText}>
-              {isLoading ? 'Sending...' : 'Send Reset Link'}
+              {isLoading ? 'Resetting...' : 'Reset Password'}
             </PoppinsText>
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity onPress={() => router.replace('/(auth)/login')} style={styles.backButton}>
             <PoppinsText style={styles.backButtonText}>Back to Login</PoppinsText>
           </TouchableOpacity>
         </View>

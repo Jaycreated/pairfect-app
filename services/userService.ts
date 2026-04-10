@@ -190,3 +190,45 @@ export const sendSwipeAction = async (targetUserId: string, action: 'like' | 'pa
     throw error;
   }
 };
+
+// Delete user account
+export const deleteAccount = async (): Promise<void> => {
+  console.log('[DELETE ACCOUNT] deleteAccount function called');
+  
+  const token = await getAuthToken();
+  console.log('[DELETE ACCOUNT] Token retrieved:', token ? 'EXISTS' : 'NULL');
+  
+  if (!token) {
+    console.log('[DELETE ACCOUNT] No token found, throwing error');
+    throw new Error('No authentication token found');
+  }
+
+  try {
+    console.log('[DELETE ACCOUNT] Making request to:', getApiUrl('/users/account'));
+    console.log('[DELETE ACCOUNT] Using token:', token ? 'Bearer [REDACTED]' : 'NO TOKEN');
+    
+    const response = await fetch(getApiUrl('/users/account'), {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    console.log('[DELETE ACCOUNT] Fetch completed, response received');
+    console.log('[DELETE ACCOUNT] Response status:', response.status);
+    console.log('[DELETE ACCOUNT] Response ok:', response.ok);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.log('[DELETE ACCOUNT] Error response data:', errorData);
+      throw new Error(errorData.message || 'Failed to delete account');
+    }
+
+    // Clear local storage after successful deletion
+    await Storage.clear();
+  } catch (error) {
+    console.error('Error deleting account:', error);
+    throw error;
+  }
+};

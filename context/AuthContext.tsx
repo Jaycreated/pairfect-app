@@ -1,4 +1,5 @@
 import { api } from '@/services/api';
+import { clearLocalMessageCount } from '@/services/messageService';
 import { SignInCredentials, SignUpData, User } from '@/types/auth';
 import { Storage } from '@/utils/storage';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
@@ -145,6 +146,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Create user object with token
       const userWithToken = { ...userData, token };
       
+      // Clear cached message count for new user
+      await clearLocalMessageCount();
+      
       setUser(userWithToken);
       setProfile(userWithToken);
       
@@ -167,15 +171,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
 
     try {
-      // TODO: Implement real sign-up flow against backend
-      // const response = await api.signup(data);
-      // const { token, user } = response.data;
-      // await Storage.setItem('auth_token', token);
-      // setUser(user);
-      // setProfile(user);
-      // return user;
-      
-      throw new Error('Sign up is not implemented yet');
+      const response = await api.register({
+        email: data.email,
+        password: data.password,
+        name: data.name,
+        sexualOrientation: data.sexualOrientation || ''
+      });
+
+      if (!response || response.error) {
+        const message = response?.error?.message || 'Failed to register';
+        throw new Error(message);
+      }
+
+      const { token, user: userData } = response.data as { token: string; user: User };
+
+      if (!token || !userData) {
+        throw new Error('Registration failed: Invalid response from server');
+      }
+
+      // Persist token (api.register also saves token, but ensure it's stored)
+      await Storage.setItem('auth_token', token);
+
+      const userWithToken = { ...userData, token };
+      setUser(userWithToken);
+      setProfile(userWithToken);
+
+      const { showToast } = useToast();
+      showToast('Registration successful!', 'success');
+
+      return userWithToken;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign up';
       setError(errorMessage);
@@ -200,6 +224,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Clear all auth state
       await Storage.deleteItem('auth_token');
+      await clearLocalMessageCount(); // Clear cached message count on logout
       setUser(null);
       setProfile(null);
       setError(null);
