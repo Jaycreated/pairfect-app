@@ -1,6 +1,7 @@
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { MessageCountProvider } from "@/context/MessageCountContext";
 import { NotificationProvider } from "@/context/NotificationContext";
+import { NotificationCountProvider } from "@/context/NotificationCountContext";
 import { SubscriptionProvider } from "@/context/SubscriptionContext";
 import { ToastProvider } from "@/context/ToastContext";
 import { WebSocketProvider } from "@/context/WebSocketContext";
@@ -8,16 +9,16 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useIAP } from "@/hooks/useIAP";
 import { Storage } from "@/utils/storage";
 import {
-    Poppins_400Regular,
-    Poppins_500Medium,
-    Poppins_600SemiBold,
-    Poppins_700Bold,
-    useFonts,
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+  useFonts,
 } from "@expo-google-fonts/poppins";
 import {
-    DarkTheme,
-    DefaultTheme,
-    ThemeProvider,
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider,
 } from "@react-navigation/native";
 import { QueryClientProvider } from "@tanstack/react-query";
 import * as Notifications from "expo-notifications";
@@ -227,11 +228,13 @@ export default function RootLayout() {
         <AuthProvider>
           <WebSocketProvider>
             <NotificationProvider>
-              <SubscriptionProvider>
-                <MessageCountProvider>
-                  <RootLayoutNav />
-                </MessageCountProvider>
-              </SubscriptionProvider>
+              <NotificationCountProvider>
+                <SubscriptionProvider>
+                  <MessageCountProvider>
+                    <RootLayoutNav />
+                  </MessageCountProvider>
+                </SubscriptionProvider>
+              </NotificationCountProvider>
             </NotificationProvider>
           </WebSocketProvider>
         </AuthProvider>

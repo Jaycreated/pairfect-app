@@ -1,17 +1,18 @@
 import { PoppinsText } from '@/components/PoppinsText';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { api } from '@/services/api';
+import { useNotificationCount } from '@/context/NotificationCountContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  RefreshControl,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Image,
+    RefreshControl,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
 // Format time to relative time (e.g., '2m ago')
@@ -69,6 +70,7 @@ const DefaultProfileIcon = ({ size = 50 }: { size?: number }) => (
 
 const NotificationsScreen = () => {
   const { subscription } = useSubscription();
+  const { refreshNotificationCount } = useNotificationCount();
   const [notifications, setNotifications] = useState<NotificationType[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -100,6 +102,7 @@ const NotificationsScreen = () => {
 
       if (unreadRes.data) {
         setUnreadCount(unreadRes.data.count);
+        await refreshNotificationCount(); // Update global count in header
       }
       setError(null);
     } catch (err) {
@@ -118,6 +121,7 @@ const NotificationsScreen = () => {
         prev.map(n => n.id === id ? { ...n, read: true, is_read: true } : n)
       );
       setUnreadCount(prev => Math.max(0, prev - 1));
+      await refreshNotificationCount(); // Update global count in header
     } catch (err) {
       console.error('Error marking notification as read:', err);
     }
@@ -128,6 +132,7 @@ const NotificationsScreen = () => {
       await api.markAllNotificationsAsRead();
       setNotifications(prev => prev.map(n => ({ ...n, read: true, is_read: true })));
       setUnreadCount(0);
+      await refreshNotificationCount(); // Update global count in header
     } catch (err) {
       console.error('Error marking all as read:', err);
     }

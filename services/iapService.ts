@@ -101,13 +101,43 @@ export const getAvailableProducts = async (): Promise<any[]> => {
 
   try {
     const productIds = getPlatformProductIds();
-    const products = await RNIap.fetchProducts({
-      skus: productIds,
-    });
+    console.log("Attempting to fetch products with IDs:", productIds);
+    
+    // Try different methods based on platform
+    let products;
+    if (Platform.OS === "android") {
+      // Android might need different approach
+      products = await RNIap.fetchProducts({
+        skus: productIds,
+      });
+    } else {
+      // iOS
+      products = await RNIap.fetchProducts({
+        skus: productIds,
+      });
+    }
+    
     console.log("Available products:", products);
-    return (products as any) || [];
-  } catch (error) {
+    
+    // If no products found, this might be normal in development
+    if (!products || products.length === 0) {
+      console.warn("No products found - this is normal in development environment");
+      console.warn("Products will be available when app is published with proper IAP setup");
+    }
+    
+    return products || [];
+  } catch (error: any) {
     console.error("Error fetching products:", error);
+    
+    // Provide more helpful error messages
+    if (error.message?.includes("Failed to query product")) {
+      console.warn("Product query failed - this is expected in development:");
+      console.warn("1. Make sure app is uploaded to Google Play Console");
+      console.warn("2. Products are configured in Play Console");
+      console.warn("3. App is signed with release key for testing");
+      console.warn("4. Test account is added to Play Console");
+    }
+    
     return [];
   }
 };
@@ -124,19 +154,29 @@ export const purchaseItem = async (productId: string): Promise<any | null> => {
   try {
     console.log("Initiating purchase for product:", productId);
 
-    const purchase = await RNIap.requestPurchase({
-      skus: [productId],
-    } as any);
+    let purchase;
+    
+    // Use different methods based on platform
+    if (Platform.OS === "android") {
+      purchase = await RNIap.requestPurchase(productId, false);
+    } else {
+      // iOS
+      purchase = await RNIap.requestPurchase(productId);
+    }
 
     console.log("Purchase initiated:", purchase);
-    return (purchase as any) || null;
+    return purchase || null;
   } catch (error: any) {
     if (error?.code === "E_USER_CANCELLED") {
       console.log("User cancelled the purchase");
+      throw new Error("Purchase was cancelled");
+    } else if (error?.message?.includes("Failed to query product")) {
+      console.warn("Product query failed during purchase:", error);
+      throw new Error("Unable to connect to payment service. Please check your internet connection and try again.");
     } else {
       console.error("Purchase error:", error);
+      throw new Error("Purchase failed: " + (error?.message || "Unknown error"));
     }
-    throw error;
   }
 };
 
