@@ -1,3 +1,4 @@
+import { NotificationBadgeUpdater } from "@/components/NotificationBadgeUpdater";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { MessageCountProvider } from "@/context/MessageCountContext";
 import { NotificationProvider } from "@/context/NotificationContext";
@@ -229,6 +230,7 @@ export default function RootLayout() {
           <WebSocketProvider>
             <NotificationProvider>
               <NotificationCountProvider>
+                <NotificationBadgeUpdater />
                 <SubscriptionProvider>
                   <MessageCountProvider>
                     <RootLayoutNav />

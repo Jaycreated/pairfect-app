@@ -19,6 +19,7 @@
       }
     },
     "android": {
+      "googleServicesFile": "./android/app/google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#E6F4FE"
@@ -27,7 +28,6 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.Pairfect",
       "versionCode": 6,
-      "googleServicesFile": "./android/app/google-services.json",
       "permissions": [
         "POST_NOTIFICATIONS",
         "android.permission.READ_EXTERNAL_STORAGE",
