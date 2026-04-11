@@ -11,6 +11,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
@@ -18,12 +19,12 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 
 // Simple chat screen with basic messaging functionality
 const ChatScreen = () => {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, userName, userAvatar } = useLocalSearchParams<{ id: string; userName?: string; userAvatar?: string }>();
   const { user } = useAuth();
   const { subscription, refreshSubscription } = useSubscription();
   const { canSend, remainingFreeMessages, sendMessage } = useMessageCount();
@@ -31,6 +32,9 @@ const ChatScreen = () => {
   const { showToast } = useToast();
   const navigation = useNavigation();
   const [requiresSubscription, setRequiresSubscription] = useState(false);
+  const [recipient, setRecipient] = useState<{ name: string; avatar?: string } | null>(
+    userName ? { name: userName, avatar: userAvatar } : null
+  );
 
   const [messages, setMessages] = useState<
     Array<{
@@ -127,6 +131,17 @@ const ChatScreen = () => {
 
           setMessages(formattedMessages);
           setRequiresSubscription(false);
+
+          // Extract recipient info from the first message or API response
+          console.log('API Response data:', response.data);
+          const recipientData = response.data.recipient || response.data.user || response.data.conversation?.recipient || response.data.participant || response.data.other_user;
+          console.log('Extracted recipient:', recipientData);
+          if (recipientData) {
+            setRecipient({
+              name: recipientData.name || recipientData.username || "Unknown",
+              avatar: recipientData.photos?.[0] || recipientData.avatar || recipientData.photo_url,
+            });
+          }
         }
       } catch (error) {
         console.error("Error loading messages:", error);
@@ -325,14 +340,30 @@ const ChatScreen = () => {
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
         style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
-        {/* Header with Back Button */}
+        {/* Header with Back Button and Recipient Info */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.push('/messages')}>
             <Ionicons name="arrow-back" size={24} color="#651B55" />
           </TouchableOpacity>
+          
+          {recipient && (
+            <View style={styles.headerRecipientInfo}>
+              {recipient.avatar ? (
+                <Image
+                  source={{ uri: recipient.avatar }}
+                  style={styles.headerAvatar}
+                />
+              ) : (
+                <View style={styles.headerAvatarPlaceholder}>
+                  <Ionicons name="person" size={20} color="#651B55" />
+                </View>
+              )}
+              <Text style={styles.headerRecipientName}>{recipient.name}</Text>
+            </View>
+          )}
         </View>
 
         {/* Messages List */}
@@ -408,9 +439,33 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
+  headerRecipientInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 12,
+    gap: 10,
+  },
+  headerAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  headerAvatarPlaceholder: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerRecipientName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#651B55',
+  },
   messagesContainer: {
     flex: 1,
-    backgroundColor: "#B2B2B2",
+    backgroundColor: "#fff",
   },
   loadingContainer: {
     flex: 1,
@@ -484,7 +539,7 @@ const styles = StyleSheet.create({
   },
   messagesList: {
     padding: 16,
-    paddingBottom: 160, // Extra space for input and keyboard
+    paddingBottom: Platform.OS === "ios" ? 200 : 120, // Extra space for input and keyboard
   },
   messageBubble: {
     marginBottom: 12,
@@ -524,16 +579,12 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-  
-    borderTopWidth: 2,
+    borderTopWidth: 1,
+    borderTopColor: "#e0e0e0",
     backgroundColor: "#fff",
-    paddingBottom: Platform.OS === "ios" ? 40 : 40,
-    borderRadius: 20,
-    marginHorizontal: 12,
-    marginBottom: 12,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingBottom: Platform.OS === "ios" ? 30 : 20,
   },
 
   safeArea: {

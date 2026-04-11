@@ -3,7 +3,7 @@ import { Storage } from '@/utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
-import { ActivityIndicator, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { PoppinsText } from '../PoppinsText';
 
 interface PhotoUploadProps {
@@ -30,8 +30,7 @@ export const PhotoUpload = ({ onPhotosSelected, onContinue }: PhotoUploadProps) 
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
+        allowsEditing: false,
         quality: 0.8,
       });
 
@@ -74,6 +73,13 @@ export const PhotoUpload = ({ onPhotosSelected, onContinue }: PhotoUploadProps) 
     return data.secure_url;
   };
 
+  const handleRemovePhoto = (index: number) => {
+    const newPhotos = [...photos];
+    newPhotos[index] = '';
+    setPhotos(newPhotos);
+    onPhotosSelected(newPhotos.filter(photo => photo !== ''));
+  };
+
   const handleContinue = async () => {
     if (photos.filter(photo => photo).length === 0) {
       showToast('Please add at least one photo', 'error');
@@ -100,110 +106,208 @@ export const PhotoUpload = ({ onPhotosSelected, onContinue }: PhotoUploadProps) 
   };
 
   return (
-    <View style={styles.container}>
-      <PoppinsText style={styles.title}>Add Your Photos</PoppinsText>
-      <PoppinsText style={styles.subtitle}>Add at least one photo to continue</PoppinsText>
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      <View style={styles.header}>
+        <PoppinsText style={styles.title}>Add Your Photos</PoppinsText>
+        <PoppinsText style={styles.subtitle}>Add at least one photo to show others who you are</PoppinsText>
+      </View>
       
       <View style={styles.photosContainer}>
         {[0, 1].map((index) => (
-          <TouchableOpacity
-            key={index}
-            style={styles.photoContainer}
-            onPress={() => pickImage(index)}
-            disabled={uploading}
-          >
-            {photos[index] ? (
-              <Image source={{ uri: photos[index] }} style={styles.photo} />
-            ) : (
-              <View style={styles.photoPlaceholder}>
-                <Ionicons name="camera" size={32} color="#666" />
-              </View>
-            )}
+          <View key={index} style={styles.photoWrapper}>
+            <TouchableOpacity
+              style={styles.photoContainer}
+              onPress={() => pickImage(index)}
+              disabled={uploading}
+              activeOpacity={0.8}
+            >
+              {photos[index] ? (
+                <>
+                  <Image source={{ uri: photos[index] }} style={styles.photo} />
+                  <TouchableOpacity
+                    style={styles.removeButton}
+                    onPress={() => handleRemovePhoto(index)}
+                    disabled={uploading}
+                  >
+                    <Ionicons name="close-circle" size={28} color="#FF6B6B" />
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <View style={styles.photoPlaceholder}>
+                  <View style={styles.cameraIconContainer}>
+                    <Ionicons name="camera" size={40} color="#651B55" />
+                  </View>
+                  <PoppinsText style={styles.tapText}>Tap to upload</PoppinsText>
+                </View>
+              )}
+            </TouchableOpacity>
             <PoppinsText style={styles.photoLabel}>
               {index === 0 ? 'Main Photo' : 'Additional Photo'}
             </PoppinsText>
-          </TouchableOpacity>
+            {index === 0 && (
+              <PoppinsText style={styles.requiredText}>Required</PoppinsText>
+            )}
+          </View>
         ))}
       </View>
 
-      <TouchableOpacity
-        style={[styles.continueButton, uploading && styles.continueButtonDisabled]}
-        onPress={handleContinue}
-        disabled={uploading}
-      >
-        {uploading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <PoppinsText style={styles.continueButtonText}>
-            Continue
-          </PoppinsText>
-        )}
-      </TouchableOpacity>
-    </View>
+      <View style={styles.bottomContainer}>
+        <PoppinsText style={styles.hintText}>
+          💡 Tip: Choose clear, well-lit photos of yourself
+        </PoppinsText>
+        
+        <TouchableOpacity
+          style={[styles.continueButton, uploading && styles.continueButtonDisabled]}
+          onPress={handleContinue}
+          disabled={uploading}
+        >
+          {uploading ? (
+            <View style={styles.uploadingContainer}>
+              <ActivityIndicator color="#fff" size="small" />
+              <PoppinsText style={styles.uploadingText}>Uploading...</PoppinsText>
+            </View>
+          ) : (
+            <PoppinsText style={styles.continueButtonText}>
+              Continue
+            </PoppinsText>
+          )}
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: '#fff',
   },
+  contentContainer: {
+    padding: 24,
+    minHeight: '100%',
+  },
+  header: {
+    marginTop: 40,
+    marginBottom: 40,
+  },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 12,
     textAlign: 'center',
+    color: '#651B55',
   },
   subtitle: {
     fontSize: 16,
     color: '#666',
-    marginBottom: 32,
     textAlign: 'center',
+    lineHeight: 22,
   },
   photosContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 32,
+    gap: 16,
+  },
+  photoWrapper: {
+    width: '48%',
+    alignItems: 'center',
   },
   photoContainer: {
-    alignItems: 'center',
-    width: '48%',
+    width: '100%',
+    aspectRatio: 3/4,
+    borderRadius: 16,
+    overflow: 'hidden',
   },
   photoPlaceholder: {
     width: '100%',
-    aspectRatio: 2/3,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 12,
+    height: '100%',
+    backgroundColor: '#f8f8f8',
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderWidth: 2,
+    borderColor: '#E6F4FE',
+    borderStyle: 'dashed',
+  },
+  cameraIconContainer: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: '#E6F4FE',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  tapText: {
+    fontSize: 13,
+    color: '#651B55',
+    fontWeight: '500',
   },
   photo: {
     width: '100%',
-    aspectRatio: 2/3,
-    borderRadius: 12,
-    marginBottom: 8,
+    height: '100%',
+    borderRadius: 16,
+  },
+  removeButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   photoLabel: {
+    fontSize: 15,
+    color: '#333',
+    marginTop: 12,
+    fontWeight: '500',
+  },
+  requiredText: {
+    fontSize: 12,
+    color: '#FF6B6B',
+    marginTop: 4,
+  },
+  bottomContainer: {
+    marginTop: 'auto',
+    paddingTop: 40,
+  },
+  hintText: {
     fontSize: 14,
     color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
   },
   continueButton: {
     backgroundColor: '#FF6B6B',
-    padding: 16,
+    padding: 18,
     borderRadius: 12,
     alignItems: 'center',
-    marginTop: 'auto',
+    shadowColor: '#FF6B6B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   continueButtonDisabled: {
-    opacity: 0.7,
+    opacity: 0.6,
   },
   continueButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
+  },
+  uploadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  uploadingText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
   },
 });

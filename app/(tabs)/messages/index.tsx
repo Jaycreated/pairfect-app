@@ -19,12 +19,11 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
-  Platform,
   RefreshControl,
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 
 // ============================================================================
@@ -152,14 +151,14 @@ const transformApiConversation = (conv: ApiConversation): ConversationType => {
 
 interface ConversationItemProps {
   item: ConversationType;
-  onPress: (id: string) => void;
+  onPress: (id: string, userName: string, userAvatar: string) => void;
 }
 
 const ConversationItem = React.memo<ConversationItemProps>(
   ({ item, onPress }) => {
     const handlePress = useCallback(() => {
-      onPress(item.id);
-    }, [item.id, onPress]);
+      onPress(item.id, item.user.name, item.user.avatar);
+    }, [item.id, item.user.name, item.user.avatar, onPress]);
 
     return (
       <TouchableOpacity
@@ -509,15 +508,21 @@ const MessagesScreen = () => {
    * Handles conversation item press - navigates to chat
    */
   const handleConversationPress = useCallback(
-    (conversationId: string) => {
+    (conversationId: string, userName: string, userAvatar: string) => {
       console.log(
         "[handleConversationPress] Opening conversation:",
         conversationId,
+        "with user:",
+        userName,
       );
-      // Navigate to the chat screen with the conversation ID
+      // Navigate to the chat screen with the conversation ID and user info
       router.push({
         pathname: "/(tabs)/messages/[id]",
-        params: { id: conversationId },
+        params: {
+          id: conversationId,
+          userName,
+          userAvatar,
+        },
       });
     },
     [router],
@@ -982,6 +987,7 @@ const styles = StyleSheet.create({
   },
   conversationList: {
     flexGrow: 1,
+    paddingBottom: 120, // Extra padding for tab bar (92px + buffer)
   },
   emptyListContent: {
     flexGrow: 1,

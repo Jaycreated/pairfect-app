@@ -47,8 +47,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 40,
     paddingBottom: 0,
-    boxShadow: '0 2px 3.84px rgba(0, 0, 0, 0.25)',
-    elevation: 5,
+    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',  // Reduced shadow
+    elevation: 2,  // Reduced for Android
     backgroundColor: '#fff',
     height: 80,
   },

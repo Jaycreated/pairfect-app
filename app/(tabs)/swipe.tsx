@@ -4,11 +4,15 @@ import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Dimensions, Image, Modal, PanResponder, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, Dimensions, Image, Modal, PanResponder, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 const SWIPE_THRESHOLD = width * 0.4;
 const SWIPE_OUT_DURATION = 250;
+
+// Responsive dimensions
+const CARD_HEIGHT = Math.min(height * 0.5, 320);  // 50% of screen or max 320
+const CARD_WIDTH = Math.min(width * 0.85, 320);    // 85% of screen or max 320
 
 // Default profile icon component for users without photos
 const DefaultProfileIcon = ({ size = 50 }: { size?: number }) => (
@@ -478,11 +482,11 @@ const fetchPotentialMatches = async () => {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.replace('/(tabs)')}>
+        {/* <TouchableOpacity onPress={() => router.replace('/(tabs)')}>
           <Ionicons name="arrow-back" size={24} color="#000" />
-        </TouchableOpacity>
+        </TouchableOpacity> */}
         <View style={styles.headerTextContainer}>
           <PoppinsText weight="bold" style={styles.headerTitle}>
             <Text>Discover people around you</Text>
@@ -522,7 +526,7 @@ const fetchPotentialMatches = async () => {
       </ScrollView>
 
       {renderMatchModal()}
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -541,7 +545,7 @@ const styles = StyleSheet.create({
   },
   scrollViewContent: {
     flexGrow: 1,
-    paddingBottom: 40,
+    paddingBottom: 120, // Extra padding for tab bar (92px + buffer)
   },
   header: {
     flexDirection: 'row',
@@ -575,11 +579,10 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   cardContainer: {
-    width: '100%',
-    height: 400,
-    maxWidth: 350,
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
     alignSelf: 'center',
-    padding: 10,
+    padding: 8,
   },
   card: {
     width: '100%',
@@ -689,16 +692,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   cardFooter: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
     paddingTop: 12,
     paddingRight: 20,
-    color: '#000000',
     paddingLeft: 20,
     marginHorizontal: -20,
   },
   cardName: {
     fontSize: 24,
     color: '#651B55',
-    marginBottom: 4,
+    marginBottom: 0,  // Removed to reduce gap
     fontWeight: '600',
   },
   cardAge: {
@@ -709,8 +714,9 @@ const styles = StyleSheet.create({
   cardLocation: {
     fontSize: 16,
     color: '#651B55',
-    marginBottom: 10,
+    marginBottom: 0,  // Removed to reduce gap
     flexDirection: 'row',
+
     alignItems: 'center',
   },
   interestText: {
@@ -726,9 +732,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 10,
-    paddingRight: 0,
-    paddingLeft: 0,
+    marginTop: 0,
+    padding: 10,
   },
   button: {
     width: 50,
