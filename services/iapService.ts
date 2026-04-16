@@ -44,6 +44,7 @@ export const getPlatformProductIds = (): string[] => {
 
 let purchaseListener: any = null;
 let purchaseErrorListener: any = null;
+let cachedSubscriptions: any[] = []; // Store subscriptions for offerToken access
 
 /**
  * Initialize IAP connection and set up purchase listener
@@ -119,6 +120,14 @@ export const getAvailableProducts = async (): Promise<any[]> => {
       RNIap.getSubscriptions({ skus: [monthlyProductId] }) // Subscription
     ]);
     
+    // Cache subscriptions for offerToken access during purchase
+    cachedSubscriptions = subscriptions || [];
+    
+    // Debug: Log subscription details to find offerToken
+    if (cachedSubscriptions.length > 0) {
+      console.log('SUBSCRIPTION DETAILS:', JSON.stringify(cachedSubscriptions, null, 2));
+    }
+    
     const allProducts = [...(products || []), ...(subscriptions || [])];
     console.log("Available products:", allProducts);
     
@@ -166,12 +175,43 @@ export const purchaseItem = async (productId: string): Promise<any | null> => {
     if (isSubscription) {
       // Use requestSubscription for monthly subscription
       if (Platform.OS === "android") {
-        // Android v14+ requires subscriptionOffers array
+        // Android v14+ requires subscriptionOffers array with real offerToken
+        
+        // Fallback: fetch subscriptions if cache is empty
+        if (cachedSubscriptions.length === 0) {
+          console.log('Cache empty, fetching subscriptions...');
+          const monthlyProductId = PRODUCT_IDS.android.monthly;
+          const subs = await RNIap.getSubscriptions({ skus: [monthlyProductId] });
+          cachedSubscriptions = subs || [];
+          console.log('Fetched subscriptions:', JSON.stringify(cachedSubscriptions, null, 2));
+        }
+        
+        // Find subscription by productId (try multiple property names)
+        const subscription = cachedSubscriptions.find(s => 
+          s.productId === productId || 
+          s.id === productId ||
+          s.productIds?.includes(productId)
+        );
+        
+        // Try multiple paths for offerToken
+        const offerToken = 
+          subscription?.subscriptionOfferDetails?.[0]?.offerToken ||
+          subscription?.offerDetails?.[0]?.offerToken ||
+          subscription?.subscriptionOffers?.[0]?.offerToken;
+        
+        if (!offerToken) {
+          console.error('No offerToken found for subscription:', productId);
+          console.error('Subscription object:', JSON.stringify(subscription, null, 2));
+          console.error('All cached subscriptions:', JSON.stringify(cachedSubscriptions, null, 2));
+          throw new Error('Subscription offer not available. Please try again.');
+        }
+        
+        console.log('Using offerToken:', offerToken);
         purchase = await RNIap.requestSubscription({
           sku: productId,
           subscriptionOffers: [{
             sku: productId,
-            offerToken: '',  // leave empty for base plan
+            offerToken: offerToken,
           }]
         });
       } else {

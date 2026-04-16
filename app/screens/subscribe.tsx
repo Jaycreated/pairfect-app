@@ -1,10 +1,10 @@
 // app/(tabs)/subscribe.tsx
 import { useSubscription } from "@/context/SubscriptionContext";
 import { useToast } from "@/context/ToastContext";
-import { PRODUCT_IDS, purchaseItem } from "@/services/iapService";
+import { getAvailableProducts, PRODUCT_IDS, purchaseItem } from "@/services/iapService";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Platform,
@@ -21,12 +21,42 @@ export default function SubscribeScreen() {
   const { showToast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [products, setProducts] = useState<any[]>([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+
+  // Fetch real prices from Play Console / App Store
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        setIsLoadingProducts(true);
+        const availableProducts = await getAvailableProducts();
+        setProducts(availableProducts || []);
+      } catch (error) {
+        console.error("Error loading products:", error);
+      } finally {
+        setIsLoadingProducts(false);
+      }
+    };
+    loadProducts();
+  }, []);
+
+  // Get real price from fetched products, fallback to hardcoded
+  const getProductPrice = (planId: string) => {
+    const platformIds = Platform.OS === "ios" ? PRODUCT_IDS.ios : PRODUCT_IDS.android;
+    const productId = planId === "daily" ? platformIds.daily : platformIds.monthly;
+    
+    const product = products.find((p: any) => 
+      p.productId === productId || p.id === productId
+    );
+    
+    // Return localized price from store, or fallback
+    return product?.localizedPrice || (planId === "daily" ? "₦300" : "₦3000");
+  };
 
   const plans = [
     {
       id: "daily",
       name: "Daily",
-      price: 300,
       duration: "day",
       description: "24 hours chat access",
       features: ["Unlimited messaging", "Chat access for 24 hours"],
@@ -35,7 +65,6 @@ export default function SubscribeScreen() {
     {
       id: "monthly",
       name: "Monthly",
-      price: 3000,
       duration: "month",
       description: "30 days chat access",
       features: ["Unlimited messaging", "Chat access for 30 days"],
@@ -99,8 +128,14 @@ export default function SubscribeScreen() {
 
             <Text style={styles.planName}>{plan.name}</Text>
             <Text style={styles.planPrice}>
-              ₦{plan.price.toLocaleString()}
-              <Text style={styles.planDuration}> / {plan.duration}</Text>
+              {isLoadingProducts ? (
+                <ActivityIndicator size="small" color="#651B55" />
+              ) : (
+                <>
+                  {getProductPrice(plan.id)}
+                  <Text style={styles.planDuration}> / {plan.duration}</Text>
+                </>
+              )}
             </Text>
             <Text style={styles.planDescription}>{plan.description}</Text>
 
