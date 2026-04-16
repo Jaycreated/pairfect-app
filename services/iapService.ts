@@ -1,3 +1,6 @@
+import { Platform } from "react-native";
+import { verifyIapReceipt } from "./subscriptionService";
+
 let RNIap: any = null;
 let iapAvailable = false;
 
@@ -13,21 +16,24 @@ try {
   iapAvailable = false;
 }
 
-import { Platform } from "react-native";
-import { verifyIapReceipt } from "./subscriptionService";
-
 // Product IDs configuration
 export const PRODUCT_IDS = {
   // iOS Product IDs (must match App Store Connect)
   ios: {
-    daily: "com.pairfect.daily",
-    monthly: "com.pairfect.monthly",
+    daily: "com.anonymous.pairfect.daily",      // One-time purchase (24h access)
+    monthly: "com.anonymous.pairfect.monthly",  // Subscription
   },
   // Android Product IDs (must match Google Play Console)
   android: {
-    daily: "com.pairfect.daily",
-    monthly: "com.pairfect.monthly",
+    daily: "com.anonymous.pairfect.daily",      // One-time purchase (24h access)
+    monthly: "com.anonymous.pairfect.monthly",  // Subscription
   },
+};
+
+// Purchase type mapping
+export const PURCHASE_TYPES = {
+  daily: 'one_time',    // One-time purchase
+  monthly: 'subscription', // Auto-renewing subscription
 };
 
 // Get platform-specific product IDs
@@ -103,29 +109,26 @@ export const getAvailableProducts = async (): Promise<any[]> => {
     const productIds = getPlatformProductIds();
     console.log("Attempting to fetch products with IDs:", productIds);
     
-    // Try different methods based on platform
-    let products;
-    if (Platform.OS === "android") {
-      // Android might need different approach
-      products = await RNIap.fetchProducts({
-        skus: productIds,
-      });
-    } else {
-      // iOS
-      products = await RNIap.fetchProducts({
-        skus: productIds,
-      });
-    }
+    // Separate daily (one-time) and monthly (subscription) products
+    const dailyProductId = Platform.OS === "ios" ? PRODUCT_IDS.ios.daily : PRODUCT_IDS.android.daily;
+    const monthlyProductId = Platform.OS === "ios" ? PRODUCT_IDS.ios.monthly : PRODUCT_IDS.android.monthly;
     
-    console.log("Available products:", products);
+    // Fetch both types of products
+    const [products, subscriptions] = await Promise.all([
+      RNIap.getProducts({ skus: [dailyProductId] }), // One-time purchase
+      RNIap.getSubscriptions({ skus: [monthlyProductId] }) // Subscription
+    ]);
+    
+    const allProducts = [...(products || []), ...(subscriptions || [])];
+    console.log("Available products:", allProducts);
     
     // If no products found, this might be normal in development
-    if (!products || products.length === 0) {
+    if (!allProducts || allProducts.length === 0) {
       console.warn("No products found - this is normal in development environment");
       console.warn("Products will be available when app is published with proper IAP setup");
     }
     
-    return products || [];
+    return allProducts;
   } catch (error: any) {
     console.error("Error fetching products:", error);
     
@@ -143,7 +146,7 @@ export const getAvailableProducts = async (): Promise<any[]> => {
 };
 
 /**
- * Purchase a product
+ * Purchase a product (handles both one-time and subscription)
  */
 export const purchaseItem = async (productId: string): Promise<any | null> => {
   if (!iapAvailable) {
@@ -154,17 +157,39 @@ export const purchaseItem = async (productId: string): Promise<any | null> => {
   try {
     console.log("Initiating purchase for product:", productId);
 
+    // Determine purchase type
+    const isMonthly = productId.includes('monthly');
+    const isSubscription = isMonthly; // Only monthly is subscription
+    
     let purchase;
     
-    // Use different methods based on platform
-    if (Platform.OS === "android") {
-      purchase = await RNIap.requestPurchase(productId, false);
+    if (isSubscription) {
+      // Use requestSubscription for monthly subscription
+      if (Platform.OS === "android") {
+        // Android v14+ requires subscriptionOffers array
+        purchase = await RNIap.requestSubscription({
+          sku: productId,
+          subscriptionOffers: [{
+            sku: productId,
+            offerToken: '',  // leave empty for base plan
+          }]
+        });
+      } else {
+        // iOS
+        purchase = await RNIap.requestSubscription({
+          sku: productId,
+          andDangerouslyFinishTransactionAutomaticallyIOS: false,
+        });
+      }
     } else {
-      // iOS
-      purchase = await RNIap.requestPurchase(productId);
+      // Use requestPurchase for one-time daily access
+      purchase = await RNIap.requestPurchase({
+        sku: productId,
+        andDangerouslyFinishTransactionAutomaticallyIOS: false,
+      });
     }
 
-    console.log("Purchase initiated:", purchase);
+    console.log(`${isSubscription ? 'Subscription' : 'One-time purchase'} initiated:`, purchase);
     return purchase || null;
   } catch (error: any) {
     if (error?.code === "E_USER_CANCELLED") {
@@ -223,23 +248,13 @@ const handlePurchaseUpdate = async (purchase: any) => {
       // Verify receipt with backend
       await verifyPurchase(purchase);
 
-      // Finish the transaction
-      if (Platform.OS === "android") {
-        try {
-          const token =
-            (purchase as any).purchaseToken || (purchase as any).token;
-          if (token) {
-            await RNIap.acknowledgePurchaseAndroid(token);
-          }
-        } catch (err) {
-          console.warn("Error acknowledging Android purchase:", err);
-        }
-      } else {
-        try {
-          await RNIap.finishTransaction({ purchase, isConsumable: false });
-        } catch (err) {
-          console.warn("Error finishing iOS transaction:", err);
-        }
+      // Finish the transaction for both platforms
+      try {
+        const isConsumable = purchase.productId.includes('daily'); // Daily pass is consumable
+        // v14+ API: finishTransaction(purchase, isConsumable, developerPayloadAndroid)
+        await RNIap.finishTransaction(purchase, isConsumable);
+      } catch (err) {
+        console.warn("Error finishing transaction:", err);
       }
     }
   } catch (error) {
@@ -305,9 +320,12 @@ const handlePendingPurchases = async () => {
 
   try {
     console.log("Checking for pending purchases...");
-
-    // In a real scenario, you'd check your backend for pending purchases
-    // This is a placeholder for cleanup purposes
+    
+    const purchases = await RNIap.getAvailablePurchases();
+    for (const purchase of purchases) {
+      console.log("Processing pending purchase:", purchase);
+      await handlePurchaseUpdate(purchase);
+    }
   } catch (error) {
     console.error("Error handling pending purchases:", error);
   }
