@@ -159,12 +159,17 @@ export const getAvailableProducts = async (): Promise<any[]> => {
  */
 export const purchaseItem = async (productId: string): Promise<any | null> => {
   if (!iapAvailable) {
-    console.warn("IAP not available - purchase cannot be completed");
+    console.error("[IAP-ERROR] IAP not available - purchase cannot be completed");
+    console.error("[IAP-ERROR] RNIap available:", !!RNIap);
     throw new Error("In-app purchases are not available on this device");
   }
 
   try {
-    console.log("Initiating purchase for product:", productId);
+    console.log("[IAP-INFO] =========================================");
+    console.log("[IAP-INFO] Initiating purchase for product:", productId);
+    console.log("[IAP-INFO] Platform:", Platform.OS);
+    console.log("[IAP-INFO] Product ID from config:", productId);
+    console.log("[IAP-INFO] Expected product IDs:", PRODUCT_IDS.android);
 
     // Determine purchase type
     const isMonthly = productId.includes('monthly');
@@ -177,43 +182,91 @@ export const purchaseItem = async (productId: string): Promise<any | null> => {
       if (Platform.OS === "android") {
         // Android v14+ requires subscriptionOffers array with real offerToken
         
-        // Fallback: fetch subscriptions if cache is empty
-        if (cachedSubscriptions.length === 0) {
-          console.log('Cache empty, fetching subscriptions...');
-          const monthlyProductId = PRODUCT_IDS.android.monthly;
-          const subs = await RNIap.getSubscriptions({ skus: [monthlyProductId] });
-          cachedSubscriptions = subs || [];
-          console.log('Fetched subscriptions:', JSON.stringify(cachedSubscriptions, null, 2));
+        // ALWAYS fetch fresh subscriptions before purchase (don't rely on cache)
+        console.log('[IAP-INFO] Fetching fresh subscriptions for purchase...');
+        console.log('[IAP-INFO] Requesting subscriptions with SKU:', productId);
+        
+        let subs: any[] = [];
+        try {
+          subs = await RNIap.getSubscriptions({ skus: [productId] });
+          console.log('[IAP-INFO] Raw subscription response:', JSON.stringify(subs, null, 2));
+          
+          if (!subs || subs.length === 0) {
+            console.error('[IAP-ERROR] No subscriptions returned from Play Store');
+            console.error('[IAP-ERROR] This means:');
+            console.error('[IAP-ERROR] 1. Product ID not found in Play Console');
+            console.error('[IAP-ERROR] 2. Subscription not Active in Play Console');
+            console.error('[IAP-ERROR] 3. App not uploaded to Play Console');
+            console.error('[IAP-ERROR] 4. No license testers configured');
+            throw new Error('Subscription not available. Please check your internet connection and try again.');
+          }
+        } catch (fetchError) {
+          console.error('[IAP-ERROR] Failed to fetch subscriptions:', fetchError);
+          throw new Error('Unable to fetch subscription details. Please try again.');
         }
         
-        // Find subscription by productId (try multiple property names)
-        const subscription = cachedSubscriptions.find(s => 
+        // Find the subscription
+        const subscription = subs.find((s: any) => 
           s.productId === productId || 
           s.id === productId ||
           s.productIds?.includes(productId)
-        );
+        ) || subs[0]; // Fallback to first subscription if ID doesn't match
         
-        // Try multiple paths for offerToken
-        const offerToken = 
-          subscription?.subscriptionOfferDetails?.[0]?.offerToken ||
-          subscription?.offerDetails?.[0]?.offerToken ||
-          subscription?.subscriptionOffers?.[0]?.offerToken;
-        
-        if (!offerToken) {
-          console.error('No offerToken found for subscription:', productId);
-          console.error('Subscription object:', JSON.stringify(subscription, null, 2));
-          console.error('All cached subscriptions:', JSON.stringify(cachedSubscriptions, null, 2));
-          throw new Error('Subscription offer not available. Please try again.');
+        if (!subscription) {
+          throw new Error('Subscription product not found in Play Store.');
         }
         
-        console.log('Using offerToken:', offerToken);
-        purchase = await RNIap.requestSubscription({
+        // Try multiple paths for offerToken
+        let offerToken = null;
+        
+        // Path 1: subscriptionOfferDetails (v14+ format)
+        if (subscription.subscriptionOfferDetails?.length > 0) {
+          offerToken = subscription.subscriptionOfferDetails[0].offerToken;
+        }
+        // Path 2: offerDetails
+        else if (subscription.offerDetails?.length > 0) {
+          offerToken = subscription.offerDetails[0].offerToken;
+        }
+        // Path 3: subscriptionOffers
+        else if (subscription.subscriptionOffers?.length > 0) {
+          offerToken = subscription.subscriptionOffers[0].offerToken;
+        }
+        
+        if (!offerToken) {
+          console.error('[IAP-ERROR] No offerToken found for subscription:', productId);
+          console.error('[IAP-ERROR] Subscription object keys:', Object.keys(subscription));
+          console.error('[IAP-ERROR] Full subscription object:', JSON.stringify(subscription, null, 2));
+          console.error('[IAP-ERROR] This means:');
+          console.error('[IAP-ERROR] 1. No base plan configured in Play Console');
+          console.error('[IAP-ERROR] 2. No offers configured for the base plan');
+          console.error('[IAP-ERROR] 3. Base plan is not Active');
+          throw new Error('Subscription offer not configured in Play Console. Please contact support.');
+        }
+        
+        console.log('[IAP-SUCCESS] Found offerToken:', offerToken);
+        
+        // v14 API requires subscriptionOffers array
+        const purchaseParams = {
           sku: productId,
           subscriptionOffers: [{
             sku: productId,
             offerToken: offerToken,
           }]
-        });
+        };
+        console.log('[IAP-INFO] Purchase params:', JSON.stringify(purchaseParams, null, 2));
+        console.log('[IAP-INFO] Attempting to request subscription...');
+        
+        try {
+          purchase = await RNIap.requestSubscription(purchaseParams);
+          console.log('[IAP-SUCCESS] Subscription request successful:', JSON.stringify(purchase, null, 2));
+        } catch (purchaseError: any) {
+          console.error('[IAP-ERROR] Subscription request failed:');
+          console.error('[IAP-ERROR] Error details:', JSON.stringify(purchaseError, null, 2));
+          console.error('[IAP-ERROR] Error code:', (purchaseError as any)?.code);
+          console.error('[IAP-ERROR] Error message:', (purchaseError as any)?.message);
+          console.error('[IAP-ERROR] Error responseCode:', (purchaseError as any)?.responseCode);
+          throw purchaseError;
+        }
       } else {
         // iOS
         purchase = await RNIap.requestSubscription({
@@ -232,14 +285,34 @@ export const purchaseItem = async (productId: string): Promise<any | null> => {
     console.log(`${isSubscription ? 'Subscription' : 'One-time purchase'} initiated:`, purchase);
     return purchase || null;
   } catch (error: any) {
+    console.error('[IAP-ERROR] =========================================');
+    console.error('[IAP-ERROR] Purchase failed for product:', productId);
+    console.error('[IAP-ERROR] Full error object:', JSON.stringify(error, null, 2));
+    console.error('[IAP-ERROR] Error code:', (error as any)?.code);
+    console.error('[IAP-ERROR] Error message:', (error as any)?.message);
+    console.error('[IAP-ERROR] Error responseCode:', (error as any)?.responseCode);
+    console.error('[IAP-ERROR] Error platform:', (error as any)?.platform);
+    console.error('[IAP-ERROR] Error productId:', (error as any)?.productId);
+    
     if (error?.code === "E_USER_CANCELLED") {
-      console.log("User cancelled the purchase");
+      console.log('[IAP-INFO] User cancelled the purchase');
       throw new Error("Purchase was cancelled");
     } else if (error?.message?.includes("Failed to query product")) {
-      console.warn("Product query failed during purchase:", error);
+      console.error('[IAP-ERROR] Product query failed during purchase:', error);
+      console.error('[IAP-ERROR] This usually means:');
+      console.error('[IAP-ERROR] 1. App not uploaded to Play Console');
+      console.error('[IAP-ERROR] 2. Wrong product ID in code vs Play Console');
+      console.error('[IAP-ERROR] 3. No license testers configured');
       throw new Error("Unable to connect to payment service. Please check your internet connection and try again.");
+    } else if (error?.message?.includes("Missing purchase request configuration")) {
+      console.error('[IAP-ERROR] Missing purchase request configuration - this is a v14 API issue');
+      console.error('[IAP-ERROR] Usually means:');
+      console.error('[IAP-ERROR] 1. No base plan configured in Play Console');
+      console.error('[IAP-ERROR] 2. No offers for the base plan');
+      console.error('[IAP-ERROR] 3. Incorrect subscriptionOffers format');
+      throw new Error("Purchase failed: Subscription not properly configured in Play Console");
     } else {
-      console.error("Purchase error:", error);
+      console.error('[IAP-ERROR] Unknown purchase error:', error);
       throw new Error("Purchase failed: " + (error?.message || "Unknown error"));
     }
   }
