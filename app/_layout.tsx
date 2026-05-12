@@ -10,17 +10,18 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useIAP } from "@/hooks/useIAP";
 import { Storage } from "@/utils/storage";
 import {
-  Poppins_400Regular,
-  Poppins_500Medium,
-  Poppins_600SemiBold,
-  Poppins_700Bold,
-  useFonts,
+    Poppins_400Regular,
+    Poppins_500Medium,
+    Poppins_600SemiBold,
+    Poppins_700Bold,
+    useFonts,
 } from "@expo-google-fonts/poppins";
 import {
-  DarkTheme,
-  DefaultTheme,
-  ThemeProvider,
+    DarkTheme,
+    DefaultTheme,
+    ThemeProvider,
 } from "@react-navigation/native";
+// import * as Sentry from "@sentry/react-native";
 import { QueryClientProvider } from "@tanstack/react-query";
 import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
@@ -30,6 +31,14 @@ import { ActivityIndicator, View } from "react-native";
 import "react-native-reanimated";
 import { queryClient } from "../lib/queryClient";
 import "./global.css";
+
+// Sentry disabled for now - add back when ready
+// Sentry.init({
+//   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN || "YOUR_SENTRY_DSN_HERE",
+//   debug: __DEV__,
+//   tracesSampleRate: 1.0,
+//   profilesSampleRate: 1.0,
+// });
 
 // Configure notification behavior
 Notifications.setNotificationHandler({

@@ -1,5 +1,5 @@
 import { api } from '@/services/api';
-import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 
 type NotificationCountContextType = {
   unreadCount: number;
@@ -17,7 +17,7 @@ export const NotificationCountProvider: React.FC<{ children: ReactNode }> = ({
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
-  const refreshNotificationCount = async () => {
+  const refreshNotificationCount = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await api.getUnreadNotificationCount();
@@ -29,7 +29,7 @@ export const NotificationCountProvider: React.FC<{ children: ReactNode }> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     refreshNotificationCount();

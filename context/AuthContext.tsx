@@ -1,6 +1,7 @@
 import { api } from '@/services/api';
 import { clearLocalMessageCount } from '@/services/messageService';
 import { SignInCredentials, SignUpData, User } from '@/types/auth';
+// import { clearSentryUser, setSentryUser } from '@/utils/sentry';
 import { Storage } from '@/utils/storage';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { useToast } from './ToastContext';
@@ -152,6 +153,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(userWithToken);
       setProfile(userWithToken);
       
+      // Sentry user tracking disabled
+      // setSentryUser(String(userData.id), userData.email, userData.name);
+      
       // Show success toast
       showToast('Login successful!', 'success');
 
@@ -225,6 +229,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Clear all auth state
       await Storage.deleteItem('auth_token');
       await clearLocalMessageCount(); // Clear cached message count on logout
+      // clearSentryUser(); // Sentry disabled
       setUser(null);
       setProfile(null);
       setError(null);

@@ -8,7 +8,7 @@ import { ActivityIndicator, Animated, Dimensions, Image, Modal, PanResponder, Sa
 
 const { width, height } = Dimensions.get('window');
 const SWIPE_THRESHOLD = width * 0.4;
-const SWIPE_OUT_DURATION = 250;
+const SWIPE_OUT_DURATION = 150;
 
 // Responsive dimensions
 const CARD_HEIGHT = Math.min(height * 0.5, 320);  // 50% of screen or max 320
@@ -179,6 +179,37 @@ const fetchPotentialMatches = async () => {
       isLastCard
     });
 
+    // Start animation immediately (optimistic UI)
+    Animated.timing(position, {
+      toValue: { 
+        x: direction * (width + 100), 
+        y: direction * 100 
+      },
+      duration: SWIPE_OUT_DURATION,
+      useNativeDriver: false,
+    }).start(() => {
+      // Reset position immediately for next card
+      position.setValue({ x: 0, y: 0 });
+      
+      if (isLastCard) {
+        console.log('Last card - fetching more matches');
+        // Reset to show loading state
+        setCurrentIndex(0);
+        currentIndexRef.current = 0;
+        setUsers([]);
+        usersRef.current = [];
+        setIsProcessingSwipe(false);
+        // Fetch new matches
+        fetchPotentialMatches();
+      } else {
+        console.log('Moving to next card:', nextIndex);
+        setCurrentIndex(nextIndex);
+        currentIndexRef.current = nextIndex;
+        setIsProcessingSwipe(false);
+      }
+    });
+
+    // Make API call in parallel (non-blocking)
     try {
       console.log(`Sending ${isLike ? 'like' : 'pass'} for user:`, currentUser.id);
       
@@ -195,12 +226,6 @@ const fetchPotentialMatches = async () => {
         
         console.error(`Error ${isLike ? 'liking' : 'passing'} user:`, errorMessage);
         showToast(`Failed to ${isLike ? 'like' : 'pass'} user: ${errorMessage}`, 'error', 3000);
-        setIsProcessingSwipe(false);
-        // Reset position on error
-        Animated.spring(position, {
-          toValue: { x: 0, y: 0 },
-          useNativeDriver: false,
-        }).start();
         return;
       }
       
@@ -220,45 +245,9 @@ const fetchPotentialMatches = async () => {
         }
       }
       
-      // Animate card off screen
-      Animated.timing(position, {
-        toValue: { 
-          x: direction * (width + 100), 
-          y: direction * 100 
-        },
-        duration: SWIPE_OUT_DURATION,
-        useNativeDriver: false,
-      }).start(() => {
-        // Reset position immediately for next card
-        position.setValue({ x: 0, y: 0 });
-        
-        if (isLastCard) {
-          console.log('Last card - fetching more matches');
-          // Reset to show loading state
-          setCurrentIndex(0);
-          currentIndexRef.current = 0;
-          setUsers([]);
-          usersRef.current = [];
-          setIsProcessingSwipe(false);
-          // Fetch new matches
-          fetchPotentialMatches();
-        } else {
-          console.log('Moving to next card:', nextIndex);
-          setCurrentIndex(nextIndex);
-          currentIndexRef.current = nextIndex;
-          setIsProcessingSwipe(false);
-        }
-      });
-      
     } catch (err) {
       console.error('Error processing swipe:', err);
       showToast('An error occurred while processing your action. Please try again.', 'error', 3000);
-      setIsProcessingSwipe(false);
-      // Reset position on error
-      Animated.spring(position, {
-        toValue: { x: 0, y: 0 },
-        useNativeDriver: false,
-      }).start();
     }
   }, [isProcessingSwipe, showToast, position]);
 

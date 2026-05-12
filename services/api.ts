@@ -109,6 +109,10 @@ async function fetchApi<T = any>(
     return { data: responseData };
   } catch (error) {
     console.error('API request failed:', error);
+    
+    // Sentry logging disabled for now
+    // logApiError(url, error, undefined, { method, endpoint, hasAuth: !!token });
+    
     return {
       error: {
         message: error instanceof Error ? error.message : 'Network error',

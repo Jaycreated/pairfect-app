@@ -20,8 +20,7 @@ try {
 export const PRODUCT_IDS = {
   // iOS Product IDs (must match App Store Connect)
   ios: {
-    daily: "com.anonymous.pairfect.daily",      // One-time purchase (24h access)
-    monthly: "com.anonymous.pairfect.monthly",  // Subscription
+    monthly: 'ng.com.pairfect.monthlyaccess',  // Subscription
   },
   // Android Product IDs (must match Google Play Console)
   android: {
@@ -45,6 +44,10 @@ export const getPlatformProductIds = (): string[] => {
 let purchaseListener: any = null;
 let purchaseErrorListener: any = null;
 let cachedSubscriptions: any[] = []; // Store subscriptions for offerToken access
+
+// Promise resolver for pending purchases
+let pendingPurchaseResolver: ((value: any) => void) | null = null;
+let pendingPurchaseRejecter: ((error: any) => void) | null = null;
 
 /**
  * Initialize IAP connection and set up purchase listener
@@ -114,7 +117,20 @@ export const getAvailableProducts = async (): Promise<any[]> => {
     const dailyProductId = Platform.OS === "ios" ? PRODUCT_IDS.ios.daily : PRODUCT_IDS.android.daily;
     const monthlyProductId = Platform.OS === "ios" ? PRODUCT_IDS.ios.monthly : PRODUCT_IDS.android.monthly;
     
-    // Fetch both types of products
+    // For iOS: daily is non-renewing subscription, monthly is auto-renewing
+    // Both need to be fetched with getSubscriptions on iOS
+    const isIOS = Platform.OS === "ios";
+    
+    if (isIOS) {
+      // iOS: both daily and monthly are subscriptions (non-renewing vs auto-renewing)
+      const allSubscriptions = await RNIap.getSubscriptions({ 
+        skus: [dailyProductId, monthlyProductId] 
+      });
+      cachedSubscriptions = allSubscriptions || [];
+      return allSubscriptions || [];
+    }
+    
+    // Android: separate products and subscriptions
     const [products, subscriptions] = await Promise.all([
       RNIap.getProducts({ skus: [dailyProductId] }), // One-time purchase
       RNIap.getSubscriptions({ skus: [monthlyProductId] }) // Subscription
@@ -268,8 +284,9 @@ export const purchaseItem = async (productId: string): Promise<any | null> => {
           throw purchaseError;
         }
       } else {
-        // iOS
-        purchase = await RNIap.requestSubscription({
+        // iOS - use requestPurchase for subscriptions too in v14+
+        // The product type determines if it's a subscription
+        purchase = await RNIap.requestPurchase({
           sku: productId,
           andDangerouslyFinishTransactionAutomaticallyIOS: false,
         });
@@ -283,7 +300,21 @@ export const purchaseItem = async (productId: string): Promise<any | null> => {
     }
 
     console.log(`${isSubscription ? 'Subscription' : 'One-time purchase'} initiated:`, purchase);
-    return purchase || null;
+    
+    // Wait for purchase verification to complete (handlePurchaseUpdate will resolve this)
+    return new Promise((resolve, reject) => {
+      pendingPurchaseResolver = resolve;
+      pendingPurchaseRejecter = reject;
+      
+      // Timeout after 30 seconds in case verification never completes
+      setTimeout(() => {
+        if (pendingPurchaseRejecter) {
+          pendingPurchaseRejecter(new Error("Purchase verification timeout"));
+          pendingPurchaseResolver = null;
+          pendingPurchaseRejecter = null;
+        }
+      }, 30000);
+    });
   } catch (error: any) {
     console.error('[IAP-ERROR] =========================================');
     console.error('[IAP-ERROR] Purchase failed for product:', productId);
@@ -369,9 +400,22 @@ const handlePurchaseUpdate = async (purchase: any) => {
       } catch (err) {
         console.warn("Error finishing transaction:", err);
       }
+
+      // Resolve the pending purchase promise
+      if (pendingPurchaseResolver) {
+        pendingPurchaseResolver(purchase);
+        pendingPurchaseResolver = null;
+        pendingPurchaseRejecter = null;
+      }
     }
   } catch (error) {
     console.error("Error handling purchase update:", error);
+    // Reject the pending purchase promise on error
+    if (pendingPurchaseRejecter) {
+      pendingPurchaseRejecter(error);
+      pendingPurchaseResolver = null;
+      pendingPurchaseRejecter = null;
+    }
   }
 };
 

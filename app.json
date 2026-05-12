@@ -11,11 +11,14 @@
     "privacyPolicy": "https://pairfect.com.ng/privacy",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.Pairfect",
+      "bundleIdentifier": "ng.com.pairfect.app",
+      "buildNumber": "3",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "SKAdNetworkItems": [],
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       }
     },
     "android": {
@@ -43,7 +46,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/Original_Logo.png",  
+          "image": "./assets/images/Original_Logo.png",
           "imageWidth": 100,
           "resizeMode": "contain",
           "backgroundColor": "#000000",

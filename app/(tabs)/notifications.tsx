@@ -1,18 +1,18 @@
 import { PoppinsText } from '@/components/PoppinsText';
+import { useNotificationCount } from '@/context/NotificationCountContext';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { api } from '@/services/api';
-import { useNotificationCount } from '@/context/NotificationCountContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    Image,
-    RefreshControl,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  Image,
+  RefreshControl,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 // Format time to relative time (e.g., '2m ago')
@@ -342,7 +342,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   notificationList: {
-    paddingBottom: 16,
+    paddingBottom: 100,
   },
   notificationItem: {
     flexDirection: 'row',
