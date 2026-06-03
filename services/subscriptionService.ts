@@ -275,12 +275,13 @@ export const checkChatAccess = async (): Promise<AccessStatusResponse> => {
     
     // Parse the nested data structure correctly
     const accessData = data.data || data;
+    const freeMessages = accessData.freeMessages || {};
     
     return {
       hasAccess: accessData.hasAccess || false,
       planType: accessData.planType || 'free',
-      freeMessagesLimit: accessData.freeMessagesLimit || 3,
-      freeMessagesRemaining: accessData.freeMessagesRemaining || 0,
+      freeMessagesLimit: freeMessages.limit || accessData.freeMessagesLimit || 3,
+      freeMessagesRemaining: freeMessages.remaining !== undefined ? freeMessages.remaining : (accessData.freeMessagesRemaining !== undefined ? accessData.freeMessagesRemaining : 0),
       expiryDate: accessData.expiryDate || null
     };
   } catch (error) {

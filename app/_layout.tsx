@@ -1,8 +1,6 @@
-import { NotificationBadgeUpdater } from "@/components/NotificationBadgeUpdater";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { MessageCountProvider } from "@/context/MessageCountContext";
 import { NotificationProvider } from "@/context/NotificationContext";
-import { NotificationCountProvider } from "@/context/NotificationCountContext";
 import { SubscriptionProvider } from "@/context/SubscriptionContext";
 import { ToastProvider } from "@/context/ToastContext";
 import { WebSocketProvider } from "@/context/WebSocketContext";
@@ -21,7 +19,6 @@ import {
     DefaultTheme,
     ThemeProvider,
 } from "@react-navigation/native";
-// import * as Sentry from "@sentry/react-native";
 import { QueryClientProvider } from "@tanstack/react-query";
 import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
@@ -31,14 +28,6 @@ import { ActivityIndicator, View } from "react-native";
 import "react-native-reanimated";
 import { queryClient } from "../lib/queryClient";
 import "./global.css";
-
-// Sentry disabled for now - add back when ready
-// Sentry.init({
-//   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN || "YOUR_SENTRY_DSN_HERE",
-//   debug: __DEV__,
-//   tracesSampleRate: 1.0,
-//   profilesSampleRate: 1.0,
-// });
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -238,14 +227,11 @@ export default function RootLayout() {
         <AuthProvider>
           <WebSocketProvider>
             <NotificationProvider>
-              <NotificationCountProvider>
-                <NotificationBadgeUpdater />
-                <SubscriptionProvider>
-                  <MessageCountProvider>
-                    <RootLayoutNav />
-                  </MessageCountProvider>
-                </SubscriptionProvider>
-              </NotificationCountProvider>
+              <SubscriptionProvider>
+                <MessageCountProvider>
+                  <RootLayoutNav />
+                </MessageCountProvider>
+              </SubscriptionProvider>
             </NotificationProvider>
           </WebSocketProvider>
         </AuthProvider>

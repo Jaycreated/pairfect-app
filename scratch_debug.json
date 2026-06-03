@@ -1,0 +1,157 @@
+{
+  "John Johnson_1": {
+    "user": {
+      "id": 1,
+      "email": "johnsonjohnadakole@gmail.com",
+      "name": "John Johnson",
+      "age": 32,
+      "gender": "male",
+      "bio": "Tell others something about yourself...",
+      "location": null,
+      "photos": [
+        "https://res.cloudinary.com/dbv9f6ucg/image/upload/v1761196442/dating-app/profiles/qjuj7pzrbp0ols5f0oau.png",
+        "https://res.cloudinary.com/dbv9f6ucg/image/upload/v1761196451/dating-app/profiles/m1w4dca6tmcqpeay3fml.png"
+      ],
+      "interests": [
+        "Relationship"
+      ],
+      "preferences": {
+        "lookingFor": "relationship"
+      },
+      "created_at": "2025-10-23T05:13:02.403Z",
+      "updated_at": "2026-05-17T17:51:45.408Z",
+      "has_chat_access": true,
+      "payment_date": "2025-10-30T15:21:09.164Z",
+      "payment_reference": "chat_ca3d5ce8-c77a-4d00-9161-9e6e3ba027c5",
+      "is_admin": false,
+      "last_login": "2026-05-19T14:33:43.513Z",
+      "paystack_customer_id": null,
+      "paystack_subscription_code": null,
+      "access_expiry_date": null,
+      "free_messages_used": 0,
+      "push_token": "ExponentPushToken[V2MG0aLJ9rC5hKJgXnZaw6]"
+    },
+    "conversations": [
+      {
+        "id": 3,
+        "name": "raph",
+        "email": "raphaeal@example.com",
+        "photos": [
+          "https://res.cloudinary.com/dbv9f6ucg/image/upload/v1761578588/dating-app/profiles/ojhmlncxq7itju81zrxd.jpg",
+          "https://res.cloudinary.com/dbv9f6ucg/image/upload/v1761578615/dating-app/profiles/bzcsfabjmohugz8kzbrm.jpg"
+        ],
+        "age": 35,
+        "location": null,
+        "last_message_at": "2026-05-16T09:13:59.973Z",
+        "last_message": "hi",
+        "unread_count": "4"
+      }
+    ],
+    "messages": {
+      "3": {
+        "status": 200,
+        "data": {
+          "messages": [
+            {
+              "id": 2,
+              "sender_id": 3,
+              "receiver_id": 1,
+              "content": "bro",
+              "is_read": false,
+              "created_at": "2025-10-27T16:05:55.290Z"
+            },
+            {
+              "id": 10,
+              "sender_id": 1,
+              "receiver_id": 3,
+              "content": "hi",
+              "is_read": false,
+              "created_at": "2025-10-30T15:21:22.077Z"
+            },
+            {
+              "id": 13,
+              "sender_id": 3,
+              "receiver_id": 1,
+              "content": "Hello",
+              "is_read": false,
+              "created_at": "2025-12-04T15:38:35.135Z"
+            },
+            {
+              "id": 14,
+              "sender_id": 3,
+              "receiver_id": 1,
+              "content": "hi",
+              "is_read": false,
+              "created_at": "2025-12-18T02:41:23.864Z"
+            },
+            {
+              "id": 15,
+              "sender_id": 3,
+              "receiver_id": 1,
+              "content": "good",
+              "is_read": false,
+              "created_at": "2025-12-18T02:41:36.039Z"
+            },
+            {
+              "id": 34,
+              "sender_id": 1,
+              "receiver_id": 3,
+              "content": "Good morning",
+              "is_read": false,
+              "created_at": "2026-05-15T06:03:18.288Z"
+            },
+            {
+              "id": 35,
+              "sender_id": 1,
+              "receiver_id": 3,
+              "content": "Hi",
+              "is_read": false,
+              "created_at": "2026-05-16T08:46:20.541Z"
+            },
+            {
+              "id": 36,
+              "sender_id": 1,
+              "receiver_id": 3,
+              "content": "hi",
+              "is_read": false,
+              "created_at": "2026-05-16T09:13:59.973Z"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "Jay Jay_122": {
+    "user": {
+      "id": 122,
+      "email": "j@example.com",
+      "name": "Jay Jay",
+      "age": 22,
+      "gender": "male",
+      "bio": null,
+      "location": "abuja",
+      "photos": [
+        "https://res.cloudinary.com/dbv9f6ucg/image/upload/v1779110159/pairfect/profile_photos/jdzjqznuamklif0w2x7c.heic",
+        "https://res.cloudinary.com/dbv9f6ucg/image/upload/v1779110171/pairfect/profile_photos/fqsroisn7bg8w8lhssbj.jpg"
+      ],
+      "interests": [
+        "Relationship"
+      ],
+      "preferences": {},
+      "created_at": "2026-05-18T13:14:53.605Z",
+      "updated_at": "2026-05-18T13:16:15.548Z",
+      "has_chat_access": false,
+      "payment_date": null,
+      "payment_reference": null,
+      "is_admin": false,
+      "last_login": null,
+      "paystack_customer_id": null,
+      "paystack_subscription_code": null,
+      "access_expiry_date": null,
+      "free_messages_used": 0,
+      "push_token": null
+    },
+    "conversations": [],
+    "messages": {}
+  }
+}

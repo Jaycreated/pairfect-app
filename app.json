@@ -4,7 +4,7 @@
     "slug": "Pairfect",
     "version": "1.0.6",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/images/icon.png",
     "scheme": "pairfect",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -12,25 +12,24 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "ng.com.pairfect.app",
-      "buildNumber": "3",
+      "buildNumber": "5",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "SKAdNetworkItems": [],
-        "UIBackgroundModes": [
-          "remote-notification"
-        ]
+        "UIBackgroundModes": ["remote-notification"]
       }
     },
     "android": {
-      "googleServicesFile": "./android/app/google-services.json",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#E6F4FE"
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.Pairfect",
-      "versionCode": 12,
+      "versionCode": 6,
       "permissions": [
         "POST_NOTIFICATIONS",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -46,7 +45,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/Original_Logo.png",
+          "image": "./assets/images/LandingLogo.png",
           "imageWidth": 100,
           "resizeMode": "contain",
           "backgroundColor": "#000000",
@@ -58,10 +57,9 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/Original_Logo.png",
+          "icon": "./assets/images/icon.png",
           "color": "#ffffff",
-          "sounds": [],
-          "defaultChannel": "chat-messages"
+          "sounds": []
         }
       ],
       [

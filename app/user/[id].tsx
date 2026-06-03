@@ -133,7 +133,7 @@ export default function PublicProfileScreen() {
             {/* Match Text */}
             <View style={styles.matchContent}>
               <PoppinsText style={styles.matchTitle}>
-                It's a Match!
+                {"It's a Match!"}
               </PoppinsText>
               <PoppinsText style={styles.matchSubtitle}>
                 You and {user.name} have liked each other!

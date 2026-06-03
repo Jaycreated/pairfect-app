@@ -53,7 +53,7 @@ export default function ForgotPasswordScreen() {
         <View style={styles.formContainer}>
           <PoppinsText style={styles.title}>Forgot Password</PoppinsText>
           <PoppinsText style={styles.subtitle}>
-            Enter your email and we'll send you a link to reset your password.
+            {"Enter your email and we'll send you a link to reset your password."}
           </PoppinsText>
           
           <View style={styles.inputContainer}>

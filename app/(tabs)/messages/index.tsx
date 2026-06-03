@@ -19,11 +19,12 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  Platform,
   RefreshControl,
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 
 // ============================================================================
@@ -151,14 +152,14 @@ const transformApiConversation = (conv: ApiConversation): ConversationType => {
 
 interface ConversationItemProps {
   item: ConversationType;
-  onPress: (id: string, userName: string, userAvatar: string) => void;
+  onPress: (id: string) => void;
 }
 
 const ConversationItem = React.memo<ConversationItemProps>(
   ({ item, onPress }) => {
     const handlePress = useCallback(() => {
-      onPress(item.id, item.user.name, item.user.avatar);
-    }, [item.id, item.user.name, item.user.avatar, onPress]);
+      onPress(item.id);
+    }, [item.id, onPress]);
 
     return (
       <TouchableOpacity
@@ -231,6 +232,7 @@ const MessagesScreen = () => {
     canSend,
     remainingFreeMessages,
     isLoading: messageCountLoading,
+    refreshMessageCount,
   } = useMessageCount();
   const { user } = useAuth();
   const router = useRouter();
@@ -267,6 +269,24 @@ const MessagesScreen = () => {
   });
 
   // ========== Effects ==========
+
+  /**
+   * Refresh and log message counts from the server when screen gets focused (tab clicked)
+   */
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("focus", async () => {
+      console.log("💬 [MessagesScreen] Screen focused (Chat Tab clicked) — calling backend to get free messages count...");
+      try {
+        await refreshMessageCount();
+        console.log("💬 [MessagesScreen] Refresh completed successfully");
+        // Also fetch conversations list on focus to keep it fresh
+        fetchConversations(false);
+      } catch (error) {
+        console.error("💬 [MessagesScreen] Error refreshing message count on focus:", error);
+      }
+    });
+    return unsubscribe;
+  }, [navigation, refreshMessageCount]);
 
   /**
    * Ensure tab bar is visible when on messages list screen
@@ -508,21 +528,15 @@ const MessagesScreen = () => {
    * Handles conversation item press - navigates to chat
    */
   const handleConversationPress = useCallback(
-    (conversationId: string, userName: string, userAvatar: string) => {
+    (conversationId: string) => {
       console.log(
         "[handleConversationPress] Opening conversation:",
         conversationId,
-        "with user:",
-        userName,
       );
-      // Navigate to the chat screen with the conversation ID and user info
+      // Navigate to the chat screen with the conversation ID
       router.push({
         pathname: "/(tabs)/messages/[id]",
-        params: {
-          id: conversationId,
-          userName,
-          userAvatar,
-        },
+        params: { id: conversationId },
       });
     },
     [router],
@@ -771,7 +785,7 @@ const MessagesScreen = () => {
           No Free Messages Left
         </PoppinsText>
         <PoppinsText style={styles.subscriptionText}>
-          You've used all your free messages. Subscribe to continue chatting!
+          {"You've used all your free messages. Subscribe to continue chatting!"}
         </PoppinsText>
         <TouchableOpacity
           onPress={handleOpenSubscribe}
@@ -987,7 +1001,6 @@ const styles = StyleSheet.create({
   },
   conversationList: {
     flexGrow: 1,
-    paddingBottom: 120, // Extra padding for tab bar (92px + buffer)
   },
   emptyListContent: {
     flexGrow: 1,

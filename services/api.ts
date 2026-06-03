@@ -109,10 +109,6 @@ async function fetchApi<T = any>(
     return { data: responseData };
   } catch (error) {
     console.error('API request failed:', error);
-    
-    // Sentry logging disabled for now
-    // logApiError(url, error, undefined, { method, endpoint, hasAuth: !!token });
-    
     return {
       error: {
         message: error instanceof Error ? error.message : 'Network error',
@@ -135,6 +131,12 @@ export const api = {
     
     return response;
   },
+
+  forgotPassword: (email: string) =>
+    fetchApi(API_CONFIG.ENDPOINTS.AUTH.FORGOT_PASSWORD, 'POST', { email }),
+
+  resetPassword: (token: string, newPassword: string) =>
+    fetchApi(API_CONFIG.ENDPOINTS.AUTH.RESET_PASSWORD, 'POST', { token, password: newPassword }),
 
   register: async (userData: {
     email: string;

@@ -313,7 +313,7 @@ const NotificationsScreen = () => {
             <Ionicons name="notifications-off-outline" size={64} color="#ccc" />
             <PoppinsText style={styles.emptyText}>No notifications yet</PoppinsText>
             <PoppinsText style={styles.emptySubtext}>
-              When you get notifications, they'll appear here
+              {"When you get notifications, they'll appear here"}
             </PoppinsText>
           </View>
         }

@@ -1,7 +1,8 @@
+import { useAuth } from "@/context/AuthContext";
 import { getActiveSubscription } from "@/services/subscriptionService";
 import { UserSubscription } from "@/types/subscription";
 import { useRouter, type Href } from "expo-router";
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 
 type SubscriptionContextType = {
@@ -21,22 +22,49 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({
     null,
   );
   const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuth();
 
-  const refreshSubscription = async () => {
+  const refreshSubscription = useCallback(async () => {
+    if (!user) {
+      console.log("SubscriptionContext: No authenticated user, clearing subscription");
+      setSubscription(null);
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
+      
+      // If user profile explicitly says they have paid chat access, mock a valid subscription object
+      if (user?.has_chat_access) {
+        console.log("SubscriptionContext: User profile has_chat_access is true, granting paid subscription");
+        setSubscription({
+          id: `sub_profile_${user.id}`,
+          userId: String(user.id),
+          planId: "premium",
+          status: "active",
+          startDate: new Date().toISOString(),
+          endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year
+          paymentReference: user.payment_reference || "profile_access",
+          amount: 0,
+          currency: "NGN"
+        });
+        return;
+      }
+
       const activeSub = await getActiveSubscription();
       setSubscription(activeSub);
     } catch (error) {
       console.error("Error refreshing subscription:", error);
+      setSubscription(null);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user?.id, user?.has_chat_access, user?.payment_reference]);
 
   useEffect(() => {
     refreshSubscription();
-  }, []);
+  }, [refreshSubscription]);
 
   return (
     <SubscriptionContext.Provider
@@ -72,11 +100,11 @@ export const withSubscription = <P extends object>(
     useEffect(() => {
       if (!isLoading && !subscription) {
         const target: Href =
-          (options.redirectTo as Href) ??
-          ("/(tabs)/subscribe" as unknown as Href);
-        router.push(target);
+          options.redirectTo ?? ("/(tabs)/subscribe" as Href);
+
+        router.replace(target);
       }
-    }, [subscription, isLoading, router]);
+    }, [subscription, isLoading, router, options.redirectTo]);
 
     if (isLoading) {
       return (

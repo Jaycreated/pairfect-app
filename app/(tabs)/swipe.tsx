@@ -4,15 +4,11 @@ import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Dimensions, Image, Modal, PanResponder, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, Dimensions, Image, Modal, PanResponder, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 const SWIPE_THRESHOLD = width * 0.4;
-const SWIPE_OUT_DURATION = 150;
-
-// Responsive dimensions
-const CARD_HEIGHT = Math.min(height * 0.5, 320);  // 50% of screen or max 320
-const CARD_WIDTH = Math.min(width * 0.85, 320);    // 85% of screen or max 320
+const SWIPE_OUT_DURATION = 250;
 
 // Default profile icon component for users without photos
 const DefaultProfileIcon = ({ size = 50 }: { size?: number }) => (
@@ -43,9 +39,11 @@ const SwipeScreen = () => {
   const [matchedUser, setMatchedUser] = useState<User | null>(null);
   const { showToast } = useToast();
   
-  // Use ref to track users array for immediate access in callbacks
+  // Use ref to track users array and processing state for immediate access in PanResponder closures
   const usersRef = useRef<User[]>([]);
   const currentIndexRef = useRef(0);
+  const isProcessingSwipeRef = useRef(false);
+  const swipeCardRef = useRef<any>(null);
   
   const position = useRef(new Animated.ValueXY()).current;
   const rotate = position.x.interpolate({
@@ -103,18 +101,18 @@ const fetchPotentialMatches = async () => {
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => !isProcessingSwipe,
+      onStartShouldSetPanResponder: () => !isProcessingSwipeRef.current,
       onPanResponderMove: (_, { dx, dy }) => {
-        if (!isProcessingSwipe) {
+        if (!isProcessingSwipeRef.current) {
           position.setValue({ x: dx, y: dy });
         }
       },
       onPanResponderRelease: (_, { dx, dy }) => {
-        if (isProcessingSwipe) return;
+        if (isProcessingSwipeRef.current) return;
         
         if (Math.abs(dx) > SWIPE_THRESHOLD) {
           const direction = dx > 0 ? 1 : -1;
-          swipeCard(direction);
+          swipeCardRef.current?.(direction);
         } else {
           Animated.spring(position, {
             toValue: { x: 0, y: 0 },
@@ -144,13 +142,14 @@ const fetchPotentialMatches = async () => {
     };
   };
 
+
   const swipeCard = useCallback(async (direction: number) => {
     // Use refs for immediate access to current state
     const currentUsers = usersRef.current;
     const currentIdx = currentIndexRef.current;
     
     // Add extra validation
-    if (isProcessingSwipe) {
+    if (isProcessingSwipeRef.current) {
       console.log('Swipe prevented - already processing');
       return;
     }
@@ -164,12 +163,13 @@ const fetchPotentialMatches = async () => {
     }
     
     setIsProcessingSwipe(true);
+    isProcessingSwipeRef.current = true;
     const currentUser = currentUsers[currentIdx];
     const isLike = direction > 0;
     const nextIndex = currentIdx + 1;
     const isLastCard = nextIndex >= currentUsers.length;
 
-    console.log('Starting swipe action:', {
+    console.log('Starting swipe action (Optimistic UI):', {
       action: isLike ? 'like' : 'pass',
       userId: currentUser.id,
       userName: currentUser.name,
@@ -179,7 +179,7 @@ const fetchPotentialMatches = async () => {
       isLastCard
     });
 
-    // Start animation immediately (optimistic UI)
+    // 🚀 STEP 1: Animate the card off-screen IMMEDIATELY so the UI feels ultra-responsive
     Animated.timing(position, {
       toValue: { 
         x: direction * (width + 100), 
@@ -188,17 +188,17 @@ const fetchPotentialMatches = async () => {
       duration: SWIPE_OUT_DURATION,
       useNativeDriver: false,
     }).start(() => {
-      // Reset position immediately for next card
+      // Reset position immediately for next card in stack
       position.setValue({ x: 0, y: 0 });
       
       if (isLastCard) {
         console.log('Last card - fetching more matches');
-        // Reset to show loading state
         setCurrentIndex(0);
         currentIndexRef.current = 0;
         setUsers([]);
         usersRef.current = [];
         setIsProcessingSwipe(false);
+        isProcessingSwipeRef.current = false;
         // Fetch new matches
         fetchPotentialMatches();
       } else {
@@ -206,50 +206,51 @@ const fetchPotentialMatches = async () => {
         setCurrentIndex(nextIndex);
         currentIndexRef.current = nextIndex;
         setIsProcessingSwipe(false);
+        isProcessingSwipeRef.current = false;
       }
     });
 
-    // Make API call in parallel (non-blocking)
+    // 🌐 STEP 2: Fire the backend API call concurrently in the background
     try {
-      console.log(`Sending ${isLike ? 'like' : 'pass'} for user:`, currentUser.id);
+      console.log(`[API] Sending background ${isLike ? 'like' : 'pass'} for user:`, currentUser.id);
       
       const response: SwipeResponse = isLike 
         ? await api.likeUser(currentUser.id)
         : await api.passUser(currentUser.id);
       
-      console.log('API Response:', JSON.stringify(response, null, 2));
+      console.log('[API] Background swipe response:', JSON.stringify(response, null, 2));
       
       if (response.error) {
         const errorMessage = typeof response.error === 'string' 
           ? response.error 
           : response.error.message || 'Unknown error';
         
-        console.error(`Error ${isLike ? 'liking' : 'passing'} user:`, errorMessage);
-        showToast(`Failed to ${isLike ? 'like' : 'pass'} user: ${errorMessage}`, 'error', 3000);
+        console.error(`[API] Error ${isLike ? 'liking' : 'passing'} user:`, errorMessage);
+        showToast(`Action failed: ${errorMessage}`, 'error', 3000);
         return;
       }
       
-      console.log(`${isLike ? 'Liked' : 'Passed'}:`, currentUser.name, 'Match data:', response.data);
+      console.log(`[API] Background success - ${isLike ? 'Liked' : 'Passed'}:`, currentUser.name);
       
       // Check if it's a mutual match
-      // The API returns both 'matched': boolean and match object
       if (isLike && response.data) {
         const isMutualMatch = (response.data as any).matched === true;
-        
         if (isMutualMatch) {
-          console.log('Mutual match found with:', currentUser.name);
+          console.log('[API] Mutual match found with:', currentUser.name);
           setMatchedUser(currentUser);
           setMatchModalVisible(true);
-        } else {
-          console.log('Like registered, but no mutual match yet with:', currentUser.name);
         }
       }
-      
     } catch (err) {
-      console.error('Error processing swipe:', err);
-      showToast('An error occurred while processing your action. Please try again.', 'error', 3000);
+      console.error('[API] Unexpected background error processing swipe:', err);
+      showToast('Connection error. Swiped state may not have synced.', 'error', 3000);
     }
-  }, [isProcessingSwipe, showToast, position]);
+  }, [showToast, position]);
+
+  // Sync the swipeCard callback ref (declared after swipeCard to satisfy block-scope hoisting)
+  useEffect(() => {
+    swipeCardRef.current = swipeCard;
+  }, [swipeCard]);
 
   const handleCardPress = useCallback((userId: string) => {
     if (!isProcessingSwipe) {
@@ -412,7 +413,7 @@ const fetchPotentialMatches = async () => {
             {/* Match Text */}
             <View style={styles.matchContent}>
               <PoppinsText weight="bold" style={styles.matchTitle}>
-                It's a Match!
+                {"It's a Match!"}
               </PoppinsText>
               <PoppinsText style={styles.matchSubtitle}>
                 You and {matchedUser.name} have liked each other!
@@ -471,11 +472,11 @@ const fetchPotentialMatches = async () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
-        {/* <TouchableOpacity onPress={() => router.replace('/(tabs)')}>
+        <TouchableOpacity onPress={() => router.replace('/(tabs)')}>
           <Ionicons name="arrow-back" size={24} color="#000" />
-        </TouchableOpacity> */}
+        </TouchableOpacity>
         <View style={styles.headerTextContainer}>
           <PoppinsText weight="bold" style={styles.headerTitle}>
             <Text>Discover people around you</Text>
@@ -515,7 +516,7 @@ const fetchPotentialMatches = async () => {
       </ScrollView>
 
       {renderMatchModal()}
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -534,7 +535,7 @@ const styles = StyleSheet.create({
   },
   scrollViewContent: {
     flexGrow: 1,
-    paddingBottom: 120, // Extra padding for tab bar (92px + buffer)
+    paddingBottom: 40,
   },
   header: {
     flexDirection: 'row',
@@ -568,10 +569,11 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   cardContainer: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
+    width: '100%',
+    height: 400,
+    maxWidth: 350,
     alignSelf: 'center',
-    padding: 8,
+    padding: 10,
   },
   card: {
     width: '100%',
@@ -681,18 +683,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   cardFooter: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 4,
     paddingTop: 12,
     paddingRight: 20,
+    color: '#000000',
     paddingLeft: 20,
     marginHorizontal: -20,
   },
   cardName: {
     fontSize: 24,
     color: '#651B55',
-    marginBottom: 0,  // Removed to reduce gap
+    marginBottom: 4,
     fontWeight: '600',
   },
   cardAge: {
@@ -703,9 +703,8 @@ const styles = StyleSheet.create({
   cardLocation: {
     fontSize: 16,
     color: '#651B55',
-    marginBottom: 0,  // Removed to reduce gap
+    marginBottom: 10,
     flexDirection: 'row',
-
     alignItems: 'center',
   },
   interestText: {
@@ -721,8 +720,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 0,
-    padding: 10,
+    marginTop: 10,
+    paddingRight: 0,
+    paddingLeft: 0,
   },
   button: {
     width: 50,

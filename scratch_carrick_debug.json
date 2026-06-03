@@ -1,0 +1,42 @@
+{
+  "profile": {
+    "id": 123,
+    "email": "carrick@example.com",
+    "name": "Michael Carrick",
+    "age": 30,
+    "gender": "male",
+    "bio": null,
+    "location": "bayelsa",
+    "photos": [
+      "https://res.cloudinary.com/dbv9f6ucg/image/upload/v1779200305/pairfect/profile_photos/a1bdsttymw3j4k6i69tu.jpg",
+      "https://res.cloudinary.com/dbv9f6ucg/image/upload/v1779200323/pairfect/profile_photos/znunpinuiavruonss3uh.jpg"
+    ],
+    "interests": [
+      "Relationship"
+    ],
+    "preferences": {},
+    "created_at": "2026-05-19T14:16:09.957Z",
+    "updated_at": "2026-05-19T14:18:48.925Z",
+    "has_chat_access": false,
+    "payment_date": null,
+    "payment_reference": null,
+    "is_admin": false,
+    "last_login": null,
+    "paystack_customer_id": null,
+    "paystack_subscription_code": null,
+    "access_expiry_date": null,
+    "free_messages_used": 0,
+    "push_token": null
+  },
+  "chatAccess": {
+    "success": true,
+    "hasAccess": true,
+    "freeMessages": {
+      "limit": 3,
+      "used": 0,
+      "remaining": 3
+    }
+  },
+  "conversations": [],
+  "messages": {}
+}

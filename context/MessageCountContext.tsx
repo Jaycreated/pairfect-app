@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useState,
+  useCallback,
   type ReactNode,
 } from 'react';
 import { ActivityIndicator, View } from 'react-native';
@@ -13,6 +14,7 @@ import { useToast } from '@/context/ToastContext';
 import {
   canSendMessage,
   getMessageCount,
+  getLocalMessageCount,
   sendMessageWithLimit,
   updatePaidAccessStatus,
   type MessageCount,
@@ -54,25 +56,53 @@ export const MessageCountProvider: React.FC<{ children: ReactNode }> = ({
   const { showToast } = useToast();
   const router = useRouter();
 
-  const refreshMessageCount = async () => {
+  const refreshMessageCount = useCallback(async () => {
     console.log('=== refreshMessageCount START ===');
     try {
       setIsLoading(true);
-      const count = await getMessageCount();
-      console.log('getMessageCount returned:', count);
+      
+      let count: MessageCount;
+      if (user?.has_chat_access) {
+        console.log('[DEBUG] User has explicit paid chat access, bypassing remote API count check');
+        count = {
+          totalSent: 0,
+          freeMessagesUsed: 0,
+          freeMessagesLimit: 9999,
+          hasPaidAccess: true
+        };
+      } else {
+        count = await getMessageCount();
+      }
+      
+      console.log('getMessageCount resolved:', count);
       setMessageCount(count);
       console.log('messageCount state updated');
     } catch (error) {
       console.error('Error refreshing message count:', error);
-      showToast('Failed to load message limits', 'error');
+      
+      // Resilient fallback to local SecureStore cache so network timeout doesn't break user experience
+      try {
+        const localCount = await getLocalMessageCount();
+        if (user?.has_chat_access) {
+          localCount.hasPaidAccess = true;
+        }
+        setMessageCount(localCount);
+        console.log('[DEBUG] Successfully set message count to local cache fallback:', localCount);
+      } catch (fallbackError) {
+        console.error('[DEBUG] Failed to get local count fallback:', fallbackError);
+      }
     } finally {
       setIsLoading(false);
       console.log('=== refreshMessageCount END ===');
     }
-  };
+  }, [user?.id, user?.has_chat_access]);
 
   const checkCanSend = async () => {
     try {
+      // If user has explicit paid chat access in their profile, skip backend limit check
+      if (user?.has_chat_access) {
+        return { canSend: true, remainingFree: 9999, requiresSubscription: false };
+      }
       return await canSendMessage();
     } catch (error) {
       console.error('Error checking send permission:', error);
@@ -85,8 +115,28 @@ export const MessageCountProvider: React.FC<{ children: ReactNode }> = ({
     console.log('=== MessageCountContext.sendMessage START ===');
     console.log('recipientId:', recipientId);
     console.log('content:', content);
+    console.log('Current messageCount before send:', messageCount);
+    console.log('Current remainingFreeMessages before send:', remainingFreeMessages);
     
     try {
+      // If user has explicit paid chat access, skip sending limit guards and just make the direct API send call
+      if (user?.has_chat_access) {
+        const { api } = await import('@/services/api');
+        const response = await api.sendMessage(recipientId, {
+          content,
+          senderId: String(user.id),
+          recipientId
+        });
+        
+        if (response.error) {
+          throw new Error(response.error.message || 'Failed to send message');
+        }
+        
+        showToast('Message sent!', 'success');
+        console.log('=== MessageCountContext.sendMessage END ===');
+        return { success: true };
+      }
+
       const result = await sendMessageWithLimit(recipientId, content);
       console.log('sendMessageWithLimit result:', result);
 
@@ -101,10 +151,13 @@ export const MessageCountProvider: React.FC<{ children: ReactNode }> = ({
         return result;
       }
 
-      console.log('Message sent successfully, refreshing message count...');
-      // update count after successful send
-      await refreshMessageCount();
-      console.log('Message count refreshed');
+      console.log('Message sent successfully, updating local state from storage...');
+      // Manually update state from local storage to reflect the increment
+      const updatedCount = await getMessageCount();
+      console.log('Updated count from local storage:', updatedCount);
+      setMessageCount(updatedCount);
+      console.log('React state updated with new count');
+      console.log('New remainingFreeMessages:', Math.max(0, updatedCount.freeMessagesLimit - updatedCount.freeMessagesUsed));
 
       if (typeof result.remainingFreeMessages === 'number') {
         console.log('remainingFreeMessages from result:', result.remainingFreeMessages);
@@ -157,16 +210,20 @@ export const MessageCountProvider: React.FC<{ children: ReactNode }> = ({
   }, [user?.id]); // Refresh when user changes
 
   const canSend =
+    !!user?.has_chat_access || (
     !!messageCount &&
     (messageCount.hasPaidAccess ||
-      messageCount.freeMessagesUsed < messageCount.freeMessagesLimit);
+      messageCount.freeMessagesUsed < messageCount.freeMessagesLimit)
+    );
 
-  const remainingFreeMessages = messageCount
-    ? Math.max(
-        0,
-        messageCount.freeMessagesLimit - messageCount.freeMessagesUsed
-      )
-    : 0;
+  const remainingFreeMessages = user?.has_chat_access
+    ? 9999
+    : (messageCount
+        ? Math.max(
+            0,
+            messageCount.freeMessagesLimit - messageCount.freeMessagesUsed
+          )
+        : 0);
 
   return (
     <MessageCountContext.Provider

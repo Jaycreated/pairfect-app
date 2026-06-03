@@ -1,18 +1,18 @@
 // app/(tabs)/subscribe.tsx
 import { useSubscription } from "@/context/SubscriptionContext";
 import { useToast } from "@/context/ToastContext";
-import { getAvailableProducts, PRODUCT_IDS, purchaseItem } from "@/services/iapService";
+import { PRODUCT_IDS, purchaseItem } from "@/services/iapService";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
-    ActivityIndicator,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 export default function SubscribeScreen() {
@@ -21,42 +21,20 @@ export default function SubscribeScreen() {
   const { showToast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-  const [products, setProducts] = useState<any[]>([]);
-  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
 
-  // Fetch real prices from Play Console / App Store
-  useEffect(() => {
-    const loadProducts = async () => {
-      try {
-        setIsLoadingProducts(true);
-        const availableProducts = await getAvailableProducts();
-        setProducts(availableProducts || []);
-      } catch (error) {
-        console.error("Error loading products:", error);
-      } finally {
-        setIsLoadingProducts(false);
-      }
-    };
-    loadProducts();
-  }, []);
-
-  // Get real price from fetched products, fallback to hardcoded
-  const getProductPrice = (planId: string) => {
-    const platformIds = Platform.OS === "ios" ? PRODUCT_IDS.ios : PRODUCT_IDS.android;
-    const productId = planId === "daily" ? platformIds.daily : platformIds.monthly;
-    
-    const product = products.find((p: any) => 
-      p.productId === productId || p.id === productId
-    );
-    
-    // Return localized price from store, or fallback
-    return product?.localizedPrice || (planId === "daily" ? "₦300" : "₦3000");
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)/messages");
+    }
   };
 
   const plans = [
     {
       id: "daily",
       name: "Daily",
+      price: 300,
       duration: "day",
       description: "24 hours chat access",
       features: ["Unlimited messaging", "Chat access for 24 hours"],
@@ -65,6 +43,7 @@ export default function SubscribeScreen() {
     {
       id: "monthly",
       name: "Monthly",
+      price: 3000,
       duration: "month",
       description: "30 days chat access",
       features: ["Unlimited messaging", "Chat access for 30 days"],
@@ -111,6 +90,15 @@ export default function SubscribeScreen() {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
+        <TouchableOpacity
+          onPress={handleBack}
+          style={styles.backButton}
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="chevron-back" size={24} color="#333" />
+        </TouchableOpacity>
         <Text style={styles.title}>Choose a Plan</Text>
       </View>
 
@@ -128,14 +116,8 @@ export default function SubscribeScreen() {
 
             <Text style={styles.planName}>{plan.name}</Text>
             <Text style={styles.planPrice}>
-              {isLoadingProducts ? (
-                <ActivityIndicator size="small" color="#651B55" />
-              ) : (
-                <>
-                  {getProductPrice(plan.id)}
-                  <Text style={styles.planDuration}> / {plan.duration}</Text>
-                </>
-              )}
+              ₦{plan.price.toLocaleString()}
+              <Text style={styles.planDuration}> / {plan.duration}</Text>
             </Text>
             <Text style={styles.planDescription}>{plan.description}</Text>
 
@@ -152,8 +134,8 @@ export default function SubscribeScreen() {
               style={[
                 styles.subscribeButton,
                 isProcessing &&
-                  selectedPlan === plan.id &&
-                  styles.subscribeButtonLoading,
+                selectedPlan === plan.id &&
+                styles.subscribeButtonLoading,
               ]}
               onPress={() => handleSubscribe(plan.id)}
               disabled={isProcessing}
@@ -179,14 +161,26 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8f8f8",
   },
   header: {
-    paddingTop: 70,
-    padding: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === "ios" ? 60 : 40,
     backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
+    position: "relative",
+  },
+  backButton: {
+    position: "absolute",
+    left: 16,
+    top: Platform.OS === "ios" ? 60 : 40,
+    zIndex: 10,
+    padding: 4,
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "bold",
     color: "#333",
     textAlign: "center",

@@ -1,9 +1,9 @@
-import { useAuth } from '@/context/AuthContext';
 import { api } from '@/services/api';
 import { registerForPushNotificationsAsync } from '@/utils/notifications';
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { useAuth } from '@/context/AuthContext';
 
 type NotificationContextType = {
   expoPushToken: string | null;
