@@ -52,7 +52,8 @@ export const API_CONFIG = {
     PAYMENTS: {
       CHAT_ACCESS: 'payments/chat/access',
       CHAT_RESET: 'payments/chat/reset',
-    }
+    },
+    REPORTS: 'reports',
   },
 
   // Default headers for API requests

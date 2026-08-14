@@ -40,6 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsProfileLoading(true);
     try {
       const response = await api.getProfile();
+      console.log('[AuthContext] loadProfile response:', response);
       if (response.data?.user) {
         // Get the token from storage to include in user object
         const token = await Storage.getItem('auth_token');
@@ -47,6 +48,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ...response.data.user,
           token: token || ''
         };
+        console.log('[AuthContext] loaded user profile with access flag:', {
+          id: userWithToken.id,
+          has_chat_access: userWithToken.has_chat_access,
+          payment_reference: userWithToken.payment_reference,
+        });
         setUser(userWithToken);
         setProfile(userWithToken);
       }

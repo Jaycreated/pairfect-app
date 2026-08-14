@@ -168,29 +168,53 @@ export const verifyIapReceipt = async (
       // If not JSON, treat as raw receipt string
     }
 
-    const response = await fetch(getApiUrl("api/payments/verify-iap"), {
+    const requestBody = {
+      receipt: receiptPayload,
+      productId,
+      platform: Platform.OS,
+    };
+    const verifyUrl = getApiUrl("payments/verify-iap");
+
+    console.log("[VerifyIAP] sending receipt payload to backend:", {
+      url: verifyUrl,
+      productId,
+      platform: Platform.OS,
+      receiptLength: typeof receiptData === "string" ? receiptData.length : JSON.stringify(receiptData).length,
+      payload: requestBody,
+    });
+
+    const response = await fetch(verifyUrl, {
       method: "POST",
       headers,
-      body: JSON.stringify({
-        receipt: receiptPayload,
-        productId,
-        platform: Platform.OS,
-      }),
+      body: JSON.stringify(requestBody),
+    });
+
+    const responseText = await response.text();
+    let parsedResponse: any = {};
+    try {
+      parsedResponse = responseText ? JSON.parse(responseText) : {};
+    } catch (parseErr) {
+      console.error("[VerifyIAP] failed to parse backend response:", parseErr, responseText);
+      parsedResponse = { message: responseText };
+    }
+
+    console.log("[VerifyIAP] backend response:", {
+      status: response.status,
+      ok: response.ok,
+      body: parsedResponse,
     });
 
     if (!response.ok) {
-      const error = await response.json();
       return {
         success: false,
-        message: error.message || "Failed to verify receipt",
+        message: parsedResponse.message || "Failed to verify receipt",
       };
     }
 
-    const data = await response.json();
     return {
       success: true,
-      subscription: data.subscription,
-      message: data.message,
+      subscription: parsedResponse.subscription,
+      message: parsedResponse.message,
     };
   } catch (error) {
     console.error("Error verifying receipt:", error);

@@ -246,10 +246,16 @@ export default function ProfileScreen() {
   };
 
   const handleSave = () => {
+    const parsedAge = profile.age ? parseInt(profile.age.toString(), 10) : null;
+    if (parsedAge !== null && (isNaN(parsedAge) || parsedAge < 18)) {
+      showToast("You must be at least 18 years old to use Pairfect.", "error");
+      return;
+    }
+
     // Prepare data for API
     const profileData = {
       name: profile.name,
-      age: profile.age ? parseInt(profile.age.toString()) : null,
+      age: parsedAge,
       bio: profile.bio,
       interests: profile.interests,
       photos: profile.photos,

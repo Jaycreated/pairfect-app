@@ -5,6 +5,7 @@ import { useMessageCount } from "@/context/MessageCountContext";
 import { useSubscription } from "@/context/SubscriptionContext";
 import { useToast } from "@/context/ToastContext";
 import { api } from "@/services/api";
+import { getBlockedUsers } from "@/utils/safety";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useRouter } from "expo-router";
@@ -135,7 +136,7 @@ const transformApiConversation = (conv: ApiConversation): ConversationType => {
   return {
     id: String(conv.id || conv._id || ""),
     user: {
-      id: String(conv.id || ""),
+      id: String(conv.userId || conv.participantId || conv.id || conv._id || ""),
       name: conv.name || "Unknown User",
       avatar: avatar,
     },
@@ -152,14 +153,14 @@ const transformApiConversation = (conv: ApiConversation): ConversationType => {
 
 interface ConversationItemProps {
   item: ConversationType;
-  onPress: (id: string) => void;
+  onPress: (id: string, recipientName?: string, recipientId?: string) => void;
 }
 
 const ConversationItem = React.memo<ConversationItemProps>(
   ({ item, onPress }) => {
     const handlePress = useCallback(() => {
-      onPress(item.id);
-    }, [item.id, onPress]);
+      onPress(item.id, item.user.name, item.user.id);
+    }, [item.id, item.user.id, item.user.name, onPress]);
 
     return (
       <TouchableOpacity
@@ -454,9 +455,12 @@ const MessagesScreen = () => {
           return;
         }
 
-        const formattedConversations = conversationsData.map(
-          transformApiConversation,
-        );
+        const blockedList = await getBlockedUsers();
+        const blockedIds = new Set(blockedList.map(u => String(u.id)));
+
+        const formattedConversations = conversationsData
+          .map(transformApiConversation)
+          .filter(conv => !blockedIds.has(String(conv.user.id)));
 
         // Sort by most recent first
         formattedConversations.sort(
@@ -528,15 +532,18 @@ const MessagesScreen = () => {
    * Handles conversation item press - navigates to chat
    */
   const handleConversationPress = useCallback(
-    (conversationId: string) => {
+    (conversationId: string, recipientName?: string, recipientId?: string) => {
       console.log(
         "[handleConversationPress] Opening conversation:",
         conversationId,
       );
-      // Navigate to the chat screen with the conversation ID
       router.push({
         pathname: "/(tabs)/messages/[id]",
-        params: { id: conversationId },
+        params: {
+          id: conversationId,
+          recipientName: recipientName || "",
+          recipientId: recipientId || "",
+        },
       });
     },
     [router],

@@ -50,8 +50,9 @@ export default function MatchesScreen() {
 
         // Transform the API response to match our Match type
         console.log("Raw API matches:", response.data.matches);
-        const formattedMatches: Match[] = response.data.matches.map(
-          (match: any) => ({
+        const formattedMatches: Match[] = response.data.matches
+          .filter((match: any) => match.age >= 18)
+          .map((match: any) => ({
             id: match.id,
             name: match.name,
             age: match.age,
@@ -62,8 +63,7 @@ export default function MatchesScreen() {
             lastMessage: "",
             unreadCount: 0,
             interest: match.interest || "",
-          }),
-        );
+          }));
         console.log("Formatted matches:", formattedMatches);
 
         setMatches(formattedMatches);
@@ -85,6 +85,8 @@ export default function MatchesScreen() {
         pathname: "/(tabs)/messages/[id]" as any,
         params: {
           id: item.id,
+          recipientName: item.name,
+          recipientId: String(item.id),
           userName: item.name,
           userAvatar: item.photos && item.photos.length > 0 ? item.photos[0] : undefined,
         },

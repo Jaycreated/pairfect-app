@@ -143,6 +143,7 @@ export const api = {
     password: string;
     name: string;
     sexualOrientation: string;
+    age?: number;
   }) => {
     const response = await fetchApi(API_CONFIG.ENDPOINTS.AUTH.REGISTER, 'POST', userData);
     

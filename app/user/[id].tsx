@@ -1,5 +1,8 @@
 import { PoppinsText } from '@/components/PoppinsText';
+import { useToast } from '@/context/ToastContext';
 import { api } from '@/services/api';
+import { blockUser } from '@/utils/safety';
+import { reportContent } from '@/services/reportService';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -51,11 +54,109 @@ interface UserProfile {
 export default function PublicProfileScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const { showToast } = useToast();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [matchModalVisible, setMatchModalVisible] = useState(false);
+  const [safetyModalVisible, setSafetyModalVisible] = useState(false);
+
+  const handleBlockUser = async () => {
+    if (!user) return;
+    try {
+      await blockUser(user.id, user.name);
+      try {
+        await api.post(`/users/${user.id}/block`, {});
+      } catch (e) {
+        console.log("Backend block notification failed:", e);
+      }
+      showToast(`Blocked ${user.name}`, "success");
+      setSafetyModalVisible(false);
+      router.back();
+    } catch (error) {
+      console.error("Failed to block user:", error);
+      showToast("Error blocking user", "error");
+    }
+  };
+
+  const handleReportUser = async () => {
+    if (!user) return;
+    try {
+      // 1. Submit report to server
+      await reportContent({
+        reportedUserId: user.id,
+        contentType: 'profile',
+        reason: 'Objectionable profile content reported'
+      });
+
+      // 2. Block user locally
+      await blockUser(user.id, user.name);
+      try {
+        await api.post(`/users/${user.id}/block`, {});
+      } catch (e) {
+        console.log("Backend block notification failed:", e);
+      }
+      showToast(`Reported and blocked ${user.name}`, "success");
+      setSafetyModalVisible(false);
+      router.back();
+    } catch (error) {
+      console.error("Failed to report user:", error);
+      showToast("Error reporting user", "error");
+    }
+  };
+
+  const renderSafetyModal = () => {
+    if (!user) return null;
+    return (
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={safetyModalVisible}
+        onRequestClose={() => setSafetyModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.safetyModalContent}>
+            <PoppinsText style={styles.safetyModalTitle}>
+              Safety Options
+            </PoppinsText>
+            <PoppinsText style={styles.safetyModalSubTitle}>
+              What would you like to do with {user.name}?
+            </PoppinsText>
+            
+            <TouchableOpacity 
+              style={[styles.safetyOptionButton, styles.reportOptionButton]}
+              onPress={handleReportUser}
+            >
+              <Ionicons name="flag-outline" size={20} color="#E03131" style={{ marginRight: 8 }} />
+              <PoppinsText style={styles.reportOptionText}>
+                Report User
+              </PoppinsText>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.safetyOptionButton, styles.blockOptionButton]}
+              onPress={handleBlockUser}
+            >
+               <Ionicons name="ban-outline" size={20} color="#E03131" style={{ marginRight: 8 }} />
+              <PoppinsText style={styles.blockOptionText}>
+                Block User
+              </PoppinsText>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.safetyOptionButton, styles.cancelOptionButton]}
+              onPress={() => setSafetyModalVisible(false)}
+            >
+              <PoppinsText style={styles.cancelOptionText}>
+                Cancel
+              </PoppinsText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
 
   // Handle like button press
   const handleLike = async () => {
@@ -259,7 +360,9 @@ export default function PublicProfileScreen() {
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
         <PoppinsText style={styles.headerTitle}>Profile</PoppinsText>
-        <View style={styles.headerRight} />
+        <TouchableOpacity onPress={() => setSafetyModalVisible(true)} style={styles.headerSafetyButton}>
+          <Ionicons name="shield-outline" size={24} color="#651B55" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scrollView}>
@@ -378,6 +481,7 @@ export default function PublicProfileScreen() {
       </View>
       
       {renderMatchModal()}
+      {renderSafetyModal()}
     </View>
   );
 }
@@ -649,5 +753,68 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F0F0F0',
+  },
+  headerSafetyButton: {
+    padding: 8,
+  },
+  safetyModalContent: {
+    backgroundColor: '#FFF',
+    borderRadius: 24,
+    padding: 24,
+    width: '90%',
+    maxWidth: 360,
+    alignItems: 'center',
+  },
+  safetyModalTitle: {
+    fontSize: 22,
+    color: '#651B55',
+    marginBottom: 8,
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+  safetyModalSubTitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 24,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  safetyOptionButton: {
+    flexDirection: 'row',
+    width: '100%',
+    padding: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+    borderWidth: 1,
+  },
+  reportOptionButton: {
+    backgroundColor: '#FFF5F5',
+    borderColor: '#FFE3E3',
+  },
+  reportOptionText: {
+    color: '#E03131',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  blockOptionButton: {
+    backgroundColor: '#FFF5F5',
+    borderColor: '#FFE3E3',
+  },
+  blockOptionText: {
+    color: '#E03131',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  cancelOptionButton: {
+    backgroundColor: '#F5F5F5',
+    borderColor: '#E5E7EB',
+    marginBottom: 0,
+  },
+  cancelOptionText: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

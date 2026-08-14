@@ -121,6 +121,18 @@ const ProfileSetup = () => {
       return;
     }
 
+    if (step === 2) {
+      const parsedAge = parseInt(formData.age, 10);
+      if (isNaN(parsedAge) || parsedAge < 18) {
+        showToast('You must be at least 18 years old to use Pairfect.', 'error');
+        return;
+      }
+      if (parsedAge > 120) {
+        showToast('Please enter a valid age.', 'error');
+        return;
+      }
+    }
+
     // If not on the final step, just go to next step
     if (step < 4) {
       console.log('⏭️ [Profile Setup] Moving to next step:', step + 1);

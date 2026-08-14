@@ -28,6 +28,8 @@ const SignUpScreen = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
+  const [agreeToTerms, setAgreeToTerms] = useState(false);
+  
   const sexualOrientations = [
     { label: 'Straight', value: 'straight' },
     { label: 'Gay', value: 'gay' },
@@ -36,6 +38,9 @@ const SignUpScreen = () => {
     { label: 'Transgender', value: 'transgender' },
     { label: 'Other', value: 'other' },
   ];
+
+  // Age options (numeric input will be used)
+
 
   const {
     control,
@@ -53,7 +58,7 @@ const SignUpScreen = () => {
   });
 
   const onSubmit = async (data: SignUpFormData) => {
-    if (isLoading) return;
+    if (isLoading || !agreeToTerms) return;
     
     try {
       setIsLoading(true);
@@ -65,6 +70,7 @@ const SignUpScreen = () => {
         email: data.email,
         password: data.password,
         sexualOrientation: data.sexualOrientation,
+        age: data.age,
       });
       
       console.log('Registration response:', response);
@@ -210,6 +216,30 @@ const SignUpScreen = () => {
             )}
           </View>
 
+          {/* Age Input */}
+          <View style={styles.inputContainer}>
+            <PoppinsText style={styles.label}>Age</PoppinsText>
+            <Controller
+              control={control}
+              name="age"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <TextInput
+                  style={[styles.input, errors.age && styles.inputError]}
+                  placeholder="Enter your age"
+                  keyboardType="numeric"
+                  value={value?.toString()}
+                  onChangeText={(text) => onChange(text ? parseInt(text, 10) : '')}
+                  onBlur={onBlur}
+                />
+              )}
+            />
+            {errors.age && (
+              <PoppinsText style={styles.errorText}>
+                {errors.age.message}
+              </PoppinsText>
+            )}
+          </View>
+
           <View style={styles.inputContainer}>
             <PoppinsText style={styles.label}>Password</PoppinsText>
             <View style={[styles.passwordInputContainer, errors.password && styles.inputError]}>
@@ -280,10 +310,36 @@ const SignUpScreen = () => {
             )}
           </View>
 
+          {/* Terms and Conditions Checkbox */}
+          <View style={styles.termsContainer}>
+            <TouchableOpacity
+              style={styles.checkbox}
+              onPress={() => setAgreeToTerms(!agreeToTerms)}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: agreeToTerms }}
+            >
+              <Ionicons
+                name={agreeToTerms ? 'checkbox' : 'square-outline'}
+                size={24}
+                color={agreeToTerms ? '#651B55' : '#666'}
+              />
+            </TouchableOpacity>
+            <PoppinsText style={styles.termsText}>
+              I agree to the{' '}
+              <PoppinsText
+                style={styles.termsLink}
+                onPress={() => router.push('/screens/eula')}
+              >
+                Terms of Use (EULA)
+              </PoppinsText>{' '}
+              and confirm there is zero tolerance for abusive content or behavior.
+            </PoppinsText>
+          </View>
+
           <TouchableOpacity
-            style={[styles.button, (isLoading) && styles.buttonDisabled]}
+            style={[styles.button, (isLoading || !agreeToTerms) && styles.buttonDisabled]}
             onPress={handleSubmit(onSubmit)}
-            disabled={isLoading}
+            disabled={isLoading || !agreeToTerms}
           >
             {isLoading ? (
               <View style={styles.loadingRow}>
@@ -439,6 +495,28 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginLeft: 12,
+  },
+  termsContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 12,
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+  checkbox: {
+    marginRight: 10,
+    marginTop: 2,
+  },
+  termsText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 18,
+  },
+  termsLink: {
+    color: '#651B55',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
 });
 

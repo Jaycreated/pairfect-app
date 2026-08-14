@@ -29,20 +29,20 @@ const onboarding3 = require('@/assets/images/onboarding3.png');
 const slides: Slide[] = [
   {
     id: '1',
-    title: 'Meet People Who Feel Right',
-    subTitle: 'Forget the endless swipes, make it easy to connect with who match your vibe',
+    title: 'Meet people with real compatibility',
+    subTitle: 'Pairfect highlights shared values, goals, and energy so your next connection feels intentional from the start.',
     bgImage: onboarding1,
   },
   {
     id: '2',
-    title: 'Skip small talk, Meet your match',
-    subTitle: 'Swipe right to like and left to pass on potential matches',
+    title: 'Understand what makes you click',
+    subTitle: 'Every suggestion is shaped around compatibility, not random swiping, so conversations begin with context and respect.',
     bgImage: onboarding2,
   },
   {
     id: '3',
-    title: 'You choose the vibe',
-    subTitle: 'Date, chat , connect - your call, we bring the people the spark',
+    title: 'Start with a better first conversation',
+    subTitle: 'Choose connections that feel aligned, thoughtful, and worth your time.',
     bgImage: onboarding3,
   },
 ];
