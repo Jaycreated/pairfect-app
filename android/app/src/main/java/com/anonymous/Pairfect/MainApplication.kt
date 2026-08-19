@@ -1,4 +1,4 @@
-package com.pairfect
+package com.anonymous.Pairfect
 
 import android.app.Application
 import android.content.res.Configuration
