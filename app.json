@@ -2,20 +2,23 @@
   "expo": {
     "name": "Pairfect",
     "slug": "Pairfect",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/icon.png",
     "scheme": "pairfect",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "privacyPolicy": "https://pairfect.com.ng/privacy",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.Pairfect",
+      "bundleIdentifier": "ng.com.pairfect.app",
+      "buildNumber": "9",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "SKAdNetworkItems": [],
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       }
     },
     "android": {
@@ -47,9 +50,9 @@
           "image": "./assets/images/LandingLogo.png",
           "imageWidth": 100,
           "resizeMode": "contain",
-          "backgroundColor": "#000000",
+          "backgroundColor": "#651B55",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#651B55"
           }
         }
       ],

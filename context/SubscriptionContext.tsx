@@ -1,12 +1,9 @@
-import { useToast } from "@/context/ToastContext";
-import {
-    clearPaymentAttempt,
-    getActiveSubscription,
-} from "@/services/subscriptionService";
+import { useAuth } from "@/context/AuthContext";
+import { getActiveSubscription } from "@/services/subscriptionService";
 import { UserSubscription } from "@/types/subscription";
 import { useRouter, type Href } from "expo-router";
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { ActivityIndicator, Linking, View } from "react-native";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { ActivityIndicator, View } from "react-native";
 
 type SubscriptionContextType = {
   subscription: UserSubscription | null;
@@ -25,108 +22,49 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({
     null,
   );
   const [isLoading, setIsLoading] = useState(true);
-  const { showToast } = useToast();
-  const router = useRouter();
+  const { user } = useAuth();
 
-  const refreshSubscription = async () => {
+  const refreshSubscription = useCallback(async () => {
+    if (!user) {
+      console.log("SubscriptionContext: No authenticated user, clearing subscription");
+      setSubscription(null);
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
+      
+      // If user profile explicitly says they have paid chat access, mock a valid subscription object
+      if (user?.has_chat_access) {
+        console.log("SubscriptionContext: User profile has_chat_access is true, granting paid subscription");
+        setSubscription({
+          id: `sub_profile_${user.id}`,
+          userId: String(user.id),
+          planId: "premium",
+          status: "active",
+          startDate: new Date().toISOString(),
+          endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year
+          paymentReference: user.payment_reference || "profile_access",
+          amount: 0,
+          currency: "NGN"
+        });
+        return;
+      }
+
       const activeSub = await getActiveSubscription();
       setSubscription(activeSub);
     } catch (error) {
       console.error("Error refreshing subscription:", error);
+      setSubscription(null);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user?.id, user?.has_chat_access, user?.payment_reference]);
 
   useEffect(() => {
     refreshSubscription();
-  }, []);
-
-  // Global deep-link handler for payment callbacks
-  useEffect(() => {
-    const handleUrlEvent = async (event: { url: string }) => {
-      try {
-        const url = event.url;
-        if (!url) return;
-
-        // parse query params
-        const query = url.includes("?") ? url.split("?")[1] : "";
-        const params = new URLSearchParams(query);
-        const reference =
-          params.get("reference") ||
-          params.get("ref") ||
-          params.get("payment_reference");
-        if (!reference) return;
-
-        // Verify payment with backend
-        const result = await verifyChatPayment(reference);
-
-        if (result && result.paid) {
-          // Clear any pending payment attempts that match this reference
-          try {
-            const pending = await getPendingPayments();
-            const matches = pending.filter((p) => p.reference === reference);
-            for (const m of matches) {
-              await clearPaymentAttempt(m.paymentId);
-            }
-          } catch (err) {
-            console.warn("Error clearing pending payments:", err);
-          }
-
-          // Refresh local subscription state
-          try {
-            await refreshSubscription();
-          } catch (err) {
-            console.warn(
-              "Error refreshing subscription after payment callback:",
-              err,
-            );
-          }
-
-          showToast("Subscription activated successfully", "success");
-          // Navigate to messages or default screen
-          try {
-            router.replace("/(tabs)/messages" as unknown as Href);
-          } catch (err) {
-            // ignore navigation errors
-          }
-        } else {
-          const message = result?.message || "Payment verification failed";
-          showToast(message, "error");
-        }
-      } catch (error) {
-        console.error("Error handling deep link payment callback:", error);
-      }
-    };
-
-    // Add listener
-    const subscriptionListener: any = Linking.addEventListener(
-      "url",
-      handleUrlEvent,
-    );
-
-    // Handle initial URL (cold start)
-    (async () => {
-      try {
-        const initialUrl = await Linking.getInitialURL();
-        if (initialUrl) {
-          await handleUrlEvent({ url: initialUrl });
-        }
-      } catch (err) {
-        // ignore
-      }
-    })();
-
-    return () => {
-      try {
-        subscriptionListener.remove();
-      } catch (err) {
-        // ignore
-      }
-    };
-  }, [refreshSubscription, router, showToast]);
+  }, [refreshSubscription]);
 
   return (
     <SubscriptionContext.Provider
@@ -162,11 +100,11 @@ export const withSubscription = <P extends object>(
     useEffect(() => {
       if (!isLoading && !subscription) {
         const target: Href =
-          (options.redirectTo as Href) ??
-          ("/(tabs)/subscribe" as unknown as Href);
-        router.push(target);
+          options.redirectTo ?? ("/(tabs)/subscribe" as Href);
+
+        router.replace(target);
       }
-    }, [subscription, isLoading, router]);
+    }, [subscription, isLoading, router, options.redirectTo]);
 
     if (isLoading) {
       return (

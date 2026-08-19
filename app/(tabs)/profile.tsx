@@ -246,10 +246,16 @@ export default function ProfileScreen() {
   };
 
   const handleSave = () => {
+    const parsedAge = profile.age ? parseInt(profile.age.toString(), 10) : null;
+    if (parsedAge !== null && (isNaN(parsedAge) || parsedAge < 18)) {
+      showToast("You must be at least 18 years old to use Pairfect.", "error");
+      return;
+    }
+
     // Prepare data for API
     const profileData = {
       name: profile.name,
-      age: profile.age ? parseInt(profile.age.toString()) : null,
+      age: parsedAge,
       bio: profile.bio,
       interests: profile.interests,
       photos: profile.photos,
@@ -714,7 +720,7 @@ const styles = StyleSheet.create({
   profileHeaderContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    padding: 16,
+    padding: 0,
     marginBottom: 16,
   },
   profileHeader: {
@@ -723,12 +729,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   mainPhotoContainer: {
-    width: 96,
-    height: 96,
+    width: 80,
+    height: 80,
     backgroundColor: "#f0f0f0",
     borderRadius: 48,
     overflow: "hidden",
-    marginRight: 16,
+    marginRight: 6,  // Reduced from 16 to bring closer to profileInfo
     // Use shadow instead of visible border for a cleaner look
     shadowColor: "#000",
     shadowOffset: {
@@ -745,7 +751,7 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins_600SemiBold",
   },
   profileName: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 600,
     color: "#651B55",
     marginBottom: 8,
@@ -754,12 +760,12 @@ const styles = StyleSheet.create({
   },
   infoRow: {
     flexDirection: "row",
+    gap: 2,
     alignItems: "center",
-    marginBottom: 4,
     fontFamily: "Poppins_600SemiBold",
   },
   infoIcon: {
-    marginRight: 6,
+    marginRight: 0,  // Reduced from 6 to bring icon closer to text
     color: "#651B55",
   },
   infoText: {
@@ -777,33 +783,21 @@ const styles = StyleSheet.create({
   photoGallery: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "flex-start",
+    justifyContent: "center",
     marginBottom: 24,
-    paddingHorizontal: 10,
+    padding: 10,
     width: "100%",
     backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
+     },
   thumbnailContainer: {
-    width: 150,
-    height: 150,
+    width: 130,
+    height: 130,
     aspectRatio: 1,
     borderRadius: 16,
     overflow: "hidden",
     borderWidth: 0,
     marginBottom: 16,
     backgroundColor: "#fff",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
     marginHorizontal: "1%",
   },
   emptyThumbnail: {
@@ -946,7 +940,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 20,
+    paddingRight: 20,
+    paddingLeft: 20,
+    paddingTop: 20,
+    paddingBottom: 0,
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },
@@ -964,7 +961,7 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
     padding: 20,
-    paddingBottom: 80,
+    paddingBottom: 120, // Extra padding for tab bar (92px + buffer)
   },
   photoSection: {
     alignItems: "center",

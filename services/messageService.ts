@@ -1,4 +1,4 @@
-import { API_CONFIG } from "@/config/api";
+import { API_CONFIG, getApiUrl } from "@/config/api";
 import { api } from "@/services/api";
 import * as SecureStore from "expo-secure-store";
 
@@ -84,11 +84,14 @@ export const saveLocalMessageCount = async (
  * storage if the request fails.
  */
 export const getMessageCount = async (): Promise<MessageCount> => {
-  console.log('=== getMessageCount START ===');
+  console.log('=== [DEBUG] getMessageCount START ===');
   try {
-    // Use the correct endpoint that exists in the backend
     const endpoint = API_CONFIG.ENDPOINTS.MESSAGES.COUNT;
-    console.log('Fetching message count from endpoint:', endpoint);
+    console.log(`[DEBUG] Target message count endpoint: "${endpoint}"`);
+    console.log(`[DEBUG] Full target URL: "${getApiUrl(endpoint)}"`);
+    
+    // Fetch count from server
+    console.log('[DEBUG] Executing api.get() for message count...');
     const response = await api.get<{
       success?: boolean;
       data?: {
@@ -105,11 +108,12 @@ export const getMessageCount = async (): Promise<MessageCount> => {
         remaining: number;
       };
     }>(endpoint);
-    console.log('getMessageCount API response:', response);
+    
+    console.log('[DEBUG] getMessageCount API raw response:', JSON.stringify(response, null, 2));
 
     if (response.error) {
-      console.error(`getMessageCount failed for ${endpoint}:`, response.error);
-      throw new Error(response.error.message || "Failed to get message count");
+      console.error(`[DEBUG] getMessageCount API call failed:`, response.error);
+      throw new Error(response.error.message || "Failed to get message count from server");
     }
 
     const data = response.data?.data || response.data || {
@@ -120,14 +124,14 @@ export const getMessageCount = async (): Promise<MessageCount> => {
       nextResetInHours: '24'
     };
 
-    console.log('API Response Data:', data);
+    console.log('[DEBUG] Resolved API response data payload:', JSON.stringify(data, null, 2));
     
     // Handle both response formats from backend
     const freeMessagesData = (data as any).freeMessages || {};
     const accessData = (data as any).data || data;
 
-    console.log('freeMessagesData:', freeMessagesData);
-    console.log('accessData:', accessData);
+    console.log('[DEBUG] freeMessagesData structure:', JSON.stringify(freeMessagesData, null, 2));
+    console.log('[DEBUG] accessData structure:', JSON.stringify(accessData, null, 2));
     
     const messageCount = {
       totalSent: 0, // Backend doesn't provide this, use default
@@ -136,18 +140,21 @@ export const getMessageCount = async (): Promise<MessageCount> => {
       hasPaidAccess: (accessData.planType || freeMessagesData.planType || 'free') !== 'free',
     };
 
-    console.log('Calculated messageCount:', messageCount);
+    console.log('[DEBUG] Final calculated messageCount object:', JSON.stringify(messageCount, null, 2));
+    console.log(`[DEBUG] Status summary - Paid Access: ${messageCount.hasPaidAccess}, Free Limit: ${messageCount.freeMessagesLimit}, Free Used: ${messageCount.freeMessagesUsed}, Remaining Free: ${messageCount.freeMessagesLimit - messageCount.freeMessagesUsed}`);
 
     // Save the correct data to local cache
     await saveLocalMessageCount(messageCount);
-    console.log('Message count saved to local cache');
+    console.log('[DEBUG] Message count successfully saved to local SecureStore cache');
     
-    console.log('=== getMessageCount END ===');
+    console.log('=== [DEBUG] getMessageCount END (Success) ===');
     return messageCount;
   } catch (error) {
-    console.error("Error getting message count — falling back to local:", error);
+    console.error("[DEBUG] Catch block triggered - Error getting message count from server:", error);
+    console.log('[DEBUG] Falling back to local cache storage values...');
     const localCount = await getLocalMessageCount();
-    console.log('Fallback to local count:', localCount);
+    console.log('[DEBUG] Fallback local count successfully loaded:', JSON.stringify(localCount, null, 2));
+    console.log('=== [DEBUG] getMessageCount END (Fallback) ===');
     return localCount;
   }
 };
@@ -268,10 +275,10 @@ export const sendMessageWithLimit = async (
         totalSent: currentCount.totalSent + 1,
         // Use server value if returned, otherwise increment locally.
         freeMessagesUsed:
-          data.freeMessagesUsed ?? currentCount.freeMessagesUsed + 1,
+          data.freeMessagesUsed !== undefined ? data.freeMessagesUsed : currentCount.freeMessagesUsed + 1,
         freeMessagesLimit:
-          data.freeMessagesLimit ?? currentCount.freeMessagesLimit,
-        hasPaidAccess: data.hasPaidAccess ?? currentCount.hasPaidAccess,
+          data.freeMessagesLimit !== undefined ? data.freeMessagesLimit : currentCount.freeMessagesLimit,
+        hasPaidAccess: data.hasPaidAccess !== undefined ? data.hasPaidAccess : currentCount.hasPaidAccess,
       };
       console.log('Updated count to be saved:', updatedCount);
       

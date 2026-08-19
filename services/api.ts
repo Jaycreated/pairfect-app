@@ -132,11 +132,18 @@ export const api = {
     return response;
   },
 
+  forgotPassword: (email: string) =>
+    fetchApi(API_CONFIG.ENDPOINTS.AUTH.FORGOT_PASSWORD, 'POST', { email }),
+
+  resetPassword: (token: string, newPassword: string) =>
+    fetchApi(API_CONFIG.ENDPOINTS.AUTH.RESET_PASSWORD, 'POST', { token, password: newPassword }),
+
   register: async (userData: {
     email: string;
     password: string;
     name: string;
     sexualOrientation: string;
+    age?: number;
   }) => {
     const response = await fetchApi(API_CONFIG.ENDPOINTS.AUTH.REGISTER, 'POST', userData);
     

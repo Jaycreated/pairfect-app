@@ -11,7 +11,7 @@ export const loginSchema = z.object({
 });
 
 export const signUpSchema = z
-  .object({
+    .object({
     name: z
       .string()
       .min(1, 'Name is required')
@@ -37,6 +37,11 @@ export const signUpSchema = z
       .min(1, 'Password is required')
       .min(6, 'Password must be at least 6 characters'),
     confirmPassword: z.string().min(1, 'Please confirm your password'),
+    age: z
+      .number({ message: 'Age must be a number' })
+      .int('Age must be an integer')
+      .min(18, 'You must be at least 18 years old')
+      .max(120, 'Please enter a valid age'),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",

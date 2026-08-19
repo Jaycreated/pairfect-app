@@ -131,7 +131,7 @@ export function NotificationTestButton() {
           💡 This test will:
         </Text>
         <Text className="text-xs text-blue-600 mt-1">
-          • Check if you're logged in
+          {"• Check if you're logged in"}
         </Text>
         <Text className="text-xs text-blue-600">
           • Get your Expo push token

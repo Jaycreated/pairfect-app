@@ -8,23 +8,24 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useIAP } from "@/hooks/useIAP";
 import { Storage } from "@/utils/storage";
 import {
-    Poppins_400Regular,
-    Poppins_500Medium,
-    Poppins_600SemiBold,
-    Poppins_700Bold,
-    useFonts,
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+  useFonts,
 } from "@expo-google-fonts/poppins";
+import * as SplashScreen from "expo-splash-screen";
 import {
-    DarkTheme,
-    DefaultTheme,
-    ThemeProvider,
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider,
 } from "@react-navigation/native";
 import { QueryClientProvider } from "@tanstack/react-query";
 import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, Image, Text, View } from "react-native";
 import "react-native-reanimated";
 import { queryClient } from "../lib/queryClient";
 import "./global.css";
@@ -51,19 +52,23 @@ function FontLoader({ children }: { children: React.ReactNode }) {
     Poppins_700Bold,
   });
 
+  // Prevent the native splash screen from auto-hiding until fonts are loaded
+  // This avoids a flash where the native splash disappears before JS is ready
+  useEffect(() => {
+    SplashScreen.preventAutoHideAsync().catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (fontsLoaded) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [fontsLoaded]);
+
   if (!fontsLoaded) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-          backgroundColor: "#000",
-        }}
-      >
-        <ActivityIndicator size="large" color="#651B55" />
-      </View>
-    );
+    // Render nothing while fonts are loading so the native splash remains the
+    // only visible launch screen. `preventAutoHideAsync` keeps the native
+    // splash visible until `hideAsync` is called when fontsLoaded becomes true.
+    return null;
   }
 
   return <>{children}</>;
@@ -190,6 +195,16 @@ function AuthLayout() {
     isCheckingOnboarding,
   ]);
 
+  // Hide the native splash when navigation/auth are ready. FontLoader
+  // already prevented the splash from auto-hiding until fonts are loaded,
+  // and because `AuthLayout` is rendered only after fonts load, this ensures
+  // the native splash stays visible until the app is truly ready to show UI.
+  useEffect(() => {
+    if (!isProfileLoading && isNavigationReady && !isCheckingOnboarding) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [isProfileLoading, isNavigationReady, isCheckingOnboarding]);
+
   if (isProfileLoading || !isNavigationReady) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
@@ -203,6 +218,10 @@ function AuthLayout() {
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="modal" options={{ presentation: "modal" }} />
+      <Stack.Screen
+        name="reportReasonPicker"
+        options={{ presentation: "modal", headerShown: false }}
+      />
     </Stack>
   );
 }

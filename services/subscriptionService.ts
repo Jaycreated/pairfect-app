@@ -1,8 +1,7 @@
 import { getApiUrl } from "@/config/api";
 import { SubscriptionPlan, UserSubscription } from "@/types/subscription";
-import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
-import { Linking, Platform } from "react-native";
+import { Platform } from "react-native";
 
 export type OrderResponse = {
   id: string;
@@ -145,116 +144,6 @@ export const getActiveSubscription =
     }
   };
 
-// Generate a unique idempotency key
-const generateIdempotencyKey = (): string => {
-  return Crypto.randomUUID();
-};
-
-export interface CreateOrderResponse {
-  orderId: string;
-  amount: number;
-  currency: string;
-}
-
-export const createOrder = async (
-  planId: string,
-): Promise<CreateOrderResponse> => {
-  try {
-    const idempotencyKey = generateIdempotencyKey();
-    const headers = await createHeaders({
-      "Idempotency-Key": idempotencyKey,
-    });
-
-    const response = await fetch(getApiUrl("/subscriptions/orders"), {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ planId }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error("Order creation failed:", {
-        status: response.status,
-        error: errorData,
-      });
-      throw new Error(errorData.message || "Failed to create order");
-    }
-
-    return response.json();
-  } catch (error) {
-    console.error("Error creating order:", error);
-    throw error;
-  }
-};
-
-export const initiatePayment = async (
-  orderId: string,
-  planId: string,
-): Promise<{
-  paymentId: string;
-  authorizationUrl: string;
-  reference: string;
-}> => {
-  try {
-    const idempotencyKey = generateIdempotencyKey();
-    const headers = await createHeaders({
-      "Idempotency-Key": idempotencyKey,
-    });
-
-    // For web, use the payment-callback route
-    // For mobile, use a deep link that will open the app
-    let callbackUrl: string;
-
-    if (Platform.OS === "web") {
-      // For web, redirect to a dedicated payment callback page
-      callbackUrl = `${window.location.origin}/payment-callback`;
-    } else {
-      // For mobile, use a deep link that will open the app
-      // Include the order ID and plan ID in the callback URL for verification
-      callbackUrl = `pairfect://payment-callback?orderId=${orderId}&planId=${planId}`;
-
-      // Also handle the case where the app is opened via the callback URL
-      const handleDeepLink = (event: { url: string }) => {
-        // Handle the deep link here if needed
-        console.log("Received deep link:", event.url);
-      };
-
-      // Add the event listener
-      Linking.addEventListener("url", handleDeepLink);
-
-      // Clean up the event listener when done
-      setTimeout(() => {
-        Linking.removeAllListeners("url");
-      }, 10000); // Clean up after 10 seconds
-    }
-
-    const response = await fetch(getApiUrl("/subscriptions/initiate-payment"), {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        orderId,
-        planId,
-        callbackUrl,
-        platform: Platform.OS,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error("Payment initiation failed:", {
-        status: response.status,
-        error: errorData,
-      });
-      throw new Error(errorData.message || "Failed to initiate payment");
-    }
-
-    return response.json();
-  } catch (error) {
-    console.error("Error initiating payment:", error);
-    throw error;
-  }
-};
-
 // Verify iOS/Android in-app purchase receipt with backend
 export const verifyIapReceipt = async (
   receiptData: string,
@@ -279,29 +168,86 @@ export const verifyIapReceipt = async (
       // If not JSON, treat as raw receipt string
     }
 
-    const response = await fetch(getApiUrl("api/payments/verify-iap"), {
+    const isDaily = (productId || "").includes("daily");
+    const planIdNumeric = isDaily ? 1 : 2;
+    const planTypeName = isDaily ? "daily" : "monthly";
+
+    const transactionId =
+      typeof receiptPayload === "object"
+        ? (receiptPayload.transactionId || receiptPayload.receipt || receiptPayload.id)
+        : receiptPayload;
+
+    const requestBody = {
+      receipt: receiptPayload,
+      receiptData: typeof receiptData === "string" ? receiptData : JSON.stringify(receiptData),
+      transactionId,
+      productId,
+      plan: planIdNumeric,
+      plan_id: planIdNumeric,
+      planId: planIdNumeric,
+      subscription_plan_id: planIdNumeric,
+      subscriptionPlanId: planIdNumeric,
+      plan_type: planTypeName,
+      planType: planTypeName,
+      platform: Platform.OS,
+      isIOS: Platform.OS === "ios",
+      isAndroid: Platform.OS === "android",
+    };
+    const verifyUrl = getApiUrl("payments/verify-iap");
+
+    console.log("[VerifyIAP] sending receipt payload to backend:", {
+      url: verifyUrl,
+      productId,
+      platform: Platform.OS,
+      receiptLength: typeof receiptData === "string" ? receiptData.length : JSON.stringify(receiptData).length,
+      payload: requestBody,
+    });
+
+    console.log("[VerifyIAP] about to fetch backend verification endpoint", {
+      url: verifyUrl,
+      method: "POST",
+      productId,
+      platform: Platform.OS,
+    });
+
+    const response = await fetch(verifyUrl, {
       method: "POST",
       headers,
-      body: JSON.stringify({
-        receipt: receiptPayload,
-        productId,
-        platform: Platform.OS,
-      }),
+      body: JSON.stringify(requestBody),
+    });
+
+    console.log("[VerifyIAP] fetch returned from backend", {
+      status: response.status,
+      ok: response.ok,
+      url: verifyUrl,
+    });
+
+    const responseText = await response.text();
+    let parsedResponse: any = {};
+    try {
+      parsedResponse = responseText ? JSON.parse(responseText) : {};
+    } catch (parseErr) {
+      console.error("[VerifyIAP] failed to parse backend response:", parseErr, responseText);
+      parsedResponse = { message: responseText };
+    }
+
+    console.log("[VerifyIAP] backend response:", {
+      status: response.status,
+      ok: response.ok,
+      body: parsedResponse,
     });
 
     if (!response.ok) {
-      const error = await response.json();
       return {
         success: false,
-        message: error.message || "Failed to verify receipt",
+        message: parsedResponse.message || "Failed to verify receipt",
       };
     }
 
-    const data = await response.json();
     return {
       success: true,
-      subscription: data.subscription,
-      message: data.message,
+      subscription: parsedResponse.subscription,
+      message: parsedResponse.message,
     };
   } catch (error) {
     console.error("Error verifying receipt:", error);
@@ -310,71 +256,6 @@ export const verifyIapReceipt = async (
       message:
         error instanceof Error ? error.message : "An unknown error occurred",
     };
-  }
-};
-
-// Payment recovery utilities
-export const storePaymentAttempt = async (paymentData: {
-  paymentId: string;
-  orderId: string;
-  reference: string;
-  planId: string;
-}): Promise<void> => {
-  try {
-    // Get existing payments
-    const existingPayments = await getPendingPayments();
-
-    // Add new payment
-    const updatedPayments = [
-      ...existingPayments.filter((p) => p.paymentId !== paymentData.paymentId),
-      {
-        ...paymentData,
-        timestamp: new Date().toISOString(),
-      },
-    ];
-
-    // Store all payments under a single key
-    return SecureStore.setItemAsync(
-      "pending_payments",
-      JSON.stringify(updatedPayments),
-    );
-  } catch (error) {
-    console.error("Error storing payment attempt:", error);
-    throw error;
-  }
-};
-
-export const getPendingPayments = async (): Promise<
-  Array<{
-    paymentId: string;
-    orderId: string;
-    reference: string;
-    planId: string;
-    timestamp: string;
-  }>
-> => {
-  try {
-    const paymentsData = await SecureStore.getItemAsync("pending_payments");
-    return paymentsData ? JSON.parse(paymentsData) : [];
-  } catch (error) {
-    console.error("Error getting pending payments:", error);
-    return [];
-  }
-};
-
-export const clearPaymentAttempt = async (paymentId: string): Promise<void> => {
-  try {
-    const payments = await getPendingPayments();
-    const updatedPayments = payments.filter(
-      (payment) => payment.paymentId !== paymentId,
-    );
-    return SecureStore.setItemAsync(
-      "pending_payments",
-      JSON.stringify(updatedPayments),
-    );
-  } catch (error) {
-    console.error("Error clearing payment attempt:", error);
-    throw error;
   }
 };
 
@@ -401,115 +282,6 @@ export const hasActiveSubscription = async (): Promise<boolean> => {
     });
     return false;
   }
-};
-
-// Clean up expired payment attempts (older than 24 hours)
-export const cleanupExpiredPayments = async (): Promise<void> => {
-  try {
-    const pendingPayments = await getPendingPayments();
-    const now = Date.now();
-    const twentyFourHoursAgo = now - 24 * 60 * 60 * 1000;
-
-    for (const payment of pendingPayments) {
-      const paymentTime = new Date(payment.timestamp).getTime();
-      if (paymentTime < twentyFourHoursAgo) {
-        await clearPaymentAttempt(payment.paymentId);
-      }
-    }
-  } catch (error) {
-    console.error("Error cleaning up expired payments:", error);
-  }
-};
-
-/**
- * Create a new payment order
- */
-export const createPaymentOrder = async (
-  amount: number,
-): Promise<OrderResponse> => {
-  const headers = await createHeaders();
-  const idempotencyKey = generateIdempotencyKey();
-
-  const response = await fetch(getApiUrl("/api/subscriptions/orders"), {
-    method: "POST",
-    headers: {
-      ...headers,
-      "Idempotency-Key": idempotencyKey,
-    },
-    body: JSON.stringify({ amount, id: idempotencyKey }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || "Failed to create payment order");
-  }
-
-  const data = await response.json();
-  return data.data;
-};
-
-/**
- * Initialize payment with payment provider
- */
-export const initializeChatPayment = async (
-  orderId: string,
-  planType: string,
-  callbackUrl?: string,
-): Promise<InitializePaymentResponse> => {
-  const headers = await createHeaders();
-  const payload: any = { orderId, planType };
-
-  if (callbackUrl) {
-    payload.callbackUrl = callbackUrl;
-  }
-
-  const response = await fetch(getApiUrl("/api/payments/chat/initialize"), {
-    method: "POST",
-    headers,
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || "Failed to initialize payment");
-  }
-
-  const data = await response.json();
-  return data.data;
-};
-
-/**
- * Verify payment status
- */
-export const verifyChatPayment = async (
-  reference: string,
-  token?: string,
-): Promise<VerifyPaymentResponse> => {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  // Add auth header if token is provided
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  } else {
-    const authToken = await getAuthToken();
-    if (authToken) {
-      headers["Authorization"] = `Bearer ${authToken}`;
-    }
-  }
-
-  const response = await fetch(getApiUrl("/api/payments/chat/verify"), {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ reference }),
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to verify payment");
-  }
-
-  return await response.json();
 };
 
 /**
@@ -560,12 +332,13 @@ export const checkChatAccess = async (): Promise<AccessStatusResponse> => {
     
     // Parse the nested data structure correctly
     const accessData = data.data || data;
+    const freeMessages = accessData.freeMessages || {};
     
     return {
       hasAccess: accessData.hasAccess || false,
       planType: accessData.planType || 'free',
-      freeMessagesLimit: accessData.freeMessagesLimit || 3,
-      freeMessagesRemaining: accessData.freeMessagesRemaining || 0,
+      freeMessagesLimit: freeMessages.limit || accessData.freeMessagesLimit || 3,
+      freeMessagesRemaining: freeMessages.remaining !== undefined ? freeMessages.remaining : (accessData.freeMessagesRemaining !== undefined ? accessData.freeMessagesRemaining : 0),
       expiryDate: accessData.expiryDate || null
     };
   } catch (error) {
@@ -575,45 +348,3 @@ export const checkChatAccess = async (): Promise<AccessStatusResponse> => {
   }
 };
 
-/**
- * Get subscription plans from the server
- */
-export const fetchSubscriptionPlans = async (): Promise<SubscriptionPlan[]> => {
-  const response = await fetch(getApiUrl("/api/payments/subscription/plans"));
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch subscription plans");
-  }
-
-  const data = await response.json();
-  return data.data || [];
-};
-
-/**
- * Verify in-app purchase receipt
- */
-export const verifyInAppPurchase = async (
-  provider: "apple" | "google",
-  receipt: string,
-  productId?: string,
-): Promise<{ reference: string }> => {
-  const headers = await createHeaders();
-
-  const response = await fetch(getApiUrl("/api/subscriptions/verify-iap"), {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      provider,
-      receipt,
-      ...(productId && { productId }),
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || "Failed to verify in-app purchase");
-  }
-
-  const data = await response.json();
-  return data.data;
-};

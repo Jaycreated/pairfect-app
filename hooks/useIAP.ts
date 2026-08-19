@@ -30,14 +30,8 @@ export const useIAP = () => {
         const products = await getAvailableProducts();
         console.log(`Successfully loaded ${products.length} products`);
 
-        // Cleanup on unmount
-        return async () => {
-          try {
-            await disconnectIAP();
-          } catch (error) {
-            console.warn("Error during IAP cleanup:", error);
-          }
-        };
+        // Keep IAP connection active for the app lifecycle
+        return undefined;
       } catch (error) {
         console.warn(
           "IAP not available - app will continue without in-app purchases:",
@@ -50,7 +44,7 @@ export const useIAP = () => {
 
     let cleanup: (() => Promise<void>) | undefined;
     initializeIAP().then((cleanupFn) => {
-      cleanup = cleanupFn;
+      cleanup = cleanupFn as any;
     });
 
     return () => {

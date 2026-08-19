@@ -4,14 +4,19 @@ import { useMessageCount } from "@/context/MessageCountContext";
 import { useSubscription } from "@/context/SubscriptionContext";
 import { useToast } from "@/context/ToastContext";
 import { api } from "@/services/api";
+import { blockUser, containsObjectionableContent } from "@/utils/safety";
+import { reportContent } from "@/services/reportService";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
+  Modal,
+  Pressable,
   Platform,
   SafeAreaView,
   StyleSheet,
@@ -23,14 +28,24 @@ import {
 
 // Simple chat screen with basic messaging functionality
 const ChatScreen = () => {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const {
+    id,
+    recipientName: routeRecipientName,
+    recipientId: routeRecipientId,
+  } = useLocalSearchParams<{
+    id?: string | string[];
+    recipientName?: string | string[];
+    recipientId?: string | string[];
+  }>();
   const { user } = useAuth();
-  const { subscription, refreshSubscription } = useSubscription();
-  const { canSend, remainingFreeMessages, sendMessage } = useMessageCount();
+  const { subscription } = useSubscription();
+  const { canSend, remainingFreeMessages, sendMessage, refreshMessageCount } = useMessageCount();
   const router = useRouter();
   const { showToast } = useToast();
   const navigation = useNavigation();
   const [requiresSubscription, setRequiresSubscription] = useState(false);
+  const [recipient, setRecipient] = useState<{ id: string; name: string } | null>(null);
+  const [safetyModalVisible, setSafetyModalVisible] = useState(false);
 
   const [messages, setMessages] = useState<
     Array<{
@@ -44,6 +59,275 @@ const ChatScreen = () => {
   const [newMessage, setNewMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const flatListRef = useRef<FlatList>(null);
+  const inputRef = useRef<TextInput>(null);
+  const conversationId = Array.isArray(id) ? id[0] : id;
+
+  useEffect(() => {
+    const resolvedRecipientName = Array.isArray(routeRecipientName)
+      ? routeRecipientName[0]
+      : routeRecipientName;
+    const resolvedRecipientId = Array.isArray(routeRecipientId)
+      ? routeRecipientId[0]
+      : routeRecipientId;
+
+    if (conversationId && (resolvedRecipientName || resolvedRecipientId)) {
+      const initialRecipient = {
+        id: resolvedRecipientId || String(conversationId),
+        name: resolvedRecipientName || "Chat Participant",
+      };
+      setRecipient(initialRecipient);
+      console.log("🧭 [ChatScreen] Initial recipient from route params:", initialRecipient);
+    }
+  }, [conversationId, routeRecipientId, routeRecipientName]);
+
+  // Fetch fresh message count and log it when entering the chat screen
+  useEffect(() => {
+    const fetchCount = async () => {
+      if (!conversationId) return;
+      console.log(`💬 [ChatScreen] Entered chat screen for conversation ${conversationId} — fetching fresh message count from server...`);
+      try {
+        await refreshMessageCount();
+        console.log("💬 [ChatScreen] Refresh completed successfully");
+      } catch (error) {
+        console.error("💬 [ChatScreen] Error refreshing message count on screen entry:", error);
+      }
+    };
+    fetchCount();
+  }, [conversationId, refreshMessageCount]);
+
+  // Fetch conversation details
+  useEffect(() => {
+    const loadConversationDetails = async () => {
+      if (!conversationId) return;
+
+      const resolvedRecipientName = Array.isArray(routeRecipientName)
+        ? routeRecipientName[0]
+        : routeRecipientName;
+      const resolvedRecipientId = Array.isArray(routeRecipientId)
+        ? routeRecipientId[0]
+        : routeRecipientId;
+
+      try {
+        console.log("Fetching details for conversation:", conversationId);
+        const response = await api.getConversation(conversationId);
+        console.log('🔍 [ChatScreen] API response:', response);
+
+        const payload = response?.data?.conversation ?? response?.data ?? response;
+        const conv = payload?.conversation ?? payload;
+
+        let name = resolvedRecipientName || 'Chat Participant';
+        let recipId = resolvedRecipientId || String(conversationId);
+
+        const directUser =
+          conv?.user ??
+          conv?.other_user ??
+          conv?.chat_partner ??
+          conv?.otherUser ??
+          conv?.otherUserInfo ??
+          conv?.participant ??
+          conv?.recipient ??
+          conv?.profile;
+
+        if (directUser?.name || directUser?.full_name || directUser?.fullName) {
+          name = directUser.name || directUser.full_name || directUser.fullName || name;
+          recipId = String(directUser.id ?? directUser.user_id ?? directUser.userId ?? resolvedRecipientId ?? conversationId);
+        } else if (Array.isArray(conv?.participants) && conv.participants.length) {
+          const otherPart = conv.participants.find((p: any) => {
+            const pid = p?.id ?? p?.user?.id ?? p?.user_id ?? p?.userId;
+            return pid && String(pid) !== String(user?.id);
+          });
+          if (otherPart) {
+            name = otherPart.name ?? otherPart.user?.name ?? otherPart.full_name ?? otherPart.fullName ?? name;
+            recipId = String(otherPart.id ?? otherPart.user?.id ?? otherPart.user_id ?? otherPart.userId ?? resolvedRecipientId ?? conversationId);
+          }
+        } else if (conv?.name) {
+          name = conv.name;
+        } else if (Array.isArray(payload?.messages) && payload.messages.length) {
+          const firstMsg = payload.messages[0];
+          const otherId = firstMsg.sender_id !== Number(user?.id) ? firstMsg.sender_id : firstMsg.receiver_id;
+          recipId = String(otherId || recipId);
+          name = resolvedRecipientName || `User ${otherId}`;
+        }
+
+        setRecipient({ id: recipId, name });
+        console.log('🔧 [ChatScreen] Recipient set:', { id: recipId, name });
+      } catch (e) {
+        console.error("Failed to load conversation details:", e);
+        setRecipient({
+          id: String(conversationId),
+          name: resolvedRecipientName || 'Chat Participant'
+        });
+      }
+    };
+    loadConversationDetails();
+  }, [conversationId, routeRecipientId, routeRecipientName, user?.id]);
+
+  const handleBlockUser = async () => {
+    if (!recipient) return;
+    try {
+      await blockUser(recipient.id, recipient.name);
+      try {
+        await api.post(`/users/${recipient.id}/block`, {});
+      } catch (e) {
+        console.log("Backend block notification failed:", e);
+      }
+      showToast(`Blocked ${recipient.name}`, "success");
+      setSafetyModalVisible(false);
+      router.push('/messages');
+    } catch (error) {
+      console.error("Failed to block user:", error);
+      showToast("Error blocking user", "error");
+    }
+  };
+
+  const handleReportUser = async () => {
+    if (!recipient) return;
+    try {
+      // 1. Submit report to server
+      await reportContent({
+        reportedUserId: recipient.id,
+        contentType: 'profile',
+        reason: 'Objectionable user profile content reported'
+      });
+
+      // 2. Block user locally
+      await blockUser(recipient.id, recipient.name);
+      try {
+        await api.post(`/users/${recipient.id}/block`, {});
+      } catch (e) {
+        console.log("Backend block notification failed:", e);
+      }
+      showToast(`Reported and blocked ${recipient.name}`, "success");
+      setSafetyModalVisible(false);
+      router.push('/messages');
+    } catch (error) {
+      console.error("Failed to report user:", error);
+      showToast("Error reporting user", "error");
+    }
+  };
+
+  const handleMessageLongPress = (message: any) => {
+    const isCurrentUser = String(message.senderId) === String(user?.id);
+    if (isCurrentUser) return;
+
+    Alert.alert(
+      "Safety Options",
+      "Choose an action for this message:",
+      [
+        {
+          text: "Report Message",
+          style: "destructive",
+          onPress: () => {
+            confirmMessageReport(message);
+          }
+        },
+        {
+          text: "Cancel",
+          style: "cancel"
+        }
+      ]
+    );
+  };
+
+  const confirmMessageReport = (message: any) => {
+    Alert.alert(
+      "Report Message",
+      "Are you sure you want to report this message? This will instantly block the sender and remove the conversation from your feed.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Report & Block",
+          style: "destructive",
+          onPress: () => handleReportMessage(message)
+        }
+      ]
+    );
+  };
+
+  const handleReportMessage = async (message: any) => {
+    if (!recipient) return;
+    try {
+      // 1. Submit report to server
+      await reportContent({
+        reportedUserId: recipient.id,
+        contentType: 'message',
+        contentId: message.id,
+        content: message.text,
+        reason: 'Objectionable chat content reported by user'
+      });
+
+      // 2. Block user locally
+      await blockUser(recipient.id, recipient.name);
+      try {
+        await api.post(`/users/${recipient.id}/block`, {});
+      } catch (e) {
+        console.log("Backend block notification failed (non-fatal):", e);
+      }
+
+      // 3. Clear feed and redirect
+      showToast(`Message reported. ${recipient.name} has been blocked.`, "success");
+      setMessages([]);
+      router.replace('/(tabs)/messages');
+    } catch (error) {
+      console.error("Failed to report message:", error);
+      showToast("Error reporting message", "error");
+    }
+  };
+
+  const renderSafetyModal = () => {
+    if (!recipient) return null;
+    return (
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={safetyModalVisible}
+        onRequestClose={() => setSafetyModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.safetyModalContent}>
+            <PoppinsText style={styles.safetyModalTitle}>
+              Safety Options
+            </PoppinsText>
+            <PoppinsText style={styles.safetyModalSubTitle}>
+              What would you like to do with {recipient.name}?
+            </PoppinsText>
+
+            <TouchableOpacity
+              style={[styles.safetyOptionButton, styles.reportOptionButton]}
+              onPress={handleReportUser}
+            >
+              <Ionicons name="flag-outline" size={20} color="#E03131" style={{ marginRight: 8 }} />
+              <PoppinsText style={styles.reportOptionText}>
+                Report User
+              </PoppinsText>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.safetyOptionButton, styles.blockOptionButton]}
+              onPress={handleBlockUser}
+            >
+              <Ionicons name="ban-outline" size={20} color="#E03131" style={{ marginRight: 8 }} />
+              <PoppinsText style={styles.blockOptionText}>
+                Block User
+              </PoppinsText>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.safetyOptionButton, styles.cancelOptionButton]}
+              onPress={() => setSafetyModalVisible(false)}
+            >
+              <PoppinsText style={styles.cancelOptionText}>
+                Cancel
+              </PoppinsText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
 
   // Hide tab bar when entering this chat screen, show it when leaving
   useEffect(() => {
@@ -85,11 +369,11 @@ const ChatScreen = () => {
   // Load messages
   useEffect(() => {
     const loadMessages = async () => {
-      if (!id) return;
+      if (!conversationId) return;
 
       try {
         setIsLoading(true);
-        const response = await api.getMessages(id);
+        const response = await api.getMessages(conversationId);
 
         // Check for subscription required error
         if (response.error) {
@@ -146,12 +430,30 @@ const ChatScreen = () => {
     router.push("/screens/subscribe" as any);
   };
 
-  // Check if user can send messages
-  const canSendMessage = canSend && !requiresSubscription && user?.id && id;
+  // Allow typing regardless of access gating so the composer stays responsive.
+  // Sending is still blocked until the message limit check allows it.
+  const currentUserId = user?.id;
+  const canTypeMessage = Boolean(currentUserId);
+  const canSendMessage = canTypeMessage && (user?.has_chat_access || canSend) && !requiresSubscription && Boolean(conversationId);
+
+  const focusComposer = () => {
+    if (!canTypeMessage) return;
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
 
   // Handle sending a new message
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !canSendMessage) {
+    if (!newMessage.trim() || !canSendMessage || !conversationId || !currentUserId) {
+      return;
+    }
+
+    // Check for objectionable content locally
+    if (containsObjectionableContent(newMessage)) {
+      Alert.alert(
+        "Content Warning",
+        "Your message contains objectionable or abusive content which violates our zero-tolerance safety policy. Please remove any offensive language.",
+        [{ text: "OK" }]
+      );
       return;
     }
 
@@ -159,7 +461,7 @@ const ChatScreen = () => {
     const messageToSend = {
       id: tempId,
       text: newMessage,
-      senderId: String(user.id),
+      senderId: String(currentUserId),
       timestamp: new Date(),
     };
 
@@ -170,7 +472,7 @@ const ChatScreen = () => {
 
     try {
       // Use message service with free message limit checking
-      const result = await sendMessage(id, messageContent);
+      const result = await sendMessage(conversationId, messageContent);
 
       if (!result.success) {
         // Remove optimistic message
@@ -187,7 +489,7 @@ const ChatScreen = () => {
       }
 
       // Refresh messages to get actual message from server
-      const messagesResponse = await api.getMessages(id);
+      const messagesResponse = await api.getMessages(conversationId);
       if (messagesResponse?.data?.messages) {
         setMessages(
           messagesResponse.data.messages.map((msg: any) => ({
@@ -213,7 +515,10 @@ const ChatScreen = () => {
     const isCurrentUser = String(item.senderId) === String(user?.id);
 
     return (
-      <View
+      <TouchableOpacity
+        onLongPress={() => handleMessageLongPress(item)}
+        activeOpacity={0.8}
+        disabled={isCurrentUser}
         style={[
           styles.messageBubble,
           isCurrentUser ? styles.currentUserBubble : styles.otherUserBubble,
@@ -236,7 +541,7 @@ const ChatScreen = () => {
             })}
           </Text>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -302,7 +607,7 @@ const ChatScreen = () => {
               style={[styles.sendButton, styles.sendButtonDisabled]}
               disabled={true}
             >
-              <Text style={[styles.sendButtonText, styles.sendButtonTextDisabled]}>Send</Text>
+              <Ionicons name="send" size={18} color="#94a3b8" />
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -325,13 +630,21 @@ const ChatScreen = () => {
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
         style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
       >
         {/* Header with Back Button */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.push('/messages')}>
             <Ionicons name="arrow-back" size={24} color="#651B55" />
+          </TouchableOpacity>
+
+          <PoppinsText weight="bold" style={styles.headerTitle}>
+            {recipient?.name || 'Chat'}
+          </PoppinsText>
+
+          <TouchableOpacity onPress={() => setSafetyModalVisible(true)} style={styles.safetyHeaderButton} accessibilityLabel="Open chat options">
+            <Ionicons name="ellipsis-vertical" size={24} color="#651B55" />
           </TouchableOpacity>
         </View>
 
@@ -347,45 +660,54 @@ const ChatScreen = () => {
           }
           onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
           style={styles.messagesContainer}
         />
 
         {/* Message Input */}
         <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.messageInput}
-            value={newMessage}
-            onChangeText={setNewMessage}
-            placeholder={
-              canSendMessage
-                ? remainingFreeMessages > 0 && !subscription
-                  ? `Type a message... (${remainingFreeMessages} free left)`
-                  : "Type a message..."
-                : "Subscribe to send messages"
-            }
-            placeholderTextColor="#999"
-            multiline
-            editable={!!canSendMessage}
-          />
+          <Pressable style={styles.messageInputWrapper} onPress={focusComposer}>
+            <TextInput
+              ref={inputRef}
+              style={styles.messageInput}
+              value={newMessage}
+              onChangeText={setNewMessage}
+                placeholder={
+                canSendMessage
+                  ? (typeof remainingFreeMessages === 'number' && remainingFreeMessages > 0 && !subscription)
+                    ? `Type a message... (${remainingFreeMessages} free left)`
+                    : "Type a message..."
+                  : "Subscribe to send messages"
+              }
+              placeholderTextColor="#94a3b8"
+              multiline
+              editable={canTypeMessage}
+              returnKeyType="default"
+              blurOnSubmit={false}
+              textAlignVertical="center"
+              selectionColor="#651B55"
+              showSoftInputOnFocus
+              onFocus={() => flatListRef.current?.scrollToEnd({ animated: true })}
+            />
+          </Pressable>
           <TouchableOpacity
             style={[
               styles.sendButton,
               (!newMessage.trim() || !canSendMessage) &&
-                styles.sendButtonDisabled,
+              styles.sendButtonDisabled,
             ]}
             onPress={handleSendMessage}
             disabled={!newMessage.trim() || !canSendMessage}
           >
-            <Text style={[
-              styles.sendButtonText,
-              (!newMessage.trim() || !canSendMessage) &&
-                styles.sendButtonTextDisabled
-            ]}>
-              Send
-            </Text>
+            <Ionicons
+              name="send"
+              size={18}
+              color={!newMessage.trim() || !canSendMessage ? "#94a3b8" : "#fff"}
+            />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+      {renderSafetyModal()}
     </SafeAreaView>
   );
 };
@@ -395,12 +717,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
     position: "relative",
-     paddingBottom: Platform.OS === "ios" ? 40 : 40,
-     paddingTop: 0,
+    paddingBottom: Platform.OS === "ios" ? 40 : 40,
+    paddingTop: 0,
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'flex-start',
+    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -524,48 +846,127 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-  
-    borderTopWidth: 2,
     backgroundColor: "#fff",
-    paddingBottom: Platform.OS === "ios" ? 40 : 40,
-    borderRadius: 20,
-    marginHorizontal: 12,
-    marginBottom: 12,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
+    marginTop: 6,
+    gap: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 4,
   },
 
   safeArea: {
     flex: 1,
     backgroundColor: "#fff",
   },
+  messageInputWrapper: {
+    flex: 1,
+  },
   messageInput: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
-    borderRadius: 20,
-    paddingHorizontal: 16,
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 999,
+    paddingHorizontal: 14,
     paddingVertical: 10,
-    maxHeight: 100,
-    fontSize: 16,
-    color: "#333",
-    marginRight: 12,
+    minHeight: 44,
+    maxHeight: 120,
+    fontSize: 15,
+    color: "#0f172a",
   },
   sendButton: {
+    width: 44,
+    height: 44,
+    justifyContent: "center",
+    alignItems: "center",
     backgroundColor: "#651B55",
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    borderRadius: 999,
   },
   sendButtonDisabled: {
-    backgroundColor: "#e0e0e0",
+    backgroundColor: "#e2e8f0",
   },
-  sendButtonText: {
-    color: "#fff",
-    fontWeight: "600",
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+    flex: 1,
+    textAlign: 'center',
   },
-  sendButtonTextDisabled: {
-    color: "#999",
+  safetyHeaderButton: {
+    padding: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  safetyModalContent: {
+    backgroundColor: '#FFF',
+    borderRadius: 24,
+    padding: 24,
+    width: '90%',
+    maxWidth: 360,
+    alignItems: 'center',
+  },
+  safetyModalTitle: {
+    fontSize: 22,
+    color: '#651B55',
+    marginBottom: 8,
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+  safetyModalSubTitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 24,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  safetyOptionButton: {
+    flexDirection: 'row',
+    width: '100%',
+    padding: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+    borderWidth: 1,
+  },
+  reportOptionButton: {
+    backgroundColor: '#FFF5F5',
+    borderColor: '#FFE3E3',
+  },
+  reportOptionText: {
+    color: '#E03131',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  blockOptionButton: {
+    backgroundColor: '#FFF5F5',
+    borderColor: '#FFE3E3',
+  },
+  blockOptionText: {
+    color: '#E03131',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  cancelOptionButton: {
+    backgroundColor: '#F5F5F5',
+    borderColor: '#E5E7EB',
+    marginBottom: 0,
+  },
+  cancelOptionText: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

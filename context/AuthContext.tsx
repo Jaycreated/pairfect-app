@@ -1,6 +1,7 @@
 import { api } from '@/services/api';
 import { clearLocalMessageCount } from '@/services/messageService';
 import { SignInCredentials, SignUpData, User } from '@/types/auth';
+// import { clearSentryUser, setSentryUser } from '@/utils/sentry';
 import { Storage } from '@/utils/storage';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { useToast } from './ToastContext';
@@ -39,6 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsProfileLoading(true);
     try {
       const response = await api.getProfile();
+      console.log('[AuthContext] loadProfile response:', response);
       if (response.data?.user) {
         // Get the token from storage to include in user object
         const token = await Storage.getItem('auth_token');
@@ -46,6 +48,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ...response.data.user,
           token: token || ''
         };
+        console.log('[AuthContext] loaded user profile with access flag:', {
+          id: userWithToken.id,
+          has_chat_access: userWithToken.has_chat_access,
+          payment_reference: userWithToken.payment_reference,
+        });
         setUser(userWithToken);
         setProfile(userWithToken);
       }
@@ -152,6 +159,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(userWithToken);
       setProfile(userWithToken);
       
+      // Sentry user tracking disabled
+      // setSentryUser(String(userData.id), userData.email, userData.name);
+      
       // Show success toast
       showToast('Login successful!', 'success');
 
@@ -225,6 +235,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Clear all auth state
       await Storage.deleteItem('auth_token');
       await clearLocalMessageCount(); // Clear cached message count on logout
+      // clearSentryUser(); // Sentry disabled
       setUser(null);
       setProfile(null);
       setError(null);

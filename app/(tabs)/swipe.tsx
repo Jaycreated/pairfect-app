@@ -1,6 +1,8 @@
 import { PoppinsText } from '@/components/PoppinsText';
 import { useToast } from '@/context/ToastContext';
 import { api } from '@/services/api';
+import { getBlockedUsers, blockUser } from '@/utils/safety';
+import { reportContent } from '@/services/reportService';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -38,10 +40,16 @@ const SwipeScreen = () => {
   const [matchModalVisible, setMatchModalVisible] = useState(false);
   const [matchedUser, setMatchedUser] = useState<User | null>(null);
   const { showToast } = useToast();
+
+  // Safety options state
+  const [safetyModalVisible, setSafetyModalVisible] = useState(false);
+  const [selectedUserForSafety, setSelectedUserForSafety] = useState<User | null>(null);
   
-  // Use ref to track users array for immediate access in callbacks
+  // Use ref to track users array and processing state for immediate access in PanResponder closures
   const usersRef = useRef<User[]>([]);
   const currentIndexRef = useRef(0);
+  const isProcessingSwipeRef = useRef(false);
+  const swipeCardRef = useRef<any>(null);
   
   const position = useRef(new Animated.ValueXY()).current;
   const rotate = position.x.interpolate({
@@ -72,10 +80,12 @@ const fetchPotentialMatches = async () => {
     const matches = await api.getPotentialMatches();
     console.log('Received matches:', matches);
     
-    // Keep users as they come - don't filter out or modify images
-    const validUsers = matches;
+    // Filter out locally blocked users
+    const blockedList = await getBlockedUsers();
+    const blockedIds = new Set(blockedList.map(u => String(u.id)));
+    const validUsers = matches.filter(user => !blockedIds.has(String(user.id)));
     
-    console.log('Valid users after mapping:', validUsers.length);
+    console.log('Valid users after filtering blocked users:', validUsers.length);
     
     if (validUsers.length === 0) {
       setError('No profiles available at the moment. Please check back later.');
@@ -99,18 +109,18 @@ const fetchPotentialMatches = async () => {
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => !isProcessingSwipe,
+      onStartShouldSetPanResponder: () => !isProcessingSwipeRef.current,
       onPanResponderMove: (_, { dx, dy }) => {
-        if (!isProcessingSwipe) {
+        if (!isProcessingSwipeRef.current) {
           position.setValue({ x: dx, y: dy });
         }
       },
       onPanResponderRelease: (_, { dx, dy }) => {
-        if (isProcessingSwipe) return;
+        if (isProcessingSwipeRef.current) return;
         
         if (Math.abs(dx) > SWIPE_THRESHOLD) {
           const direction = dx > 0 ? 1 : -1;
-          swipeCard(direction);
+          swipeCardRef.current?.(direction);
         } else {
           Animated.spring(position, {
             toValue: { x: 0, y: 0 },
@@ -140,13 +150,14 @@ const fetchPotentialMatches = async () => {
     };
   };
 
+
   const swipeCard = useCallback(async (direction: number) => {
     // Use refs for immediate access to current state
     const currentUsers = usersRef.current;
     const currentIdx = currentIndexRef.current;
     
     // Add extra validation
-    if (isProcessingSwipe) {
+    if (isProcessingSwipeRef.current) {
       console.log('Swipe prevented - already processing');
       return;
     }
@@ -160,12 +171,13 @@ const fetchPotentialMatches = async () => {
     }
     
     setIsProcessingSwipe(true);
+    isProcessingSwipeRef.current = true;
     const currentUser = currentUsers[currentIdx];
     const isLike = direction > 0;
     const nextIndex = currentIdx + 1;
     const isLastCard = nextIndex >= currentUsers.length;
 
-    console.log('Starting swipe action:', {
+    console.log('Starting swipe action (Optimistic UI):', {
       action: isLike ? 'like' : 'pass',
       userId: currentUser.id,
       userName: currentUser.name,
@@ -175,94 +187,191 @@ const fetchPotentialMatches = async () => {
       isLastCard
     });
 
+    // 🚀 STEP 1: Animate the card off-screen IMMEDIATELY so the UI feels ultra-responsive
+    Animated.timing(position, {
+      toValue: { 
+        x: direction * (width + 100), 
+        y: direction * 100 
+      },
+      duration: SWIPE_OUT_DURATION,
+      useNativeDriver: false,
+    }).start(() => {
+      // Reset position immediately for next card in stack
+      position.setValue({ x: 0, y: 0 });
+      
+      if (isLastCard) {
+        console.log('Last card - fetching more matches');
+        setCurrentIndex(0);
+        currentIndexRef.current = 0;
+        setUsers([]);
+        usersRef.current = [];
+        setIsProcessingSwipe(false);
+        isProcessingSwipeRef.current = false;
+        // Fetch new matches
+        fetchPotentialMatches();
+      } else {
+        console.log('Moving to next card:', nextIndex);
+        setCurrentIndex(nextIndex);
+        currentIndexRef.current = nextIndex;
+        setIsProcessingSwipe(false);
+        isProcessingSwipeRef.current = false;
+      }
+    });
+
+    // 🌐 STEP 2: Fire the backend API call concurrently in the background
     try {
-      console.log(`Sending ${isLike ? 'like' : 'pass'} for user:`, currentUser.id);
+      console.log(`[API] Sending background ${isLike ? 'like' : 'pass'} for user:`, currentUser.id);
       
       const response: SwipeResponse = isLike 
         ? await api.likeUser(currentUser.id)
         : await api.passUser(currentUser.id);
       
-      console.log('API Response:', JSON.stringify(response, null, 2));
+      console.log('[API] Background swipe response:', JSON.stringify(response, null, 2));
       
       if (response.error) {
         const errorMessage = typeof response.error === 'string' 
           ? response.error 
           : response.error.message || 'Unknown error';
         
-        console.error(`Error ${isLike ? 'liking' : 'passing'} user:`, errorMessage);
-        showToast(`Failed to ${isLike ? 'like' : 'pass'} user: ${errorMessage}`, 'error', 3000);
-        setIsProcessingSwipe(false);
-        // Reset position on error
-        Animated.spring(position, {
-          toValue: { x: 0, y: 0 },
-          useNativeDriver: false,
-        }).start();
+        console.error(`[API] Error ${isLike ? 'liking' : 'passing'} user:`, errorMessage);
+        showToast(`Action failed: ${errorMessage}`, 'error', 3000);
         return;
       }
       
-      console.log(`${isLike ? 'Liked' : 'Passed'}:`, currentUser.name, 'Match data:', response.data);
+      console.log(`[API] Background success - ${isLike ? 'Liked' : 'Passed'}:`, currentUser.name);
       
       // Check if it's a mutual match
-      // The API returns both 'matched': boolean and match object
       if (isLike && response.data) {
         const isMutualMatch = (response.data as any).matched === true;
-        
         if (isMutualMatch) {
-          console.log('Mutual match found with:', currentUser.name);
+          console.log('[API] Mutual match found with:', currentUser.name);
           setMatchedUser(currentUser);
           setMatchModalVisible(true);
-        } else {
-          console.log('Like registered, but no mutual match yet with:', currentUser.name);
         }
       }
-      
-      // Animate card off screen
-      Animated.timing(position, {
-        toValue: { 
-          x: direction * (width + 100), 
-          y: direction * 100 
-        },
-        duration: SWIPE_OUT_DURATION,
-        useNativeDriver: false,
-      }).start(() => {
-        // Reset position immediately for next card
-        position.setValue({ x: 0, y: 0 });
-        
-        if (isLastCard) {
-          console.log('Last card - fetching more matches');
-          // Reset to show loading state
-          setCurrentIndex(0);
-          currentIndexRef.current = 0;
-          setUsers([]);
-          usersRef.current = [];
-          setIsProcessingSwipe(false);
-          // Fetch new matches
-          fetchPotentialMatches();
-        } else {
-          console.log('Moving to next card:', nextIndex);
-          setCurrentIndex(nextIndex);
-          currentIndexRef.current = nextIndex;
-          setIsProcessingSwipe(false);
-        }
-      });
-      
     } catch (err) {
-      console.error('Error processing swipe:', err);
-      showToast('An error occurred while processing your action. Please try again.', 'error', 3000);
-      setIsProcessingSwipe(false);
-      // Reset position on error
-      Animated.spring(position, {
-        toValue: { x: 0, y: 0 },
-        useNativeDriver: false,
-      }).start();
+      console.error('[API] Unexpected background error processing swipe:', err);
+      showToast('Connection error. Swiped state may not have synced.', 'error', 3000);
     }
-  }, [isProcessingSwipe, showToast, position]);
+  }, [showToast, position]);
+
+  // Sync the swipeCard callback ref (declared after swipeCard to satisfy block-scope hoisting)
+  useEffect(() => {
+    swipeCardRef.current = swipeCard;
+  }, [swipeCard]);
 
   const handleCardPress = useCallback((userId: string) => {
     if (!isProcessingSwipe) {
       router.push(`/user/${userId}`);
     }
   }, [router, isProcessingSwipe]);
+
+  const handleOpenSafetyModal = (user: User) => {
+    setSelectedUserForSafety(user);
+    setSafetyModalVisible(true);
+  };
+
+  const handleBlockUser = async () => {
+    if (!selectedUserForSafety) return;
+    const userId = selectedUserForSafety.id;
+    const name = selectedUserForSafety.name;
+    
+    try {
+      await blockUser(userId, name);
+      try {
+        await api.post(`/users/${userId}/block`, {});
+      } catch (e) {
+        console.log("Backend block notification failed (non-fatal):", e);
+      }
+      setSafetyModalVisible(false);
+      showToast(`Blocked ${name}`, "success");
+      swipeCard(-1);
+    } catch (error) {
+      console.error("Failed to block user:", error);
+      showToast("Error blocking user", "error");
+    }
+  };
+
+  const handleReportUser = async () => {
+    if (!selectedUserForSafety) return;
+    const userId = selectedUserForSafety.id;
+    const name = selectedUserForSafety.name;
+    
+    try {
+      // 1. Submit report to server
+      await reportContent({
+        reportedUserId: userId,
+        contentType: 'profile',
+        reason: 'Objectionable profile content reported by user'
+      });
+
+      // 2. Block user locally
+      await blockUser(userId, name);
+      try {
+        await api.post(`/users/${userId}/block`, {});
+      } catch (e) {
+        console.log("Backend block notification failed (non-fatal):", e);
+      }
+      setSafetyModalVisible(false);
+      showToast(`Reported and blocked ${name}`, "success");
+      swipeCard(-1);
+    } catch (error) {
+      console.error("Failed to report user:", error);
+      showToast("Error reporting user", "error");
+    }
+  };
+
+  const renderSafetyModal = () => {
+    if (!selectedUserForSafety) return null;
+    return (
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={safetyModalVisible}
+        onRequestClose={() => setSafetyModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.safetyModalContent}>
+            <PoppinsText weight="bold" style={styles.safetyModalTitle}>
+              Safety Options
+            </PoppinsText>
+            <PoppinsText style={styles.safetyModalSubTitle}>
+              What would you like to do with {selectedUserForSafety.name}?
+            </PoppinsText>
+            
+            <TouchableOpacity 
+              style={[styles.safetyOptionButton, styles.reportOptionButton]}
+              onPress={handleReportUser}
+            >
+              <Ionicons name="flag-outline" size={20} color="#E03131" style={{ marginRight: 8 }} />
+              <PoppinsText weight="bold" style={styles.reportOptionText}>
+                Report User
+              </PoppinsText>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.safetyOptionButton, styles.blockOptionButton]}
+              onPress={handleBlockUser}
+            >
+              <Ionicons name="ban-outline" size={20} color="#E03131" style={{ marginRight: 8 }} />
+              <PoppinsText weight="bold" style={styles.blockOptionText}>
+                Block User
+              </PoppinsText>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.safetyOptionButton, styles.cancelOptionButton]}
+              onPress={() => setSafetyModalVisible(false)}
+            >
+              <PoppinsText weight="bold" style={styles.cancelOptionText}>
+                Cancel
+              </PoppinsText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
 
   const renderCard = (user: User) => {
     if (!user) return null;
@@ -306,6 +415,17 @@ const fetchPotentialMatches = async () => {
               </View>
             )}
             <View style={styles.cardOverlay}>
+              <View style={styles.cardTopHeader}>
+                <View />
+                <TouchableOpacity
+                  style={styles.safetyCardButton}
+                  onPress={() => handleOpenSafetyModal(user)}
+                  accessibilityLabel="Safety options"
+                >
+                  <Ionicons name="shield-outline" size={24} color="#fff" />
+                </TouchableOpacity>
+              </View>
+
               <Animated.View 
                 style={[styles.likeBadgeContainer, { opacity: likeOpacity }]}
               >
@@ -340,6 +460,12 @@ const fetchPotentialMatches = async () => {
                 </View>
               )}
             </View>
+            {/* <View style={styles.compatibilityRow}>
+              <Ionicons name="sparkles-outline" size={16} color="#651B55" />
+              <PoppinsText style={styles.compatibilityText}>
+                Compatibility match for your values and interests
+              </PoppinsText>
+            </View> */}
             {user.interest && (
               <View>
                 <PoppinsText style={styles.interestText}>
@@ -419,7 +545,7 @@ const fetchPotentialMatches = async () => {
             {/* Match Text */}
             <View style={styles.matchContent}>
               <PoppinsText weight="bold" style={styles.matchTitle}>
-                It's a Match!
+                {"It's a Match!"}
               </PoppinsText>
               <PoppinsText style={styles.matchSubtitle}>
                 You and {matchedUser.name} have liked each other!
@@ -484,11 +610,13 @@ const fetchPotentialMatches = async () => {
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
         <View style={styles.headerTextContainer}>
-          <PoppinsText weight="bold" style={styles.headerTitle}>
-            <Text>Discover people around you</Text>
-          </PoppinsText>
+          <View style={styles.headerPill}>
+            <Ionicons name="sparkles-outline" size={14} color="#651B55" />
+            <PoppinsText style={styles.headerPillText}>Compatibility-led matching</PoppinsText>
+          </View>
+         
           <PoppinsText style={styles.subtitle}>
-            <Text>Keep swiping to meet your match</Text>
+            <Text>Explore people who align with your values and vibe.</Text>
           </PoppinsText>
         </View>
         <View style={{ width: 24 }} />
@@ -522,6 +650,7 @@ const fetchPotentialMatches = async () => {
       </ScrollView>
 
       {renderMatchModal()}
+      {renderSafetyModal()}
     </View>
   );
 };
@@ -559,6 +688,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     marginTop: 4,
+  },
+  headerPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F8E9F6',
+    borderColor: '#E8CBE6',
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginBottom: 8,
+  },
+  headerPillText: {
+    fontSize: 11,
+    color: '#651B55',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   subtitle: {
     fontSize: 14,
@@ -713,6 +861,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  compatibilityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+    marginBottom: 8,
+    backgroundColor: 'rgba(101, 27, 85, 0.9)',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  compatibilityText: {
+    color: '#FFF',
+    fontSize: 12,
+    flexShrink: 1,
+  },
   interestText: {
     color: '#651B55',
     fontSize: 12,
@@ -848,6 +1013,78 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F0F0F0',
+  },
+  cardTopHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    paddingHorizontal: 4,
+    paddingTop: 4,
+  },
+  safetyCardButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  safetyModalContent: {
+    backgroundColor: '#FFF',
+    borderRadius: 24,
+    padding: 24,
+    width: '90%',
+    maxWidth: 360,
+    alignItems: 'center',
+  },
+  safetyModalTitle: {
+    fontSize: 22,
+    color: '#651B55',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  safetyModalSubTitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 24,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  safetyOptionButton: {
+    flexDirection: 'row',
+    width: '100%',
+    padding: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+    borderWidth: 1,
+  },
+  reportOptionButton: {
+    backgroundColor: '#FFF5F5',
+    borderColor: '#FFE3E3',
+  },
+  reportOptionText: {
+    color: '#E03131',
+    fontSize: 16,
+  },
+  blockOptionButton: {
+    backgroundColor: '#FFF5F5',
+    borderColor: '#FFE3E3',
+  },
+  blockOptionText: {
+    color: '#E03131',
+    fontSize: 16,
+  },
+  cancelOptionButton: {
+    backgroundColor: '#F5F5F5',
+    borderColor: '#E5E7EB',
+    marginBottom: 0,
+  },
+  cancelOptionText: {
+    color: '#333',
+    fontSize: 16,
   },
 });
 

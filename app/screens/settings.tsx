@@ -231,6 +231,21 @@ const SettingsScreen = () => {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Safety & Privacy</Text>
+          
+          <TouchableOpacity 
+            style={styles.settingItem} 
+            onPress={() => router.push('/screens/blocked-users')}
+          >
+            <View style={styles.settingLeft}>
+              <Ionicons name="shield-outline" size={24} color="#333" />
+              <Text style={styles.settingText}>Blocked Users</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#999" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Support</Text>
           
           <TouchableOpacity 

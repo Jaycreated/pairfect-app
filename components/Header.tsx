@@ -1,5 +1,6 @@
+import { useNotificationCount } from '@/context/NotificationCountContext';
 import { Ionicons } from '@expo/vector-icons';
-import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type HeaderProps = {
   showNotification?: boolean;
@@ -7,6 +8,8 @@ type HeaderProps = {
 };
 
 export const Header = ({ showNotification = true, onNotificationPress }: HeaderProps) => {
+  const { unreadCount } = useNotificationCount();
+
   return (
     <View style={styles.container}>
       <Image
@@ -22,6 +25,13 @@ export const Header = ({ showNotification = true, onNotificationPress }: HeaderP
         >
           <View style={styles.notificationIconInner}>
             <Ionicons name="notifications" size={24} color="#651B55" />
+            {unreadCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Text>
+              </View>
+            )}
           </View>
         </TouchableOpacity>
       )}
@@ -37,8 +47,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 40,
     paddingBottom: 0,
-    boxShadow: '0 2px 3.84px rgba(0, 0, 0, 0.25)',
-    elevation: 5,
+    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',  // Reduced shadow
+    elevation: 2,  // Reduced for Android
     backgroundColor: '#fff',
     height: 80,
   },
@@ -54,5 +64,23 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 3,
     elevation: 4,
+  },
+  badge: {
+    position: 'absolute',
+    right: -6,
+    top: -3,
+    backgroundColor: '#FF3B30',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  badgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
 });

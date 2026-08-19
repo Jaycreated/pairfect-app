@@ -13,7 +13,7 @@ interface LoginCredentials {
 
 interface RegisterData extends LoginCredentials {
   name: string;
-  // Add other registration fields as needed
+  sexualOrientation: string;
 }
 
 export const useAuth = () => {
@@ -57,7 +57,7 @@ export const useAuth = () => {
   const logoutMutation = useMutation({
     mutationFn: async () => {
       try {
-        await api.post(api.ENDPOINTS.AUTH.LOGOUT, {});
+        await api.logout();
       } catch (error) {
         console.warn('Logout API call failed, but continuing with local logout', error);
       }
@@ -102,22 +102,6 @@ export const useAuth = () => {
     },
   });
 
-  // Upload avatar mutation
-  const uploadAvatarMutation = useMutation({
-    mutationFn: async (imageUri: string) => {
-      const response = await api.uploadAvatar(imageUri);
-      
-      if (response.error) {
-        throw new Error(response.error.message);
-      }
-      
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [AUTH_QUERY_KEYS.PROFILE] });
-    },
-  });
-
   return {
     // Login
     login: loginMutation.mutateAsync,
@@ -142,10 +126,6 @@ export const useAuth = () => {
     // Update Profile
     updateProfile: updateProfileMutation.mutateAsync,
     isUpdatingProfile: updateProfileMutation.isPending,
-    
-    // Upload Avatar
-    uploadAvatar: uploadAvatarMutation.mutateAsync,
-    isUploadingAvatar: uploadAvatarMutation.isPending,
   };
 };
 

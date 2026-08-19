@@ -6,13 +6,13 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-    Dimensions,
-    FlatList,
-    Image,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Dimensions,
+  FlatList,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 const { width } = Dimensions.get("window");
@@ -49,19 +49,22 @@ export default function MatchesScreen() {
         }
 
         // Transform the API response to match our Match type
-        const formattedMatches: Match[] = response.data.matches.map(
-          (match: any) => ({
+        console.log("Raw API matches:", response.data.matches);
+        const formattedMatches: Match[] = response.data.matches
+          .filter((match: any) => match.age >= 18)
+          .map((match: any) => ({
             id: match.id,
             name: match.name,
             age: match.age,
             bio: match.bio,
             photos: match.photos,
+            location: match.location || "",
             matched_at: match.matched_at,
             lastMessage: "",
             unreadCount: 0,
             interest: match.interest || "",
-          }),
-        );
+          }));
+        console.log("Formatted matches:", formattedMatches);
 
         setMatches(formattedMatches);
       } catch (error) {
@@ -78,7 +81,7 @@ export default function MatchesScreen() {
   const renderMatchItem = ({ item }: { item: Match }) => (
     <TouchableOpacity
       style={styles.matchCard}
-      onPress={() => router.push(`/(tabs)/messages/${item.id}`)}
+      onPress={() => router.push(`/user/${item.id}` as any)}
     >
       <Image
         source={{
@@ -186,7 +189,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 16,
-    paddingBottom: 24,
+    paddingBottom: 120, // Extra padding for tab bar (92px + buffer)
   },
   columnWrapper: {
     justifyContent: "space-between",

@@ -8,12 +8,12 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator, Image,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator, Image,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 const ProfileSetup = () => {
@@ -61,8 +61,7 @@ const ProfileSetup = () => {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes,
-        allowsEditing: true,
-        aspect: [1, 1],
+        allowsEditing: false,
         quality: 0.8,
       });
 
@@ -122,6 +121,18 @@ const ProfileSetup = () => {
       return;
     }
 
+    if (step === 2) {
+      const parsedAge = parseInt(formData.age, 10);
+      if (isNaN(parsedAge) || parsedAge < 18) {
+        showToast('You must be at least 18 years old to use Pairfect.', 'error');
+        return;
+      }
+      if (parsedAge > 120) {
+        showToast('Please enter a valid age.', 'error');
+        return;
+      }
+    }
+
     // If not on the final step, just go to next step
     if (step < 4) {
       console.log('⏭️ [Profile Setup] Moving to next step:', step + 1);
@@ -137,6 +148,19 @@ const ProfileSetup = () => {
   const submitProfile = async () => {
     try {
       setIsLoading(true);
+
+      // Validate required fields
+      if (!formData.gender) {
+        showToast('Please select your gender', 'error');
+        setIsLoading(false);
+        return;
+      }
+
+      if (!formData.age || parseInt(formData.age, 10) < 18 || parseInt(formData.age, 10) > 120) {
+        showToast('Please enter a valid age between 18 and 120', 'error');
+        setIsLoading(false);
+        return;
+      }
 
       // Convert gender to lowercase to match backend expectations
       const genderMapping: Record<string, string> = {

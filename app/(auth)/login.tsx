@@ -156,7 +156,7 @@ const LoginScreen = () => {
 
             <View style={styles.signupContainer}>
               <PoppinsText style={styles.signupText}>
-                Don't have an account?{' '}
+                {"Don't have an account? "}
               </PoppinsText>
               <TouchableOpacity onPress={navigateToSignUp}>
                 <PoppinsText style={styles.signupLink}>Sign Up</PoppinsText>
