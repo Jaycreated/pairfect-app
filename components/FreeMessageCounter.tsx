@@ -23,7 +23,7 @@ export const FreeMessageCounter: React.FC<FreeMessageCounterProps> = ({ style })
   }
 
   // Don't show if no free messages remaining
-  if (remainingFreeMessages <= 0) {
+  if (remainingFreeMessages === undefined || remainingFreeMessages <= 0) {
     return null;
   }
 

@@ -24,7 +24,8 @@ type MessageCountContextType = {
   messageCount: MessageCount | null;
   isLoading: boolean;
   canSend: boolean;
-  remainingFreeMessages: number;
+  // undefined means "not applicable / paid user" so UI can hide the counter
+  remainingFreeMessages?: number;
   refreshMessageCount: () => Promise<void>;
   sendMessage: (
     recipientId: string,
@@ -216,8 +217,10 @@ export const MessageCountProvider: React.FC<{ children: ReactNode }> = ({
       messageCount.freeMessagesUsed < messageCount.freeMessagesLimit)
     );
 
+  // For paid users we return `undefined` so components know not to display
+  // a remaining-free counter. For free users we compute the remaining number.
   const remainingFreeMessages = user?.has_chat_access
-    ? 9999
+    ? undefined
     : (messageCount
         ? Math.max(
             0,
@@ -263,7 +266,7 @@ export const useMessageCount = (): MessageCountContextType => {
 
 type InjectedProps = {
   canSendMessage: boolean;
-  remainingFreeMessages: number;
+  remainingFreeMessages?: number;
   onSendMessage: (
     recipientId: string,
     content: string

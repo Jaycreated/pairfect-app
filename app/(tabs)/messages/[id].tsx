@@ -638,11 +638,13 @@ const ChatScreen = () => {
           <TouchableOpacity onPress={() => router.push('/messages')}>
             <Ionicons name="arrow-back" size={24} color="#651B55" />
           </TouchableOpacity>
+
           <PoppinsText weight="bold" style={styles.headerTitle}>
             {recipient?.name || 'Chat'}
           </PoppinsText>
-          <TouchableOpacity onPress={() => setSafetyModalVisible(true)} style={styles.safetyHeaderButton}>
-            <Ionicons name="shield-outline" size={24} color="#651B55" />
+
+          <TouchableOpacity onPress={() => setSafetyModalVisible(true)} style={styles.safetyHeaderButton} accessibilityLabel="Open chat options">
+            <Ionicons name="ellipsis-vertical" size={24} color="#651B55" />
           </TouchableOpacity>
         </View>
 
@@ -670,9 +672,9 @@ const ChatScreen = () => {
               style={styles.messageInput}
               value={newMessage}
               onChangeText={setNewMessage}
-              placeholder={
+                placeholder={
                 canSendMessage
-                  ? remainingFreeMessages > 0 && !subscription
+                  ? (typeof remainingFreeMessages === 'number' && remainingFreeMessages > 0 && !subscription)
                     ? `Type a message... (${remainingFreeMessages} free left)`
                     : "Type a message..."
                   : "Subscribe to send messages"
@@ -720,7 +722,7 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'flex-start',
+    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -893,6 +895,8 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     color: "#333",
+    flex: 1,
+    textAlign: 'center',
   },
   safetyHeaderButton: {
     padding: 4,

@@ -193,9 +193,22 @@ export const getAvailableProducts = async (): Promise<any[]> => {
   }
 };
 
-/**
- * Purchase a product (handles both one-time and subscription)
- */
+export const ensureIAPConnected = async (): Promise<boolean> => {
+  if (!iapAvailable || !RNIap) {
+    return false;
+  }
+
+  try {
+    console.log("[IAP-INFO] Ensuring IAP connection is active...");
+    await RNIap.initConnection();
+    setupPurchaseListener();
+    return true;
+  } catch (error) {
+    console.error("[IAP-ERROR] Failed to initialize IAP connection:", error);
+    return false;
+  }
+};
+
 export const purchaseItem = async (productId: string): Promise<any | null> => {
   if (!iapAvailable) {
     console.error("[IAP-ERROR] IAP not available - purchase cannot be completed");
@@ -203,140 +216,163 @@ export const purchaseItem = async (productId: string): Promise<any | null> => {
     throw new Error("In-app purchases are not available on this device");
   }
 
-  try {
-    console.log("[IAP-INFO] =========================================");
-    console.log("[IAP-INFO] Initiating purchase for product:", productId);
-    console.log("[IAP-INFO] Platform:", Platform.OS);
-    console.log("[IAP-INFO] Product ID from config:", productId);
-    console.log("[IAP-INFO] Expected product IDs:", PRODUCT_IDS.android);
+  // Ensure native StoreKit/Play Store connection and listeners are initialized
+  const connected = await ensureIAPConnected();
+  if (!connected) {
+    throw new Error("Unable to connect to App Store payment services. Please check your internet connection and try again.");
+  }
 
-    // Determine purchase type
-    const isMonthly = productId.includes('monthly');
-    const isSubscription = isMonthly; // Only monthly is subscription
+  return new Promise(async (resolve, reject) => {
+    pendingPurchaseResolver = resolve;
+    pendingPurchaseRejecter = reject;
 
-    let purchase;
+    // 5-minute timeout to accommodate slow StoreKit sandbox responses and Apple ID authentication
+    const timeoutId = setTimeout(() => {
+      if (pendingPurchaseRejecter) {
+        pendingPurchaseRejecter(new Error("Purchase verification timeout. Please try again."));
+        pendingPurchaseResolver = null;
+        pendingPurchaseRejecter = null;
+      }
+    }, 300000);
 
-    if (isSubscription) {
-      if (Platform.OS === "android") {
-        console.log("[IAP-INFO] Fetching fresh subscriptions for purchase...");
-        console.log("[IAP-INFO] Requesting subscriptions with SKU:", productId);
+    try {
+      console.log("[IAP-INFO] =========================================");
+      console.log("[IAP-INFO] Initiating purchase for product:", productId);
+      console.log("[IAP-INFO] Platform:", Platform.OS);
+      console.log("[IAP-INFO] Product ID from config:", productId);
+      console.log("[IAP-INFO] Expected product IDs:", PRODUCT_IDS.android);
+      console.log("[IAP-INFO] Before requestPurchase - listener state:", {
+        hasPurchaseListener: !!purchaseListener,
+        hasPurchaseErrorListener: !!purchaseErrorListener,
+      });
 
-        let subs: any[] = [];
-        try {
-          subs = await fetchProductsCompat([productId], "subs");
-          console.log("[IAP-INFO] Raw subscription response:", JSON.stringify(subs, null, 2));
+      // Determine purchase type
+      const isMonthly = productId.includes("monthly");
+      const isSubscription = isMonthly;
 
-          if (!subs || subs.length === 0) {
-            console.error("[IAP-ERROR] No subscriptions returned from Play Store");
-            throw new Error("Subscription not available. Please check your internet connection and try again.");
+      let purchaseResult: any = null;
+
+      if (isSubscription) {
+        if (Platform.OS === "android") {
+          console.log("[IAP-INFO] Fetching fresh subscriptions for purchase...");
+          console.log("[IAP-INFO] Requesting subscriptions with SKU:", productId);
+
+          let subs: any[] = [];
+          try {
+            subs = await fetchProductsCompat([productId], "subs");
+            console.log("[IAP-INFO] Raw subscription response:", JSON.stringify(subs, null, 2));
+
+            if (!subs || subs.length === 0) {
+              console.error("[IAP-ERROR] No subscriptions returned from Play Store");
+              throw new Error("Subscription not available. Please check your internet connection and try again.");
+            }
+          } catch (fetchError) {
+            console.error("[IAP-ERROR] Failed to fetch subscriptions:", fetchError);
+            throw new Error("Unable to fetch subscription details. Please try again.");
           }
-        } catch (fetchError) {
-          console.error("[IAP-ERROR] Failed to fetch subscriptions:", fetchError);
-          throw new Error("Unable to fetch subscription details. Please try again.");
-        }
 
-        let offerToken = null;
-        const subscription = subs.find((s: any) =>
-          s.productId === productId ||
-          s.id === productId ||
-          s.productIds?.includes(productId)
-        ) || subs[0];
+          let offerToken = null;
+          const subscription =
+            subs.find(
+              (s: any) =>
+                s.productId === productId ||
+                s.id === productId ||
+                s.productIds?.includes(productId)
+            ) || subs[0];
 
-        if (subscription) {
-          if (subscription.subscriptionOfferDetails?.length > 0) {
-            offerToken = subscription.subscriptionOfferDetails[0].offerToken;
-          } else if (subscription.offerDetails?.length > 0) {
-            offerToken = subscription.offerDetails[0].offerToken;
-          } else if (subscription.subscriptionOffers?.length > 0) {
-            offerToken = subscription.subscriptionOffers[0].offerToken;
+          if (subscription) {
+            if (subscription.subscriptionOfferDetails?.length > 0) {
+              offerToken = subscription.subscriptionOfferDetails[0].offerToken;
+            } else if (subscription.offerDetails?.length > 0) {
+              offerToken = subscription.offerDetails[0].offerToken;
+            } else if (subscription.subscriptionOffers?.length > 0) {
+              offerToken = subscription.subscriptionOffers[0].offerToken;
+            }
           }
-        }
 
-        const requestPayload: any = {
-          request: {
-            android: {
-              skus: [productId],
-              ...(offerToken ? { subscriptionOffers: [{ sku: productId, offerToken }] } : {}),
+          const requestPayload: any = {
+            request: {
+              google: {
+                skus: [productId],
+                ...(offerToken ? { subscriptionOffers: [{ sku: productId, offerToken }] } : {}),
+              },
+              android: {
+                skus: [productId],
+                ...(offerToken ? { subscriptionOffers: [{ sku: productId, offerToken }] } : {}),
+              },
             },
-          },
-          type: "subs",
-        };
+            type: "subs",
+          };
 
-        console.log("[IAP-INFO] Purchase params:", JSON.stringify(requestPayload, null, 2));
-        try {
-          purchase = await RNIap.requestPurchase(requestPayload);
-          console.log("[IAP-SUCCESS] Subscription request successful:", JSON.stringify(purchase, null, 2));
-        } catch (purchaseError: any) {
-          console.error("[IAP-ERROR] Subscription request failed:");
-          console.error("[IAP-ERROR] Error details:", JSON.stringify(purchaseError, null, 2));
-          throw purchaseError;
+          console.log("[IAP-INFO] Purchase params:", JSON.stringify(requestPayload, null, 2));
+          console.log("[IAP-INFO] Calling requestPurchase for subscription payload:", JSON.stringify(requestPayload, null, 2));
+          purchaseResult = await RNIap.requestPurchase(requestPayload);
+          console.log("[IAP-SUCCESS] Subscription request dispatched successfully:", JSON.stringify(purchaseResult, null, 2));
+        } else {
+          console.log("[IAP-INFO] Calling requestPurchase for iOS subscription:", productId);
+          purchaseResult = await RNIap.requestPurchase({
+            request: {
+              apple: { sku: productId },
+              ios: { sku: productId },
+            },
+            type: "subs",
+          });
         }
       } else {
-        purchase = await RNIap.requestPurchase({
+        console.log("[IAP-INFO] Calling requestPurchase for one-time product:", productId);
+        purchaseResult = await RNIap.requestPurchase({
           request: {
+            apple: { sku: productId },
             ios: { sku: productId },
+            google: { skus: [productId] },
+            android: { skus: [productId] },
           },
-          type: "subs",
+          type: "in-app",
         });
       }
-    } else {
-      purchase = await RNIap.requestPurchase({
-        request: {
-          ios: { sku: productId },
-          android: { skus: [productId] },
-        },
-        type: "in-app",
+
+      console.log("[IAP-INFO] requestPurchase returned; waiting for purchase update listener...", {
+        requestResult: purchaseResult,
+        listenerAttached: !!purchaseListener,
       });
+
+      // If requestPurchase returned a completed purchase payload directly (rare, platform dependent)
+      const isValidDirectPurchase =
+        purchaseResult &&
+        (purchaseResult.transactionId ||
+          (purchaseResult.orderId && purchaseResult.purchaseState !== "cancelled"));
+
+      if (isValidDirectPurchase) {
+        console.log("[IAP-INFO] requestPurchase returned purchase object directly:", purchaseResult);
+        clearTimeout(timeoutId);
+        await handlePurchaseUpdate(purchaseResult);
+      }
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      pendingPurchaseResolver = null;
+      pendingPurchaseRejecter = null;
+
+      console.error("[IAP-ERROR] =========================================");
+      console.error("[IAP-ERROR] Purchase initiation failed for product:", productId);
+      console.error("[IAP-ERROR] Full error object:", JSON.stringify(error, null, 2));
+
+      const isCancel =
+        error?.code === "E_USER_CANCELLED" ||
+        error?.message?.toLowerCase().includes("user cancelled") ||
+        error?.message?.toLowerCase().includes("cancelled");
+
+      if (isCancel) {
+        console.log("[IAP-INFO] User cancelled the purchase");
+        reject(new Error("Purchase was cancelled"));
+      } else if (error?.message?.includes("Failed to query product")) {
+        reject(new Error("Unable to connect to payment service. Please check your internet connection and try again."));
+      } else if (error?.message?.includes("Missing purchase request configuration")) {
+        reject(new Error("Purchase failed: Subscription not properly configured in Play Console"));
+      } else {
+        reject(new Error("Purchase failed: " + (error?.message || "Unknown error")));
+      }
     }
-
-    console.log(`${isSubscription ? 'Subscription' : 'One-time purchase'} initiated:`, purchase);
-
-    // Wait for purchase verification to complete (handlePurchaseUpdate will resolve this)
-    return new Promise((resolve, reject) => {
-      pendingPurchaseResolver = resolve;
-      pendingPurchaseRejecter = reject;
-
-      // Timeout after 30 seconds in case verification never completes
-      setTimeout(() => {
-        if (pendingPurchaseRejecter) {
-          pendingPurchaseRejecter(new Error("Purchase verification timeout"));
-          pendingPurchaseResolver = null;
-          pendingPurchaseRejecter = null;
-        }
-      }, 30000);
-    });
-  } catch (error: any) {
-    console.error('[IAP-ERROR] =========================================');
-    console.error('[IAP-ERROR] Purchase failed for product:', productId);
-    console.error('[IAP-ERROR] Full error object:', JSON.stringify(error, null, 2));
-    console.error('[IAP-ERROR] Error code:', (error as any)?.code);
-    console.error('[IAP-ERROR] Error message:', (error as any)?.message);
-    console.error('[IAP-ERROR] Error responseCode:', (error as any)?.responseCode);
-    console.error('[IAP-ERROR] Error platform:', (error as any)?.platform);
-    console.error('[IAP-ERROR] Error productId:', (error as any)?.productId);
-
-    if (error?.code === "E_USER_CANCELLED") {
-      console.log('[IAP-INFO] User cancelled the purchase');
-      throw new Error("Purchase was cancelled");
-    } else if (error?.message?.includes("Failed to query product")) {
-      console.error('[IAP-ERROR] Product query failed during purchase:', error);
-      console.error('[IAP-ERROR] This usually means:');
-      console.error('[IAP-ERROR] 1. App not uploaded to Play Console');
-      console.error('[IAP-ERROR] 2. Wrong product ID in code vs Play Console');
-      console.error('[IAP-ERROR] 3. No license testers configured');
-      throw new Error("Unable to connect to payment service. Please check your internet connection and try again.");
-    } else if (error?.message?.includes("Missing purchase request configuration")) {
-      console.error('[IAP-ERROR] Missing purchase request configuration - this is a v14 API issue');
-      console.error('[IAP-ERROR] Usually means:');
-      console.error('[IAP-ERROR] 1. No base plan configured in Play Console');
-      console.error('[IAP-ERROR] 2. No offers for the base plan');
-      console.error('[IAP-ERROR] 3. Incorrect subscriptionOffers format');
-      throw new Error("Purchase failed: Subscription not properly configured in Play Console");
-    } else {
-      console.error('[IAP-ERROR] Unknown purchase error:', error);
-      throw new Error("Purchase failed: " + (error?.message || "Unknown error"));
-    }
-  }
+  });
 };
 
 /**
@@ -348,12 +384,39 @@ const setupPurchaseListener = () => {
   }
 
   try {
+    if (purchaseListener) {
+      try { purchaseListener.remove(); } catch {}
+      purchaseListener = null;
+    }
+    if (purchaseErrorListener) {
+      try { purchaseErrorListener.remove(); } catch {}
+      purchaseErrorListener = null;
+    }
+
+    console.log("[IAP-INFO] Registering purchase listeners...");
     purchaseListener = RNIap.purchaseUpdatedListener((purchase: any) => {
+      console.log("[IAP-INFO] purchaseUpdatedListener fired with purchase:", JSON.stringify(purchase, null, 2));
       handlePurchaseUpdate(purchase);
     });
 
     purchaseErrorListener = RNIap.purchaseErrorListener((error: any) => {
-      console.error("Purchase error received:", error);
+      console.error("[IAP-ERROR] purchaseErrorListener fired:", error);
+      if (pendingPurchaseRejecter) {
+        const isCancel =
+          error?.code === "E_USER_CANCELLED" ||
+          error?.responseCode === 2 ||
+          error?.message?.toLowerCase().includes("user cancelled") ||
+          error?.message?.toLowerCase().includes("cancelled");
+        if (isCancel) {
+          pendingPurchaseRejecter(new Error("Purchase was cancelled"));
+        } else {
+          pendingPurchaseRejecter(
+            error instanceof Error ? error : new Error(error?.message || "Purchase error")
+          );
+        }
+        pendingPurchaseResolver = null;
+        pendingPurchaseRejecter = null;
+      }
     });
   } catch (error) {
     console.error("Error setting up purchase listener:", error);
@@ -370,6 +433,7 @@ const handlePurchaseUpdate = async (purchase: any) => {
 
   try {
     console.log("Purchase update received:", purchase);
+    const targetProductId = purchase?.productId || purchase?.id || purchase?.sku || '';
 
     // For iOS: transactionId exists
     // For Android: orderId exists and needs acknowledgement
@@ -384,7 +448,7 @@ const handlePurchaseUpdate = async (purchase: any) => {
 
       // Finish the transaction for both platforms
       try {
-        const isConsumable = purchase.productId.includes('daily'); // Daily pass is consumable
+        const isConsumable = targetProductId.includes('daily'); // Daily pass is consumable
         // v14+ API: finishTransaction(purchase, isConsumable, developerPayloadAndroid)
         await RNIap.finishTransaction({ purchase, isConsumable });
       } catch (err) {
@@ -418,7 +482,8 @@ const verifyPurchase = async (purchase: any) => {
   }
 
   try {
-    console.log("Verifying purchase:", purchase.productId);
+    const targetProductId = purchase?.productId || purchase?.id || purchase?.sku || '';
+    console.log("Verifying purchase:", targetProductId);
 
     // Prepare receipt data with base64 encoding for security
     let receiptData: any = {};
@@ -426,22 +491,27 @@ const verifyPurchase = async (purchase: any) => {
     if (Platform.OS === "ios") {
       // For iOS, the transactionReceipt is already base64 encoded
       receiptData = {
-        transactionId: purchase.transactionId,
-        receipt: (purchase as any).transactionReceipt || purchase.transactionId,
-        productId: purchase.productId,
+        transactionId: purchase.transactionId || purchase.id,
+        receipt: (purchase as any).transactionReceipt || purchase.transactionId || purchase.id,
+        productId: targetProductId,
         isIOS: true,
         isAndroid: false,
       };
     } else {
       // For Android, base64 encode the originalJson for security
-      const originalJson = (purchase as any).originalJson;
-      const base64Receipt = btoa(unescape(encodeURIComponent(originalJson)));
+      const originalJson = (purchase as any).originalJson || '{}';
+      let base64Receipt = '';
+      try {
+        base64Receipt = btoa(unescape(encodeURIComponent(originalJson)));
+      } catch {
+        base64Receipt = originalJson;
+      }
 
       receiptData = {
         originalJson: base64Receipt, // Base64 encoded
         signature: (purchase as any).signature,
         purchaseToken: purchase.purchaseToken || (purchase as any).token,
-        productId: purchase.productId,
+        productId: targetProductId,
         isIOS: false,
         isAndroid: true,
       };
@@ -450,7 +520,7 @@ const verifyPurchase = async (purchase: any) => {
     // Call backend to verify receipt and fail explicitly if the backend rejects the receipt.
     const verificationResult = await verifyIapReceipt(
       JSON.stringify(receiptData),
-      purchase.productId,
+      targetProductId,
     );
 
     if (!verificationResult.success) {

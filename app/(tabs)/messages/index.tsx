@@ -643,8 +643,8 @@ const MessagesScreen = () => {
       isSubscriptionLoading ||
       messageCountLoading ||
       (isLoading && !isRefreshing),
-    shouldShowSubscriptionPrompt: !canSend && remainingFreeMessages <= 0,
-    shouldShowFreeMessageLimit: !canSend && remainingFreeMessages <= 0,
+    shouldShowSubscriptionPrompt: !canSend && (typeof remainingFreeMessages === 'number' && remainingFreeMessages <= 0),
+    shouldShowFreeMessageLimit: !canSend && (typeof remainingFreeMessages === 'number' && remainingFreeMessages <= 0),
     shouldShowConversations:
       (subscription && canSend) || (!subscription && canSend),
   });
@@ -704,13 +704,13 @@ const MessagesScreen = () => {
    * If the user does not have an active subscription, show a prominent
    * message with a button that opens the in-app subscription screen.
    */
-  if (!canSend && remainingFreeMessages <= 0) {
+  if (!canSend && (typeof remainingFreeMessages === 'number' && remainingFreeMessages <= 0)) {
     console.log(
       "[MessagesScreen] DECISION: Showing subscription prompt - conditions:",
       {
         subscription: !!subscription,
         requiresSubscription,
-        condition: !canSend && remainingFreeMessages <= 0,
+        condition: !canSend && (typeof remainingFreeMessages === 'number' && remainingFreeMessages <= 0),
         canSend,
         remainingFreeMessages,
       },

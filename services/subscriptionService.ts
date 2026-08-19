@@ -168,10 +168,30 @@ export const verifyIapReceipt = async (
       // If not JSON, treat as raw receipt string
     }
 
+    const isDaily = (productId || "").includes("daily");
+    const planIdNumeric = isDaily ? 1 : 2;
+    const planTypeName = isDaily ? "daily" : "monthly";
+
+    const transactionId =
+      typeof receiptPayload === "object"
+        ? (receiptPayload.transactionId || receiptPayload.receipt || receiptPayload.id)
+        : receiptPayload;
+
     const requestBody = {
       receipt: receiptPayload,
+      receiptData: typeof receiptData === "string" ? receiptData : JSON.stringify(receiptData),
+      transactionId,
       productId,
+      plan: planIdNumeric,
+      plan_id: planIdNumeric,
+      planId: planIdNumeric,
+      subscription_plan_id: planIdNumeric,
+      subscriptionPlanId: planIdNumeric,
+      plan_type: planTypeName,
+      planType: planTypeName,
       platform: Platform.OS,
+      isIOS: Platform.OS === "ios",
+      isAndroid: Platform.OS === "android",
     };
     const verifyUrl = getApiUrl("payments/verify-iap");
 
@@ -183,10 +203,23 @@ export const verifyIapReceipt = async (
       payload: requestBody,
     });
 
+    console.log("[VerifyIAP] about to fetch backend verification endpoint", {
+      url: verifyUrl,
+      method: "POST",
+      productId,
+      platform: Platform.OS,
+    });
+
     const response = await fetch(verifyUrl, {
       method: "POST",
       headers,
       body: JSON.stringify(requestBody),
+    });
+
+    console.log("[VerifyIAP] fetch returned from backend", {
+      status: response.status,
+      ok: response.ok,
+      url: verifyUrl,
     });
 
     const responseText = await response.text();

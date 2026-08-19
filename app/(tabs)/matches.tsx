@@ -81,16 +81,7 @@ export default function MatchesScreen() {
   const renderMatchItem = ({ item }: { item: Match }) => (
     <TouchableOpacity
       style={styles.matchCard}
-      onPress={() => router.push({
-        pathname: "/(tabs)/messages/[id]" as any,
-        params: {
-          id: item.id,
-          recipientName: item.name,
-          recipientId: String(item.id),
-          userName: item.name,
-          userAvatar: item.photos && item.photos.length > 0 ? item.photos[0] : undefined,
-        },
-      })}
+      onPress={() => router.push(`/user/${item.id}` as any)}
     >
       <Image
         source={{

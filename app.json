@@ -50,9 +50,9 @@
           "image": "./assets/images/LandingLogo.png",
           "imageWidth": 100,
           "resizeMode": "contain",
-          "backgroundColor": "#000000",
+          "backgroundColor": "#651B55",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#651B55"
           }
         }
       ],
